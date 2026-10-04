@@ -21,6 +21,11 @@
  * @property {string[]} allergens       Identifiants parmi les 14 allergenes
  * @property {IngredientConversion[]} conversions
  * @property {boolean} [notPurchased]   Vrai pour l'eau du robinet : jamais dans la liste de courses
+ * @property {DietCategory[]} [categories]  Origine animale, pour les regimes (vide = vegetal)
+ */
+
+/**
+ * @typedef {'meat' | 'poultry' | 'pork' | 'fish' | 'shellfish' | 'dairy' | 'egg' | 'honey' | 'gelatin' | 'animal_rennet'} DietCategory
  */
 
 /**

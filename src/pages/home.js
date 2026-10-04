@@ -1,6 +1,7 @@
 import { formatDayLong } from '../utils/format.js';
 import { escapeHtml } from '../utils/html.js';
 import { exportData, isReminderDue } from '../services/backupService.js';
+import { getHousehold } from '../services/householdService.js';
 
 /**
  * Ecran Accueil.
@@ -8,7 +9,7 @@ import { exportData, isReminderDue } from '../services/backupService.js';
  */
 export async function renderHome(el) {
   const today = formatDayLong(new Date());
-  const reminder = await isReminderDue();
+  const [reminder, household] = await Promise.all([isReminderDue(), getHousehold()]);
 
   el.innerHTML = `
     <section class="today">
@@ -16,6 +17,15 @@ export async function renderHome(el) {
       <p class="today__empty">Aucun repas prévu aujourd'hui.</p>
       <p class="hint">Le planning de la semaine arrive dans une prochaine version.</p>
     </section>
+    ${
+      household.members.length === 0
+        ? `<section class="notice" aria-labelledby="household-title">
+            <h2 id="household-title">Présentez votre foyer</h2>
+            <p>Indiquez qui mange à la maison, les allergies et les régimes : MealDom ne proposera que des recettes qui conviennent à tout le monde.</p>
+            <a class="button" href="#/foyer">Présenter mon foyer</a>
+          </section>`
+        : ''
+    }
     ${
       reminder
         ? `<section class="notice" aria-labelledby="backup-title">

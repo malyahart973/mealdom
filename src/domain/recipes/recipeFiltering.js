@@ -3,7 +3,7 @@
  * Sert a la recherche et, plus tard, aux suggestions compatibles avec le foyer.
  */
 import { normalizeText } from '../ingredients/ingredients.js';
-import { checkRecipeAllergens, isFeasibleWithEquipment } from './recipes.js';
+import { evaluateRecipeForHousehold } from '../household/compatibility.js';
 
 /** @typedef {import('./recipes.js').Recipe} Recipe */
 /** @typedef {import('./recipes.js').Preparation} Preparation */
@@ -13,8 +13,8 @@ import { checkRecipeAllergens, isFeasibleWithEquipment } from './recipes.js';
  * @typedef {Object} RecipeFilter
  * @property {string} [query]                 Texte recherche (nom, cuisine, ingredient)
  * @property {boolean} [vesselOnly]           Seulement One Pot / One Pan / One Tray
- * @property {string[]} [forbiddenAllergens]  Allergies du foyer
- * @property {string[] | null} [equipment]    Equipement du foyer (null = non renseigne)
+ * @property {import('../household/household.js').Household | null} [household]
+ *   Si fourni : seules les recettes qui conviennent a tout le foyer sont gardees
  */
 
 /**
@@ -39,8 +39,7 @@ function searchableText(recipe, ctx) {
 
 /**
  * Applique les filtres. Seules les recettes "validated" sont proposees.
- * Une recette dont les allergenes ne peuvent pas etre verifies est exclue
- * des qu'une allergie est declaree.
+ * Avec un foyer, une recette impossible a verifier ("unknown") est exclue.
  * @param {Recipe[]} recipes
  * @param {RecipeFilter} filter
  * @param {FilterContext} ctx
@@ -48,16 +47,13 @@ function searchableText(recipe, ctx) {
  */
 export function filterRecipes(recipes, filter, ctx) {
   const words = normalizeText(filter.query ?? '').split(' ').filter(Boolean);
-  const forbidden = filter.forbiddenAllergens ?? [];
 
   return recipes.filter((recipe) => {
     if (recipe.status !== 'validated') return false;
     if (filter.vesselOnly && !recipe.vessel) return false;
-    if (forbidden.length > 0) {
-      const check = checkRecipeAllergens(recipe, forbidden, ctx.preparations, ctx.ingredients);
-      if (check.status !== 'compatible') return false;
+    if (filter.household && evaluateRecipeForHousehold(recipe, filter.household, ctx).status !== 'compatible') {
+      return false;
     }
-    if (filter.equipment && !isFeasibleWithEquipment(recipe, filter.equipment, ctx.preparations)) return false;
     if (words.length > 0) {
       const text = searchableText(recipe, ctx);
       if (!words.every((w) => text.includes(w))) return false;

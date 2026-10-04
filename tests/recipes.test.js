@@ -5,7 +5,6 @@ import {
   findSharedPreparations,
   compatibleMethods,
   isFeasibleWithEquipment,
-  checkRecipeAllergens,
   recipeAllergens,
   allIngredientIds,
 } from '../src/domain/recipes/recipes.js';
@@ -106,11 +105,12 @@ test('Les allergènes des préparations sont pris en compte', () => {
 });
 test('Riz sauté : œufs, soja et gluten détectés', () =>
   assertEqual(recipeAllergens(recipe('vegetable_fried_rice'), preparations, ingredients), { allergens: ['eggs', 'gluten', 'soy'], complete: true }));
-test('Colombo : moutarde détectée (poudre à colombo)', () =>
-  assertEqual(checkRecipeAllergens(recipe('chicken_colombo'), ['mustard'], preparations, ingredients).status, 'incompatible'));
-test('Préparation inconnue : allergènes jamais garantis', () => {
+test('Colombo : moutarde détectée (poudre à colombo)', () => {
+  if (!recipeAllergens(recipe('chicken_colombo'), preparations, ingredients).allergens.includes('mustard')) throw new Error('absente');
+});
+test('Préparation inconnue : liste des allergènes déclarée incomplète', () => {
   const r = variant({ preparations: [{ preparationId: 'inconnue', quantity: 1, unit: 'g' }] });
-  assertEqual(checkRecipeAllergens(r, ['milk'], preparations, ingredients).status, 'unknown');
+  assertEqual(recipeAllergens(r, preparations, ingredients).complete, false);
 });
 
 // --- Équipement ---
@@ -127,17 +127,8 @@ test('Recherche par cuisine sans accents : « italienne »', () =>
 test('Filtre « un seul récipient » : toutes les recettes affichées en ont un', () => {
   for (const r of filterRecipes(RECIPES, { vesselOnly: true }, ctx)) if (!r.vessel) throw new Error(r.id);
 });
-test('Allergie au gluten : pâtes et riz sauté exclus', () => {
-  const ids = filterRecipes(RECIPES, { forbiddenAllergens: ['gluten'] }, ctx).map((r) => r.id);
-  if (ids.includes('one_pot_pasta_tomato_basil') || ids.includes('vegetable_fried_rice')) throw new Error(ids.join(','));
-  if (!ids.includes('red_lentil_dal')) throw new Error('dal exclu à tort');
-});
 test('Chili + riz avec seulement un autocuiseur : irréalisable (le riz demande des plaques)', () =>
   assertEqual(isFeasibleWithEquipment(recipe('chili_con_carne'), ['pressure_cooker'], preparations), false));
-test('Équipement : sans plaques, aucune recette actuelle n’est proposée', () =>
-  assertEqual(filterRecipes(RECIPES, { equipment: ['pressure_cooker', 'oven'] }, ctx).length, 0));
-test('Équipement : avec des plaques, toutes les recettes sont proposées', () =>
-  assertEqual(filterRecipes(RECIPES, { equipment: ['stovetop'] }, ctx).length, RECIPES.length));
 test('Recette non validée jamais proposée', () => {
   const draft = variant({ id: 'brouillon', status: 'draft' });
   assertEqual(filterRecipes([draft], {}, ctx).length, 0);

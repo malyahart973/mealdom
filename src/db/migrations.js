@@ -9,9 +9,13 @@
 
 /** @type {Migration[]} */
 export const migrations = [
-  // v1 : reglages de l'application (cle -> valeur)
+  // v1 (0.1.0) : reglages de l'application (cle -> valeur)
   (db) => {
     db.createObjectStore('settings', { keyPath: 'key' });
+  },
+  // v2 (0.4.0) : foyer (un seul enregistrement, id "main")
+  (db) => {
+    db.createObjectStore('household', { keyPath: 'id' });
   },
 ];
 

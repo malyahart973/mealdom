@@ -11,11 +11,44 @@ import {
   totalMinutes,
 } from '../domain/recipes/recipes.js';
 import { recipes, recipesById, preparationsById, ingredientsById, cuisineLabels } from '../services/catalog.js';
+import { getHousehold } from '../services/householdService.js';
+import { evaluateRecipeForHousehold } from '../domain/household/compatibility.js';
+import { DIETS } from '../domain/household/household.js';
 
 /** @typedef {import('../domain/recipes/recipes.js').IngredientLine} IngredientLine */
 /** @typedef {import('../domain/recipes/recipes.js').CookingMethod} CookingMethod */
 
 const allergenLabels = new Map(ALLERGENS.map((a) => [a.id, a.label]));
+const dietLabels = new Map(DIETS.map((d) => [d.id, d.label.toLowerCase()]));
+
+/**
+ * "Léa", "Léa et Marc", "Léa, Marc et Sam"
+ * @param {string[]} names
+ * @returns {string}
+ */
+function joinNames(names) {
+  return names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} et ${names[names.length - 1]}`;
+}
+
+/**
+ * Phrase expliquant pourquoi la recette ne convient pas.
+ * @param {import('../domain/household/compatibility.js').IncompatibilityReason} reason
+ * @returns {string}
+ */
+function reasonText(reason) {
+  switch (reason.type) {
+    case 'allergen':
+      return `Contient : ${(allergenLabels.get(reason.allergen) ?? reason.allergen).toLowerCase()}. Allergie de ${joinNames(reason.members)}.`;
+    case 'diet':
+      return `Ne respecte pas le régime ${dietLabels.get(reason.diet) ?? reason.diet} de ${joinNames(reason.members)}.`;
+    case 'dislike':
+      return `Contient ${ingredientsById.get(reason.ingredientId)?.name ?? reason.ingredientId}, refusé par ${joinNames(reason.members)}.`;
+    case 'equipment':
+      return 'Demande un matériel qui n’est pas coché dans votre foyer.';
+    case 'unknown_ingredient':
+      return 'Un ingrédient n’a pas pu être vérifié.';
+  }
+}
 
 /**
  * @param {IngredientLine[]} lines
@@ -52,12 +85,23 @@ function methodsHtml(methods, level) {
  * @param {HTMLElement} el
  * @param {Record<string, string>} params
  */
-export function renderRecipe(el, params) {
+export async function renderRecipe(el, params) {
   const recipe = recipesById.get(params.id ?? '');
   if (!recipe) {
     el.innerHTML = `<p>Cette recette n’existe pas ou a été retirée.</p><p><a href="#/recettes">Voir toutes les recettes</a></p>`;
     return;
   }
+
+  const household = await getHousehold();
+  const fit = evaluateRecipeForHousehold(recipe, household, { ingredients: ingredientsById, preparations: preparationsById });
+  const fitHtml =
+    fit.status === 'compatible'
+      ? household.members.length
+        ? '<div class="fit fit--ok"><p><strong>Convient à tout le foyer.</strong></p></div>'
+        : ''
+      : `<div class="fit fit--ko"><p><strong>${
+          fit.status === 'unknown' ? 'Compatibilité impossible à vérifier' : 'Ne convient pas à votre foyer'
+        }</strong></p><ul>${fit.reasons.map((r) => `<li>${escapeHtml(reasonText(r))}</li>`).join('')}</ul></div>`;
 
   const shared = findSharedPreparations(recipes);
   const { allergens, complete } = recipeAllergens(recipe, preparationsById, ingredientsById);
@@ -106,6 +150,7 @@ export function renderRecipe(el, params) {
         ${recipe.vessel ? `<div><dt>Vaisselle</dt><dd>${escapeHtml(VESSEL_LABELS[recipe.vessel])}</dd></div>` : ''}
       </dl>
 
+      ${fitHtml}
       <div class="allergens" role="note">
         <p><strong>${escapeHtml(allergenText)}</strong></p>
         <p class="hint">${escapeHtml(PRODUCT_LABEL_WARNING)}</p>

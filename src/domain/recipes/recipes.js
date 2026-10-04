@@ -2,10 +2,8 @@
  * Modele des recettes et des preparations (RM-16 a RM-19), et regles associees.
  */
 import { getUnit } from '../units/units.js';
-import { checkAllergens } from '../ingredients/ingredients.js';
 
 /** @typedef {import('../ingredients/ingredients.js').Ingredient} Ingredient */
-/** @typedef {import('../ingredients/ingredients.js').AllergenCheck} AllergenCheck */
 
 /**
  * Ligne d'ingredient. quantity est null pour une quantite qualitative ("au goût").
@@ -94,18 +92,6 @@ export function allIngredientIds(recipe, preparations) {
     else ids.add(`preparation:${line.preparationId}`); // inconnue -> verification "unknown"
   }
   return [...ids];
-}
-
-/**
- * Verifie qu'une recette ne contient aucun allergene interdit (ingredients + preparations).
- * @param {Recipe} recipe
- * @param {string[]} forbidden
- * @param {Map<string, Preparation>} preparations
- * @param {Map<string, Ingredient>} ingredients
- * @returns {AllergenCheck}
- */
-export function checkRecipeAllergens(recipe, forbidden, preparations, ingredients) {
-  return checkAllergens(allIngredientIds(recipe, preparations), forbidden, ingredients);
 }
 
 /**

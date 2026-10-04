@@ -4,6 +4,8 @@ import { renderMore } from './pages/more.js';
 import { renderSettings } from './pages/settings.js';
 import { renderRecipes } from './pages/recipes.js';
 import { renderRecipe } from './pages/recipe.js';
+import { renderHousehold } from './pages/household.js';
+import { renderMember } from './pages/member.js';
 
 /**
  * @typedef {Object} Route
@@ -56,6 +58,8 @@ const routes = [
     render: (el) =>
       renderPlaceholder(el, { title: 'Budget', text: 'Le budget prévu, les dépenses réellement payées et ce qu’il reste.' }),
   },
+  { pattern: /^\/foyer$/, title: 'Mon foyer', tab: '/plus', render: renderHousehold },
+  { pattern: /^\/foyer\/personne\/(?<id>[^/]+)$/, title: 'Personne du foyer', tab: '/plus', render: renderMember },
   { pattern: /^\/parametres$/, title: 'Paramètres', tab: '/plus', render: renderSettings },
 ];
 
