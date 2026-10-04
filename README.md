@@ -28,6 +28,10 @@ src/
   pages/              Écrans (affichage uniquement)
   services/           Liens entre écrans, données et navigateur
   domain/             Règles métier (calculs purs, testés)
+    units/            Unités et conversions universelles
+    ingredients/      Ingrédients, 14 allergènes, conversions propres à un aliment
+    portions/         Portions adulte/enfant, arrondi, dîner + déjeuner du lendemain
+  data/               Données de référence (ingrédients, coefficients de portions)
   db/                 Base locale et accès aux données
   utils/              Petits outils communs
   styles/main.css     Style
@@ -49,4 +53,5 @@ tests/                Tests des règles métier (ouvrir tests/index.html)
 
 ## Historique
 
+- **0.2.0** — Unités et conversions, ingrédients normalisés, 14 allergènes, calcul des portions.
 - **0.1.0** — Fondation : structure, navigation, mode hors ligne, installation, base locale, export des données, rappel de sauvegarde.

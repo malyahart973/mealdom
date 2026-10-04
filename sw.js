@@ -28,6 +28,13 @@ const APP_FILES = [
   './src/db/migrations.js',
   './src/db/repositories/settingsRepository.js',
   './src/domain/backup/backup.js',
+  './src/domain/units/units.js',
+  './src/domain/ingredients/allergens.js',
+  './src/domain/ingredients/ingredients.js',
+  './src/domain/ingredients/conversion.js',
+  './src/domain/portions/portions.js',
+  './src/data/ingredients.js',
+  './src/data/portionRules.js',
   './src/utils/html.js',
   './src/utils/format.js',
 ];

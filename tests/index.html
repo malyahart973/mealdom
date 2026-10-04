@@ -19,6 +19,9 @@
       import { runTests } from './runner.js';
       // Ajouter ici chaque nouveau fichier de tests :
       import './backup.test.js';
+      import './units.test.js';
+      import './ingredients.test.js';
+      import './portions.test.js';
 
       const results = await runTests();
       const failed = results.filter((r) => !r.ok);
