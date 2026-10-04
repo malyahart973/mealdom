@@ -81,7 +81,6 @@ export async function renderMeal(el, params) {
 
   el.innerHTML = `
     <section>
-      <p><a href="#/planning/semaine/${escapeHtml(meal.date)}" class="back">Planning</a></p>
       <h1 class="page-title">${existing ? 'Modifier le repas' : 'Ajouter un repas'}</h1>
       ${locked ? '<p class="notice-inline">Ce repas est verrouillé. Décochez « Verrouiller ce repas » et enregistrez pour pouvoir le modifier.</p>' : ''}
       <div class="alert" role="alert" hidden></div>
@@ -221,7 +220,7 @@ export async function renderMeal(el, params) {
       alertBox.scrollIntoView({ block: 'center' });
       return;
     }
-    window.location.hash = `#/planning/semaine/${draft.date}`;
+    window.location.replace(`#/planning/semaine/${draft.date}`);
   });
 
   el.querySelector('[data-action="delete"]')?.addEventListener('click', async () => {
@@ -232,7 +231,7 @@ export async function renderMeal(el, params) {
       alertBox.textContent = error;
       return;
     }
-    window.location.hash = `#/planning/semaine/${meal.date}`;
+    window.location.replace(`#/planning/semaine/${meal.date}`);
   });
 
   renderRecipeChoices();

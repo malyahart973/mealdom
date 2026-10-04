@@ -110,6 +110,38 @@ a {
   }
 }
 
+.topbar__start {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.topbar__back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  margin-left: calc(-1 * var(--space-2));
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.14);
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.topbar__back[hidden] {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .topbar__back {
+    background: var(--leaf-soft);
+  }
+}
+
 .brand {
   font-weight: 800;
   font-size: 1.125rem;
@@ -378,14 +410,6 @@ a {
   color: var(--leaf);
   font-size: 0.8125rem;
   font-weight: 700;
-}
-
-.back {
-  font-weight: 600;
-}
-
-.back::before {
-  content: "‹ ";
 }
 
 .recipe__facts {
@@ -835,7 +859,9 @@ a.button {
 
 .field input[type="date"],
 .field input[type="search"],
-.field select {
+.field select,
+.when input,
+.when select {
   width: 100%;
   min-height: 3rem;
   padding: 0 var(--space-3);
@@ -973,6 +999,126 @@ a.button {
   margin: var(--space-2) 0;
   padding-left: 1.1rem;
   font-size: 0.9375rem;
+}
+
+/* ---------- Courses et stock ---------- */
+
+.shop,
+.stock {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.shop li,
+.stock li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.shop__item {
+  flex: 1;
+  min-width: 12rem;
+  align-items: flex-start;
+}
+
+.shop__item input {
+  margin-top: 0.2rem;
+}
+
+.shop__item input:checked + span {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.shop__qty {
+  display: block;
+  color: var(--leaf);
+  font-weight: 700;
+}
+
+.shop__item .hint {
+  display: block;
+  font-size: 0.8125rem;
+}
+
+.shop__pkg {
+  padding: var(--space-2) 0 var(--space-2) 2rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.icon-button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: 1.375rem;
+  cursor: pointer;
+}
+
+.covered {
+  margin: var(--space-6) 0 var(--space-4);
+}
+
+.stock__name {
+  flex: 1;
+  font-weight: 700;
+}
+
+.stock__qty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stock__qty input {
+  width: 5rem;
+  min-height: 2.75rem;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: right;
+}
+
+.stock__plan {
+  flex-basis: 100%;
+  font-size: 0.8125rem;
+}
+
+.stock-form {
+  margin: var(--space-4) 0 var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+}
+
+.stock-form .field {
+  margin-bottom: var(--space-3);
+}
+
+.stock-form input,
+.stock-form select {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
 }
 
 /* ---------- Barre de navigation du bas ---------- */

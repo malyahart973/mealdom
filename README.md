@@ -11,7 +11,7 @@ Fonctionne sans compte et sans Internet. Les données restent sur l'appareil.
 - Vérification stricte du code par VS Code (`jsconfig.json`, typage JSDoc).
 - Données locales : IndexedDB (`src/db/`), avec migrations versionnées.
 - Hors ligne : service worker (`sw.js`).
-- Publication : Netlify publie le dépôt GitHub tel quel (`netlify.toml`).
+- Publication : n'importe quel hébergeur de site statique en HTTPS (Netlify, Cloudflare Pages...). Les en-têtes de cache sont dans `_headers`.
 
 ## Organisation
 
@@ -35,6 +35,7 @@ src/
     household/        Foyer, membres, régimes, compatibilité recette / foyer
     planning/         Dates, planning manuel, portions par repas, restes, verrouillage
     batchCooking/     Préparations de la semaine, quantités totales, ordre et durée de la session
+    shopping/         Besoins de la semaine, agrégation, stock, conditionnements, liste de courses
   data/               Données de référence (ingrédients, cuisines, préparations, recettes, portions)
   db/                 Base locale et accès aux données
   utils/              Petits outils communs
@@ -57,6 +58,7 @@ tests/                Tests des règles métier (ouvrir tests/index.html)
 
 ## Historique
 
+- **0.7.0** — Stock, liste de courses de la semaine (agrégation, déduction du stock, conditionnements, rayons, cases à cocher hors ligne, articles ajoutés à la main). Bouton Retour dans la barre du haut. Base v4.
 - **0.6.0** — Batch cooking de la semaine (préparations partagées, quantités, ordre, cuissons en parallèle). 2 préparations et 2 recettes ajoutées. Vérification des mises à jour au retour dans l'application.
 - **0.5.0** — Planning manuel de la semaine : ajout, modification, déplacement, verrouillage, invités, dîner qui sert au déjeuner du lendemain. Repas du jour sur l'accueil. Base v3.
 - **0.4.0** — Foyer : personnes, allergies, régimes, aliments refusés, équipement, portion enfant, objectifs. Recettes adaptées au foyer. Base v2.

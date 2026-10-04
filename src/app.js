@@ -29,7 +29,7 @@ function watchConnection() {
 
 function start() {
   watchConnection();
-  startRouter(requireElement('view'), requireElement('tabbar'));
+  startRouter(requireElement('view'), requireElement('tabbar'), /** @type {HTMLButtonElement} */ (requireElement('back-button')));
   requestPersistentStorage();
 
   const banner = requireElement('update-banner');

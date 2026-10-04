@@ -6,7 +6,7 @@ import { test, assertEqual } from './runner.js';
 import { migrations } from '../src/db/migrations.js';
 
 const hasIndexedDb = typeof indexedDB !== 'undefined';
-const ALL_STORES = ['household', 'meals', 'settings'];
+const ALL_STORES = ['household', 'inventory', 'meals', 'packages', 'settings', 'shoppingLists'];
 
 /**
  * @template T
@@ -66,6 +66,19 @@ if (hasIndexedDb) {
     assertEqual(household.members[0].name, 'Léa');
     assertEqual([...v3.transaction('meals').objectStore('meals').indexNames], ['date']);
     v3.close();
+    await done(indexedDB.deleteDatabase(name));
+  });
+
+  test('Migration v3 -> v4 : les repas sont conservés, stock et courses ajoutés', async () => {
+    const name = `mealdom-test-v3-${Date.now()}`;
+    const v3 = await openDatabaseWith(name, migrations.slice(0, 3));
+    await write(v3, 'meals', { id: 'm1', date: '2026-10-05', slot: 'dinner' });
+    v3.close();
+
+    const v4 = await openDatabaseWith(name, migrations.slice(0, 4));
+    assertEqual(await done(v4.transaction('meals').objectStore('meals').get('m1')), { id: 'm1', date: '2026-10-05', slot: 'dinner' });
+    assertEqual([...v4.objectStoreNames].sort(), ALL_STORES);
+    v4.close();
     await done(indexedDB.deleteDatabase(name));
   });
 

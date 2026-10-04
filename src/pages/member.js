@@ -37,7 +37,6 @@ export async function renderMember(el, params) {
 
   el.innerHTML = `
     <section>
-      <p><a href="#/foyer" class="back">Mon foyer</a></p>
       <h1 class="page-title">${isNew ? 'Ajouter une personne' : escapeHtml(member.name)}</h1>
       <div class="alert" role="alert" hidden></div>
       <form data-form="member" novalidate>
@@ -160,13 +159,13 @@ export async function renderMember(el, params) {
       alertBox.scrollIntoView({ block: 'center' });
       return;
     }
-    window.location.hash = '#/foyer';
+    window.location.replace('#/foyer');
   });
 
   el.querySelector('[data-action="delete"]')?.addEventListener('click', async () => {
     if (!window.confirm(`Retirer ${member.name} du foyer ?`)) return;
     await deleteMember(member.id);
-    window.location.hash = '#/foyer';
+    window.location.replace('#/foyer');
   });
 
   renderDislikes();

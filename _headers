@@ -1,0 +1,8 @@
+# En-tetes HTTP, compris par Netlify ET Cloudflare Pages.
+# Le service worker et la version ne doivent jamais rester en cache,
+# sinon les telephones ne verraient pas les mises a jour.
+/sw.js
+  Cache-Control: no-cache
+
+/src/version.js
+  Cache-Control: no-cache

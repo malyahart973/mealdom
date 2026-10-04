@@ -67,7 +67,6 @@ export async function renderBatch(el, params) {
 
   el.innerHTML = `
     <section>
-      <p><a href="#/planning/semaine/${monday}" class="back">Planning</a></p>
       <h1 class="page-title">Batch cooking</h1>
       <nav class="week-nav" aria-label="Changer de semaine">
         <a href="#/batch/semaine/${addDays(monday, -7)}" aria-label="Semaine précédente">‹</a>

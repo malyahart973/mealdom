@@ -22,6 +22,12 @@ export const migrations = [
     const store = db.createObjectStore('meals', { keyPath: 'id' });
     store.createIndex('date', 'date');
   },
+  // v4 (0.7.0) : stock, conditionnements habituels, listes de courses (une par semaine)
+  (db) => {
+    db.createObjectStore('inventory', { keyPath: 'id' });
+    db.createObjectStore('packages', { keyPath: 'ingredientId' });
+    db.createObjectStore('shoppingLists', { keyPath: 'week' });
+  },
 ];
 
 /** Version actuelle du schema de la base. */

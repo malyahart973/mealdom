@@ -22,7 +22,24 @@
  * @property {IngredientConversion[]} conversions
  * @property {boolean} [notPurchased]   Vrai pour l'eau du robinet : jamais dans la liste de courses
  * @property {DietCategory[]} [categories]  Origine animale, pour les regimes (vide = vegetal)
+ * @property {Aisle} [aisle]              Rayon du magasin, pour classer la liste de courses
  */
+
+/**
+ * @typedef {'fruits_vegetables' | 'meat_fish' | 'dairy_eggs' | 'grocery' | 'spices' | 'frozen' | 'bakery' | 'other'} Aisle
+ */
+
+/** Rayons, dans l'ordre habituel d'un magasin. @type {{ id: Aisle, label: string }[]} */
+export const AISLES = [
+  { id: 'fruits_vegetables', label: 'Fruits et légumes' },
+  { id: 'bakery', label: 'Pain et boulangerie' },
+  { id: 'meat_fish', label: 'Viandes et poissons' },
+  { id: 'dairy_eggs', label: 'Crèmerie et œufs' },
+  { id: 'grocery', label: 'Épicerie' },
+  { id: 'spices', label: 'Épices et condiments' },
+  { id: 'frozen', label: 'Surgelés' },
+  { id: 'other', label: 'Autres' },
+]
 
 /**
  * @typedef {'meat' | 'poultry' | 'pork' | 'fish' | 'shellfish' | 'dairy' | 'egg' | 'honey' | 'gelatin' | 'animal_rennet'} DietCategory

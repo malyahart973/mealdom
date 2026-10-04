@@ -1,24 +1,21 @@
-import { openDatabase, promisify } from '../database.js';
+import { objectStore } from './storeHelpers.js';
 
 /** @typedef {import('../../domain/household/household.js').Household} Household */
 
-const STORE = 'household';
+const household = objectStore('household');
 
 /**
  * Le foyer enregistre, ou null s'il n'a jamais ete cree.
  * @returns {Promise<Household | null>}
  */
 export async function loadHouseholdRecord() {
-  const db = await openDatabase();
-  const record = await promisify(db.transaction(STORE).objectStore(STORE).get('main'));
-  return record ? /** @type {Household} */ (record) : null;
+  return (await household.get('main')) ?? null;
 }
 
 /**
- * @param {Household} household
+ * @param {Household} value
  * @returns {Promise<void>}
  */
-export async function saveHouseholdRecord(household) {
-  const db = await openDatabase();
-  await promisify(db.transaction(STORE, 'readwrite').objectStore(STORE).put(household));
+export function saveHouseholdRecord(value) {
+  return household.put(value);
 }

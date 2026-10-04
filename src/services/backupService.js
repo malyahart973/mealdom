@@ -3,6 +3,7 @@ import { buildExport, exportFileName, isBackupReminderDue } from '../domain/back
 import { getAllSettings, getSetting, setSetting } from '../db/repositories/settingsRepository.js';
 import { loadHouseholdRecord } from '../db/repositories/householdRepository.js';
 import { getAllMeals } from '../db/repositories/mealRepository.js';
+import { getInventory, getPackages, getShoppingLists } from '../db/repositories/shoppingRepository.js';
 
 const LAST_EXPORT_KEY = 'lastExportAt';
 
@@ -26,11 +27,18 @@ export async function isReminderDue() {
  */
 export async function exportData() {
   const now = new Date();
-  const [settings, household, meals] = await Promise.all([getAllSettings(), loadHouseholdRecord(), getAllMeals()]);
+  const [settings, household, meals, inventory, packages, shoppingLists] = await Promise.all([
+    getAllSettings(),
+    loadHouseholdRecord(),
+    getAllMeals(),
+    getInventory(),
+    getPackages(),
+    getShoppingLists(),
+  ]);
   const file = buildExport({
     schemaVersion: SCHEMA_VERSION,
     applicationVersion: APP_VERSION,
-    data: { settings, household, meals },
+    data: { settings, household, meals, inventory, packages, shoppingLists },
     now,
   });
   const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });

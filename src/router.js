@@ -9,6 +9,9 @@ import { renderMember } from './pages/member.js';
 import { renderPlanning } from './pages/planning.js';
 import { renderMeal } from './pages/meal.js';
 import { renderBatch } from './pages/batch.js';
+import { renderShopping } from './pages/shopping.js';
+import { renderPackage } from './pages/package.js';
+import { renderStock } from './pages/stock.js';
 
 /**
  * @typedef {Object} Route
@@ -16,6 +19,9 @@ import { renderBatch } from './pages/batch.js';
  * @property {string} title       Titre de l'onglet du navigateur
  * @property {string} tab         Onglet de la barre du bas a mettre en avant
  * @property {(el: HTMLElement, params: Record<string, string>) => void | Promise<void>} render
+ * @property {(params: Record<string, string>) => string} [parent]
+ *   Ecran "au-dessus" : affiche le bouton Retour (utile dans l'application installee,
+ *   qui n'a pas de bouton retour du navigateur)
  */
 
 /** @type {Route[]} */
@@ -28,43 +34,47 @@ const routes = [
     title: 'Ajouter un repas',
     tab: '/planning',
     render: renderMeal,
+    parent: (p) => `/planning/semaine/${p.date}`,
   },
-  { pattern: /^\/planning\/repas\/(?<id>[^/]+)$/, title: 'Repas', tab: '/planning', render: renderMeal },
-  { pattern: /^\/batch$/, title: 'Batch cooking', tab: '/planning', render: renderBatch },
-  { pattern: /^\/batch\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/, title: 'Batch cooking', tab: '/planning', render: renderBatch },
-  { pattern: /^\/recettes$/, title: 'Recettes', tab: '/recettes', render: renderRecipes },
-  { pattern: /^\/recettes\/(?<id>[^/]+)$/, title: 'Recette', tab: '/recettes', render: renderRecipe },
+  { pattern: /^\/planning\/repas\/(?<id>[^/]+)$/, title: 'Repas', tab: '/planning', render: renderMeal, parent: () => '/planning' },
+  { pattern: /^\/batch$/, title: 'Batch cooking', tab: '/planning', render: renderBatch, parent: () => '/planning' },
   {
-    pattern: /^\/courses$/,
-    title: 'Courses',
+    pattern: /^\/batch\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/,
+    title: 'Batch cooking',
+    tab: '/planning',
+    render: renderBatch,
+    parent: (p) => `/planning/semaine/${p.date}`,
+  },
+  { pattern: /^\/recettes$/, title: 'Recettes', tab: '/recettes', render: renderRecipes },
+  { pattern: /^\/recettes\/(?<id>[^/]+)$/, title: 'Recette', tab: '/recettes', render: renderRecipe, parent: () => '/recettes' },
+  { pattern: /^\/courses$/, title: 'Courses', tab: '/courses', render: renderShopping },
+  { pattern: /^\/courses\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/, title: 'Courses', tab: '/courses', render: renderShopping },
+  {
+    pattern: /^\/courses\/conditionnement\/(?<ingredientId>[^/]+)\/(?<week>\d{4}-\d{2}-\d{2})$/,
+    title: 'Conditionnement',
     tab: '/courses',
-    render: (el) =>
-      renderPlaceholder(el, {
-        title: 'Courses',
-        text: 'La liste de courses calculée à partir du planning et du stock, et la comparaison des magasins avec le trajet.',
-      }),
+    render: renderPackage,
+    parent: (p) => `/courses/semaine/${p.week}`,
   },
   { pattern: /^\/plus$/, title: 'Plus', tab: '/plus', render: renderMore },
-  {
-    pattern: /^\/stock$/,
-    title: 'Stock',
-    tab: '/plus',
-    render: (el) =>
-      renderPlaceholder(el, {
-        title: 'Stock',
-        text: 'Ce que vous avez déjà dans les placards, le frigo et le congélateur, déduit automatiquement des courses.',
-      }),
-  },
+  { pattern: /^\/stock$/, title: 'Stock', tab: '/plus', render: renderStock, parent: () => '/plus' },
   {
     pattern: /^\/budget$/,
     title: 'Budget',
     tab: '/plus',
+    parent: () => '/plus',
     render: (el) =>
       renderPlaceholder(el, { title: 'Budget', text: 'Le budget prévu, les dépenses réellement payées et ce qu’il reste.' }),
   },
-  { pattern: /^\/foyer$/, title: 'Mon foyer', tab: '/plus', render: renderHousehold },
-  { pattern: /^\/foyer\/personne\/(?<id>[^/]+)$/, title: 'Personne du foyer', tab: '/plus', render: renderMember },
-  { pattern: /^\/parametres$/, title: 'Paramètres', tab: '/plus', render: renderSettings },
+  { pattern: /^\/foyer$/, title: 'Mon foyer', tab: '/plus', render: renderHousehold, parent: () => '/plus' },
+  {
+    pattern: /^\/foyer\/personne\/(?<id>[^/]+)$/,
+    title: 'Personne du foyer',
+    tab: '/plus',
+    render: renderMember,
+    parent: () => '/foyer',
+  },
+  { pattern: /^\/parametres$/, title: 'Paramètres', tab: '/plus', render: renderSettings, parent: () => '/plus' },
 ];
 
 /**
@@ -80,13 +90,31 @@ function match() {
   return { route: routes[0], params: {} };
 }
 
+/** Vrai des que l'utilisateur a navigue dans l'application : "Retour" peut alors utiliser l'historique. */
+let hasNavigated = false;
+
+/**
+ * Bouton Retour de la barre du haut : historique si possible, sinon ecran parent.
+ * @param {HTMLButtonElement} button
+ * @param {string | null} parentPath
+ */
+function updateBackButton(button, parentPath) {
+  button.hidden = parentPath === null;
+  button.onclick = () => {
+    if (hasNavigated && window.history.length > 1) window.history.back();
+    else window.location.replace(`#${parentPath ?? '/'}`);
+  };
+}
+
 /**
  * Affiche l'ecran correspondant a l'adresse (#/planning, #/recettes/colombo...).
  * @param {HTMLElement} view
  * @param {HTMLElement} nav
+ * @param {HTMLButtonElement} back
  */
-async function show(view, nav) {
+async function show(view, nav, back) {
   const { route, params } = match();
+  updateBackButton(back, route.parent ? route.parent(params) : null);
   document.title = route.title === 'Accueil' ? 'MealDom' : `${route.title} – MealDom`;
   for (const link of nav.querySelectorAll('a[data-tab]')) {
     if (link.getAttribute('data-tab') === route.tab) link.setAttribute('aria-current', 'page');
@@ -105,8 +133,12 @@ async function show(view, nav) {
 /**
  * @param {HTMLElement} view
  * @param {HTMLElement} nav
+ * @param {HTMLButtonElement} back
  */
-export function startRouter(view, nav) {
-  window.addEventListener('hashchange', () => show(view, nav));
-  show(view, nav);
+export function startRouter(view, nav, back) {
+  window.addEventListener('hashchange', () => {
+    hasNavigated = true;
+    show(view, nav, back);
+  });
+  show(view, nav, back);
 }

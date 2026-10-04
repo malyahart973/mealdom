@@ -138,7 +138,6 @@ export async function renderRecipe(el, params) {
 
   el.innerHTML = `
     <article class="recipe">
-      <p><a href="#/recettes" class="back">Toutes les recettes</a></p>
       <h1 class="page-title">${escapeHtml(recipe.name)}</h1>
       <p>${escapeHtml(recipe.description)}</p>
       <dl class="recipe__facts">
