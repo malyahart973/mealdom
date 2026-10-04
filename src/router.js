@@ -8,6 +8,7 @@ import { renderHousehold } from './pages/household.js';
 import { renderMember } from './pages/member.js';
 import { renderPlanning } from './pages/planning.js';
 import { renderMeal } from './pages/meal.js';
+import { renderBatch } from './pages/batch.js';
 
 /**
  * @typedef {Object} Route
@@ -29,6 +30,8 @@ const routes = [
     render: renderMeal,
   },
   { pattern: /^\/planning\/repas\/(?<id>[^/]+)$/, title: 'Repas', tab: '/planning', render: renderMeal },
+  { pattern: /^\/batch$/, title: 'Batch cooking', tab: '/planning', render: renderBatch },
+  { pattern: /^\/batch\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/, title: 'Batch cooking', tab: '/planning', render: renderBatch },
   { pattern: /^\/recettes$/, title: 'Recettes', tab: '/recettes', render: renderRecipes },
   { pattern: /^\/recettes\/(?<id>[^/]+)$/, title: 'Recette', tab: '/recettes', render: renderRecipe },
   {

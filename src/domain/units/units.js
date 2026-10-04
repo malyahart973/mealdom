@@ -103,3 +103,22 @@ export function convertUniversal(quantity, fromId, toId) {
   }
   return { ok: false, reason: 'no_conversion' };
 }
+
+/**
+ * Arrondi au-dessus, a une precision utile en cuisine (on n'achete pas 437,25 g).
+ * - g, ml : 5 pres ; mg : 1 pres ; kg, L : 0,05 pres ; cl : 1 pres
+ * - pieces, gousses, cuilleres... : demi-unite
+ * - quantites qualitatives : inchangees
+ * @param {number} quantity
+ * @param {string} unitId
+ * @returns {number}
+ */
+export function roundUpQuantity(quantity, unitId) {
+  /** @type {Record<string, number>} */
+  const steps = { g: 5, ml: 5, mg: 1, cl: 1, kg: 0.05, l: 0.05 };
+  const unit = getUnit(unitId);
+  if (!unit || unit.kind === 'qualitative') return quantity;
+  const step = steps[unitId] ?? 0.5;
+  const clean = cleanNumber(quantity / step);
+  return cleanNumber(Math.ceil(clean) * step);
+}

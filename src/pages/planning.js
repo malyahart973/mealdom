@@ -63,6 +63,7 @@ export async function renderPlanning(el, params) {
         <a href="#/planning/semaine/${addDays(monday, 7)}" aria-label="Semaine suivante">›</a>
       </nav>
       ${monday !== weekStart(today) ? '<p class="week-today"><a href="#/planning">Revenir à cette semaine</a></p>' : ''}
+      <p class="actions"><a class="button button--secondary" href="#/batch/semaine/${monday}">Préparer la semaine en batch cooking</a></p>
       <ol class="week">
         ${grid
           .map(

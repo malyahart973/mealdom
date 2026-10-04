@@ -74,7 +74,7 @@ function methodsHtml(methods, level) {
     .map(
       (m) => `
       <${level}>${escapeHtml(m.label)}</${level}>
-      <p class="hint">Matériel : ${escapeHtml(m.equipment.map(equipmentLabel).join(', '))}</p>
+      <p class="hint">Matériel : ${escapeHtml(m.equipment.length ? m.equipment.map(equipmentLabel).join(', ') : 'aucun')}</p>
       <ol class="steps">${m.steps.map((s) => `<li>${escapeHtml(s)}</li>`).join('')}</ol>`,
     )
     .join('');

@@ -20,6 +20,11 @@ export async function registerServiceWorker(onUpdateReady) {
     if (registration.waiting && navigator.serviceWorker.controller) {
       onUpdateReady(registration.waiting);
     }
+    // Une application installee reste souvent ouverte en arriere-plan :
+    // on verifie les mises a jour a chaque retour sur l'application.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') registration.update().catch(() => {});
+    });
     registration.addEventListener('updatefound', () => {
       const worker = registration.installing;
       if (!worker) return;

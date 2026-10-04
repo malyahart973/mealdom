@@ -930,6 +930,51 @@ a.button {
   font-weight: 600;
 }
 
+/* ---------- Batch cooking ---------- */
+
+.batch-summary {
+  margin: var(--space-4) 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-small);
+  background: var(--leaf-soft);
+}
+
+.batch-summary p:last-child {
+  margin-bottom: 0;
+}
+
+.tasks {
+  margin: 0 0 var(--space-6);
+  padding-left: 1.5rem;
+}
+
+.tasks > li::marker {
+  color: var(--leaf);
+  font-weight: 800;
+  font-size: 1.125rem;
+}
+
+.task {
+  padding: var(--space-3) 0 var(--space-4) var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+
+.task__title {
+  margin: 0 0 var(--space-1);
+  font-size: 1.125rem;
+}
+
+.task__qty {
+  color: var(--leaf);
+  white-space: nowrap;
+}
+
+.task__uses {
+  margin: var(--space-2) 0;
+  padding-left: 1.1rem;
+  font-size: 0.9375rem;
+}
+
 /* ---------- Barre de navigation du bas ---------- */
 
 .tabbar {

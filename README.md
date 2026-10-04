@@ -34,6 +34,7 @@ src/
     recipes/          Recettes, préparations réutilisables, équipements, filtrage
     household/        Foyer, membres, régimes, compatibilité recette / foyer
     planning/         Dates, planning manuel, portions par repas, restes, verrouillage
+    batchCooking/     Préparations de la semaine, quantités totales, ordre et durée de la session
   data/               Données de référence (ingrédients, cuisines, préparations, recettes, portions)
   db/                 Base locale et accès aux données
   utils/              Petits outils communs
@@ -56,6 +57,7 @@ tests/                Tests des règles métier (ouvrir tests/index.html)
 
 ## Historique
 
+- **0.6.0** — Batch cooking de la semaine (préparations partagées, quantités, ordre, cuissons en parallèle). 2 préparations et 2 recettes ajoutées. Vérification des mises à jour au retour dans l'application.
 - **0.5.0** — Planning manuel de la semaine : ajout, modification, déplacement, verrouillage, invités, dîner qui sert au déjeuner du lendemain. Repas du jour sur l'accueil. Base v3.
 - **0.4.0** — Foyer : personnes, allergies, régimes, aliments refusés, équipement, portion enfant, objectifs. Recettes adaptées au foyer. Base v2.
 - **0.3.0** — Modèle des recettes et des préparations, 5 premières recettes, écrans Recettes et Fiche recette.

@@ -125,4 +125,7 @@ export const INGREDIENTS = [
   { id: 'ginger', name: 'gingembre frais', aliases: ['gingembre', 'ginger'], allergens: [], conversions: [] },
   { id: 'turmeric', name: 'curcuma', aliases: ['turmeric'], allergens: [], conversions: [] },
   { id: 'coriander', name: 'coriandre fraîche', aliases: ['coriandre', 'cilantro'], allergens: [], conversions: [] },
+  { id: 'wheat_tortilla', name: 'tortillas de blé', aliases: ['tortillas', 'tortilla', 'wraps'], allergens: ['gluten'], conversions: [] },
+  { id: 'avocado', name: 'avocat', aliases: ['avocats', 'avocado'], allergens: [], conversions: [] },
+  { id: 'bay_leaf', name: 'laurier', aliases: ['feuille de laurier', 'feuilles de laurier', 'bay leaf'], allergens: [], conversions: [] },
 ];

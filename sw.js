@@ -58,6 +58,8 @@ const APP_FILES = [
   './src/services/planningService.js',
   './src/pages/planning.js',
   './src/pages/meal.js',
+  './src/domain/batchCooking/batchCooking.js',
+  './src/pages/batch.js',
   './src/utils/html.js',
   './src/utils/format.js',
 ];
