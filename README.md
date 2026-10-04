@@ -31,7 +31,8 @@ src/
     units/            Unités et conversions universelles
     ingredients/      Ingrédients, 14 allergènes, conversions propres à un aliment
     portions/         Portions adulte/enfant, arrondi, dîner + déjeuner du lendemain
-  data/               Données de référence (ingrédients, coefficients de portions)
+    recipes/          Recettes, préparations réutilisables, équipements, filtrage
+  data/               Données de référence (ingrédients, cuisines, préparations, recettes, portions)
   db/                 Base locale et accès aux données
   utils/              Petits outils communs
   styles/main.css     Style
@@ -53,5 +54,6 @@ tests/                Tests des règles métier (ouvrir tests/index.html)
 
 ## Historique
 
+- **0.3.0** — Modèle des recettes et des préparations, 5 premières recettes, écrans Recettes et Fiche recette.
 - **0.2.0** — Unités et conversions, ingrédients normalisés, 14 allergènes, calcul des portions.
 - **0.1.0** — Fondation : structure, navigation, mode hors ligne, installation, base locale, export des données, rappel de sauvegarde.

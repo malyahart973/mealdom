@@ -16,6 +16,7 @@
  * @property {string} id
  * @property {string} label           Libelle affiche
  * @property {UnitKind} kind
+ * @property {string} [plural]        Libelle au pluriel quand il differe
  * @property {number} [toBase]        Pour mass (base g) et volume (base ml) uniquement
  */
 
@@ -29,18 +30,19 @@ export const UNITS = [
   { id: 'ml', label: 'ml', kind: 'volume', toBase: 1 },
   { id: 'cl', label: 'cl', kind: 'volume', toBase: 10 },
   { id: 'l', label: 'L', kind: 'volume', toBase: 1000 },
-  { id: 'tsp', label: 'cuillère à café', kind: 'volume', toBase: 5 },
-  { id: 'tbsp', label: 'cuillère à soupe', kind: 'volume', toBase: 15 },
+  { id: 'tsp', label: 'c. à café', kind: 'volume', toBase: 5 },
+  { id: 'tbsp', label: 'c. à soupe', kind: 'volume', toBase: 15 },
   { id: 'cup', label: 'cup (237 ml)', kind: 'volume', toBase: 236.59 },
   // Quantites comptees : convertibles en grammes seulement si l'aliment le precise
-  { id: 'piece', label: 'pièce', kind: 'count' },
-  { id: 'slice', label: 'tranche', kind: 'count' },
-  { id: 'handful', label: 'poignée', kind: 'count' },
+  { id: 'piece', label: 'pièce', plural: 'pièces', kind: 'count' },
+  { id: 'clove', label: 'gousse', plural: 'gousses', kind: 'count' },
+  { id: 'slice', label: 'tranche', plural: 'tranches', kind: 'count' },
+  { id: 'handful', label: 'poignée', plural: 'poignées', kind: 'count' },
   // Contenants : leur contenu depend du produit
-  { id: 'sachet', label: 'sachet', kind: 'package' },
-  { id: 'can', label: 'boîte', kind: 'package' },
-  { id: 'pack', label: 'paquet', kind: 'package' },
-  { id: 'bottle', label: 'bouteille', kind: 'package' },
+  { id: 'sachet', label: 'sachet', plural: 'sachets', kind: 'package' },
+  { id: 'can', label: 'boîte', plural: 'boîtes', kind: 'package' },
+  { id: 'pack', label: 'paquet', plural: 'paquets', kind: 'package' },
+  { id: 'bottle', label: 'bouteille', plural: 'bouteilles', kind: 'package' },
   // Quantites qualitatives : jamais converties
   { id: 'to_taste', label: 'au goût', kind: 'qualitative' },
   { id: 'pinch', label: 'une pincée', kind: 'qualitative' },

@@ -20,6 +20,7 @@
  * @property {string[]} aliases         Autres ecritures acceptees (pluriel, anglais...)
  * @property {string[]} allergens       Identifiants parmi les 14 allergenes
  * @property {IngredientConversion[]} conversions
+ * @property {boolean} [notPurchased]   Vrai pour l'eau du robinet : jamais dans la liste de courses
  */
 
 /**
