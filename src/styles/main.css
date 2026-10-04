@@ -1,0 +1,351 @@
+/* =========================================================
+   MealDom - feuille de style unique
+   Toutes les couleurs et tailles passent par les variables ci-dessous.
+   ========================================================= */
+
+:root {
+  /* Vert feuille de bananier, jaune maracuja */
+  --leaf: #1f5641;
+  --leaf-soft: #e3eee7;
+  --maracuja: #f2b33d;
+  --paper: #f5f8f3;
+  --surface: #ffffff;
+  --ink: #172a21;
+  --muted: #56685e;
+  --line: #d6e1d9;
+  --danger: #a3302a;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  --radius-small: 8px;
+  --radius: 14px;
+
+  --tabbar-height: 4rem;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --leaf: #7cc4a0;
+    --leaf-soft: #1c2f26;
+    --maracuja: #f2b33d;
+    --paper: #0f1a15;
+    --surface: #16241d;
+    --ink: #e6efe9;
+    --muted: #9fb2a7;
+    --line: #2a3d33;
+    --danger: #ef8a83;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+h1,
+h2 {
+  line-height: 1.2;
+  margin: 0 0 var(--space-3);
+}
+
+h2 {
+  font-size: 1.125rem;
+  margin-top: var(--space-6);
+}
+
+p {
+  margin: 0 0 var(--space-3);
+  max-width: 38rem;
+}
+
+a {
+  color: var(--leaf);
+}
+
+:focus-visible {
+  outline: 3px solid var(--maracuja);
+  outline-offset: 2px;
+}
+
+/* ---------- Barre du haut ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--space-4) var(--space-3);
+  background: var(--leaf);
+  color: #fff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .topbar {
+    background: var(--surface);
+    color: var(--ink);
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+.brand {
+  font-weight: 800;
+  font-size: 1.125rem;
+  letter-spacing: -0.01em;
+}
+
+.net-status {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  background: var(--maracuja);
+  color: #2b2005;
+}
+
+/* ---------- Bandeau de mise a jour ---------- */
+
+.update-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--leaf-soft);
+  border-bottom: 1px solid var(--line);
+}
+
+.update-banner[hidden] {
+  display: none;
+}
+
+.update-banner p {
+  margin: 0;
+}
+
+/* ---------- Contenu ---------- */
+
+.view {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4) calc(var(--tabbar-height) + var(--space-8) + env(safe-area-inset-bottom, 0px));
+}
+
+.view:focus {
+  outline: none;
+}
+
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.error {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* La date du jour : l'element fort de l'accueil */
+.today__date {
+  font-size: clamp(2.25rem, 9vw, 3.25rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin-bottom: var(--space-4);
+}
+
+.today__date::first-letter {
+  text-transform: uppercase;
+}
+
+.today__date::after {
+  content: "";
+  display: block;
+  width: 3.5rem;
+  height: 6px;
+  margin-top: var(--space-3);
+  border-radius: 3px;
+  background: var(--maracuja);
+}
+
+.today__empty {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+
+.notice {
+  margin-top: var(--space-8);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--maracuja);
+  border-radius: var(--radius-small);
+}
+
+.notice h2 {
+  margin-top: 0;
+}
+
+/* ---------- Boutons ---------- */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  padding: 0 var(--space-6);
+  border: 0;
+  border-radius: 999px;
+  background: var(--leaf);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  .button {
+    color: var(--paper);
+  }
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button--small {
+  min-height: 2.5rem;
+  padding: 0 var(--space-4);
+}
+
+/* ---------- Listes ---------- */
+
+.link-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.link-list a {
+  display: block;
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 1.0625rem;
+  text-decoration: none;
+}
+
+.link-list a span {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.9375rem;
+}
+
+.facts {
+  margin: 0 0 var(--space-6);
+}
+
+.facts div {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.facts dt {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ---------- Barre de navigation du bas ---------- */
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+.tabbar a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--tabbar-height);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tabbar svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tabbar a[data-tab="/plus"] svg {
+  fill: currentColor;
+  stroke: none;
+}
+
+.tabbar a[aria-current="page"] {
+  color: var(--leaf);
+}
+
+.tabbar a[aria-current="page"] span {
+  border-bottom: 3px solid var(--maracuja);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

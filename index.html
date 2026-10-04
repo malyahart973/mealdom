@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="Repas de la semaine, batch cooking, courses et budget du foyer." />
+    <meta name="theme-color" content="#1F5641" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="MealDom" />
+    <title>MealDom</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="src/styles/main.css" />
+    <script src="src/version.js"></script>
+    <script type="module" src="src/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <span class="brand">MealDom</span>
+      <span id="net-status" class="net-status" hidden>Hors ligne</span>
+    </header>
+
+    <div id="update-banner" class="update-banner" role="status" hidden>
+      <p>Une nouvelle version de MealDom est prête.</p>
+      <button id="update-button" type="button" class="button button--small">Mettre à jour</button>
+    </div>
+
+    <main id="view" class="view" tabindex="-1">
+      <p class="hint">Chargement…</p>
+    </main>
+
+    <nav id="tabbar" class="tabbar" aria-label="Navigation principale">
+      <a href="#/" data-tab="/">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" /></svg>
+        <span>Accueil</span>
+      </a>
+      <a href="#/planning" data-tab="/planning">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>
+        <span>Planning</span>
+      </a>
+      <a href="#/recettes" data-tab="/recettes">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11h16v3a6 6 0 0 1-6 6h-4a6 6 0 0 1-6-6z" /><path d="M2 11h20M9 7c0-1.5 1.3-2.5 3-2.5s3 1 3 2.5" /></svg>
+        <span>Recettes</span>
+      </a>
+      <a href="#/courses" data-tab="/courses">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18l-2 11H5z" /><path d="M8 9l4-6 4 6" /></svg>
+        <span>Courses</span>
+      </a>
+      <a href="#/plus" data-tab="/plus">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
+        <span>Plus</span>
+      </a>
+    </nav>
+
+    <noscript>MealDom a besoin de JavaScript pour fonctionner. Activez-le dans les réglages du navigateur.</noscript>
+  </body>
+</html>

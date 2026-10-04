@@ -1,0 +1,15 @@
+# Site statique : pas de compilation, Netlify publie les fichiers tels quels.
+[build]
+  publish = "."
+
+# Le service worker et la version ne doivent jamais rester en cache,
+# sinon les telephones ne verraient pas les mises a jour.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/src/version.js"
+  [headers.values]
+    Cache-Control = "no-cache"

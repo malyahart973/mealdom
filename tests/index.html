@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tests – MealDom</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 1.5rem; line-height: 1.5; }
+      .ok { color: #1f6b44; }
+      .ko { color: #a3302a; font-weight: 700; }
+      #summary { font-size: 1.25rem; font-weight: 800; }
+    </style>
+  </head>
+  <body>
+    <h1>Tests des calculs de MealDom</h1>
+    <p id="summary">Tests en cours…</p>
+    <ul id="results"></ul>
+    <script type="module">
+      import { runTests } from './runner.js';
+      // Ajouter ici chaque nouveau fichier de tests :
+      import './backup.test.js';
+
+      const results = await runTests();
+      const failed = results.filter((r) => !r.ok);
+      document.getElementById('summary').textContent = failed.length === 0
+        ? `Tous les tests réussis (${results.length})`
+        : `${failed.length} test(s) en échec sur ${results.length}`;
+      document.getElementById('summary').className = failed.length === 0 ? 'ok' : 'ko';
+      const list = document.getElementById('results');
+      for (const r of results) {
+        const li = document.createElement('li');
+        li.className = r.ok ? 'ok' : 'ko';
+        li.textContent = r.ok ? `✔ ${r.name}` : `✘ ${r.name} : ${r.error}`;
+        list.append(li);
+      }
+    </script>
+  </body>
+</html>
