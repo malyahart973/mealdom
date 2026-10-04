@@ -1,0 +1,7 @@
+# Fichiers système Windows et Mac
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Paramètres personnels de VS Code
+.vscode/
