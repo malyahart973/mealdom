@@ -17,6 +17,11 @@ export const migrations = [
   (db) => {
     db.createObjectStore('household', { keyPath: 'id' });
   },
+  // v3 (0.5.0) : repas planifies, recherchables par date
+  (db) => {
+    const store = db.createObjectStore('meals', { keyPath: 'id' });
+    store.createIndex('date', 'date');
+  },
 ];
 
 /** Version actuelle du schema de la base. */

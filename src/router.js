@@ -6,6 +6,8 @@ import { renderRecipes } from './pages/recipes.js';
 import { renderRecipe } from './pages/recipe.js';
 import { renderHousehold } from './pages/household.js';
 import { renderMember } from './pages/member.js';
+import { renderPlanning } from './pages/planning.js';
+import { renderMeal } from './pages/meal.js';
 
 /**
  * @typedef {Object} Route
@@ -18,16 +20,15 @@ import { renderMember } from './pages/member.js';
 /** @type {Route[]} */
 const routes = [
   { pattern: /^\/$/, title: 'Accueil', tab: '/', render: renderHome },
+  { pattern: /^\/planning$/, title: 'Planning', tab: '/planning', render: renderPlanning },
+  { pattern: /^\/planning\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/, title: 'Planning', tab: '/planning', render: renderPlanning },
   {
-    pattern: /^\/planning$/,
-    title: 'Planning',
+    pattern: /^\/planning\/ajouter\/(?<date>\d{4}-\d{2}-\d{2})\/(?<slot>[a-z]+)$/,
+    title: 'Ajouter un repas',
     tab: '/planning',
-    render: (el) =>
-      renderPlaceholder(el, {
-        title: 'Planning',
-        text: 'Vous construirez ici la semaine : repas, portions, et dîner qui sert aussi au déjeuner du lendemain.',
-      }),
+    render: renderMeal,
   },
+  { pattern: /^\/planning\/repas\/(?<id>[^/]+)$/, title: 'Repas', tab: '/planning', render: renderMeal },
   { pattern: /^\/recettes$/, title: 'Recettes', tab: '/recettes', render: renderRecipes },
   { pattern: /^\/recettes\/(?<id>[^/]+)$/, title: 'Recette', tab: '/recettes', render: renderRecipe },
   {

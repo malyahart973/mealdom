@@ -42,3 +42,34 @@ export function formatMinutes(minutes) {
   const m = minutes % 60;
   return m === 0 ? `${h} h` : `${h} h ${String(m).padStart(2, '0')}`;
 }
+
+const dayMonth = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
+
+/**
+ * "lundi 5 octobre" a partir d'une date AAAA-MM-JJ (heure locale).
+ * @param {string} isoDay
+ * @returns {string}
+ */
+export function formatIsoDay(isoDay) {
+  const [y, m, d] = isoDay.split('-').map(Number);
+  return dateLong.format(new Date(y, m - 1, d));
+}
+
+/**
+ * "5 octobre" a partir d'une date AAAA-MM-JJ.
+ * @param {string} isoDay
+ * @returns {string}
+ */
+export function formatIsoDayMonth(isoDay) {
+  const [y, m, d] = isoDay.split('-').map(Number);
+  return dayMonth.format(new Date(y, m - 1, d));
+}
+
+/**
+ * "3 portions", "2,5 portions", "1 portion".
+ * @param {number} portions
+ * @returns {string}
+ */
+export function formatPortions(portions) {
+  return `${formatNumber(portions)} ${portions >= 2 ? 'portions' : 'portion'}`;
+}

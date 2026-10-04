@@ -52,6 +52,12 @@ const APP_FILES = [
   './src/services/householdService.js',
   './src/pages/household.js',
   './src/pages/member.js',
+  './src/domain/planning/dates.js',
+  './src/domain/planning/planning.js',
+  './src/db/repositories/mealRepository.js',
+  './src/services/planningService.js',
+  './src/pages/planning.js',
+  './src/pages/meal.js',
   './src/utils/html.js',
   './src/utils/format.js',
 ];
