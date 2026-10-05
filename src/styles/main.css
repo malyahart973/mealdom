@@ -1109,7 +1109,11 @@ a.button {
   margin-bottom: var(--space-3);
 }
 
-.stock-form input,
+.stock-form > .check {
+  margin-bottom: var(--space-3);
+}
+
+.stock-form input:not([type="checkbox"]),
 .stock-form select {
   width: 100%;
   min-height: 3rem;
@@ -1119,6 +1123,65 @@ a.button {
   background: var(--paper);
   color: var(--ink);
   font: inherit;
+}
+
+/* ---------- Magasins et budget ---------- */
+
+.when label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-weight: 700;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.shop__price {
+  display: block;
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.budget-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.budget-card div {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.budget-card dt {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.budget-card dd {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.budget-card .over {
+  border-color: var(--danger);
+}
+
+.budget-card .over dd {
+  color: var(--danger);
+}
+
+h3 {
+  margin: var(--space-6) 0 var(--space-2);
+  font-size: 1rem;
 }
 
 /* ---------- Barre de navigation du bas ---------- */

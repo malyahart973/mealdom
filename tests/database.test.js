@@ -6,7 +6,7 @@ import { test, assertEqual } from './runner.js';
 import { migrations } from '../src/db/migrations.js';
 
 const hasIndexedDb = typeof indexedDB !== 'undefined';
-const ALL_STORES = ['household', 'inventory', 'meals', 'packages', 'settings', 'shoppingLists'];
+const ALL_STORES = ['budget', 'expenses', 'household', 'inventory', 'meals', 'packages', 'prices', 'settings', 'shoppingLists', 'stores'];
 
 /**
  * @template T
@@ -77,8 +77,22 @@ if (hasIndexedDb) {
 
     const v4 = await openDatabaseWith(name, migrations.slice(0, 4));
     assertEqual(await done(v4.transaction('meals').objectStore('meals').get('m1')), { id: 'm1', date: '2026-10-05', slot: 'dinner' });
-    assertEqual([...v4.objectStoreNames].sort(), ALL_STORES);
+    assertEqual([...v4.objectStoreNames].sort(), ['household', 'inventory', 'meals', 'packages', 'settings', 'shoppingLists']);
     v4.close();
+    await done(indexedDB.deleteDatabase(name));
+  });
+
+  test('Migration v4 -> v5 : le stock est conservé, magasins et budget ajoutés', async () => {
+    const name = `mealdom-test-v4-${Date.now()}`;
+    const v4 = await openDatabaseWith(name, migrations.slice(0, 4));
+    await write(v4, 'inventory', { id: 'i1', ingredientId: 'rice_white', quantity: 500, unit: 'g', location: 'pantry' });
+    v4.close();
+
+    const v5 = await openDatabaseWith(name, migrations.slice(0, 5));
+    const item = /** @type {{ quantity: number }} */ (await done(v5.transaction('inventory').objectStore('inventory').get('i1')));
+    assertEqual(item.quantity, 500);
+    assertEqual([...v5.objectStoreNames].sort(), ALL_STORES);
+    v5.close();
     await done(indexedDB.deleteDatabase(name));
   });
 

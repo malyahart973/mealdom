@@ -1,5 +1,4 @@
 import { renderHome } from './pages/home.js';
-import { renderPlaceholder } from './pages/placeholder.js';
 import { renderMore } from './pages/more.js';
 import { renderSettings } from './pages/settings.js';
 import { renderRecipes } from './pages/recipes.js';
@@ -12,6 +11,9 @@ import { renderBatch } from './pages/batch.js';
 import { renderShopping } from './pages/shopping.js';
 import { renderPackage } from './pages/package.js';
 import { renderStock } from './pages/stock.js';
+import { renderStores } from './pages/stores.js';
+import { renderStore } from './pages/store.js';
+import { renderBudget } from './pages/budget.js';
 
 /**
  * @typedef {Object} Route
@@ -58,14 +60,10 @@ const routes = [
   },
   { pattern: /^\/plus$/, title: 'Plus', tab: '/plus', render: renderMore },
   { pattern: /^\/stock$/, title: 'Stock', tab: '/plus', render: renderStock, parent: () => '/plus' },
-  {
-    pattern: /^\/budget$/,
-    title: 'Budget',
-    tab: '/plus',
-    parent: () => '/plus',
-    render: (el) =>
-      renderPlaceholder(el, { title: 'Budget', text: 'Le budget prévu, les dépenses réellement payées et ce qu’il reste.' }),
-  },
+  { pattern: /^\/budget$/, title: 'Budget', tab: '/plus', render: renderBudget, parent: () => '/plus' },
+  { pattern: /^\/budget\/mois\/(?<month>\d{4}-\d{2})$/, title: 'Budget', tab: '/plus', render: renderBudget, parent: () => '/plus' },
+  { pattern: /^\/magasins$/, title: 'Magasins', tab: '/plus', render: renderStores, parent: () => '/plus' },
+  { pattern: /^\/magasins\/(?<id>[^/]+)$/, title: 'Magasin', tab: '/plus', render: renderStore, parent: () => '/magasins' },
   { pattern: /^\/foyer$/, title: 'Mon foyer', tab: '/plus', render: renderHousehold, parent: () => '/plus' },
   {
     pattern: /^\/foyer\/personne\/(?<id>[^/]+)$/,

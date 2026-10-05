@@ -6,7 +6,9 @@ import { addDays, parseIsoDate, toIsoDate, weekStart } from '../domain/planning/
 import { AISLES } from '../domain/ingredients/ingredients.js';
 import { ingredientsById } from '../services/catalog.js';
 import { getHousehold } from '../services/householdService.js';
-import { weekShoppingList, saveShoppingList, newId } from '../services/shoppingService.js';
+import { saveShoppingList, newId } from '../services/shoppingService.js';
+import { weekShoppingEstimate, getStores } from '../services/budgetService.js';
+import { formatCents } from '../domain/budget/money.js';
 
 /** @typedef {import('../domain/shopping/shopping.js').ShoppingLine} ShoppingLine */
 
@@ -53,7 +55,14 @@ export async function renderShopping(el, params) {
     return;
   }
 
-  const { mealCount, lines, state } = await weekShoppingList(monday);
+  const [{ mealCount, lines, state, estimate }, stores] = await Promise.all([weekShoppingEstimate(monday), getStores()]);
+  const storeNames = new Map(stores.map((st) => [st.id, st.name]));
+  const bestByKey = new Map(estimate.lines.map((e) => [e.key, e.best]));
+  /** @param {string} key */
+  const priceText = (key) => {
+    const best = bestByKey.get(key);
+    return best ? `Environ ${formatCents(best.cents)} chez ${storeNames.get(best.storeId) ?? 'un magasin'}` : '';
+  };
   const toBuy = lines.filter((l) => !l.covered);
   const covered = lines.filter((l) => l.covered);
   const name = (/** @type {string} */ id) => ingredientsById.get(id)?.name ?? id;
@@ -69,7 +78,8 @@ export async function renderShopping(el, params) {
             <input type="checkbox" data-key="${escapeHtml(l.key)}"${state.checked.includes(l.key) ? ' checked' : ''} />
             <span><strong>${escapeHtml(name(l.ingredientId))}</strong>
               <span class="shop__qty">${escapeHtml(buyText(l))}</span>
-              <span class="hint">${escapeHtml(detailText(l))}</span></span>
+              <span class="hint">${escapeHtml(detailText(l))}</span>
+              ${priceText(l.key) ? `<span class="shop__price">${escapeHtml(priceText(l.key))}</span>` : ''}</span>
           </label>
           ${
             l.need !== null
@@ -107,8 +117,16 @@ export async function renderShopping(el, params) {
           ? `<p class="empty">Aucun repas planifié cette semaine.</p>
              <p>La liste se remplit toute seule à partir du planning, en tenant compte de votre stock.</p>
              <p><a class="button button--secondary" href="#/planning/semaine/${monday}">Ouvrir le planning</a></p>`
-          : `<p class="batch-summary"><strong>${checkedCount} sur ${total} article${total > 1 ? 's' : ''} dans le panier.</strong>
-              Liste calculée pour ${mealCount} repas, stock déduit.</p>`
+          : `<div class="batch-summary"><p><strong>${checkedCount} sur ${total} article${total > 1 ? 's' : ''} dans le panier.</strong>
+              Liste calculée pour ${mealCount} repas, stock déduit.</p>
+              <p>${
+                estimate.lines.length === 0
+                  ? ''
+                  : estimate.complete
+                    ? `Coût estimé : environ ${escapeHtml(formatCents(estimate.totalCents))}.`
+                    : `Coût estimé : au moins ${escapeHtml(formatCents(estimate.totalCents))} (prix inconnu pour ${estimate.missing.length} article${estimate.missing.length > 1 ? 's' : ''}). <a href="#/magasins">Ajouter des prix</a>`
+              }</p>
+              <p><a href="#/budget">Enregistrer le montant payé</a></p></div>`
       }
       ${aislesHtml}
 

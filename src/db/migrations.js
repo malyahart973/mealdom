@@ -28,6 +28,13 @@ export const migrations = [
     db.createObjectStore('packages', { keyPath: 'ingredientId' });
     db.createObjectStore('shoppingLists', { keyPath: 'week' });
   },
+  // v5 (0.8.0) : magasins, prix, budget, depenses reelles
+  (db) => {
+    db.createObjectStore('stores', { keyPath: 'id' });
+    db.createObjectStore('prices', { keyPath: 'id' }).createIndex('storeId', 'storeId');
+    db.createObjectStore('budget', { keyPath: 'id' });
+    db.createObjectStore('expenses', { keyPath: 'id' }).createIndex('date', 'date');
+  },
 ];
 
 /** Version actuelle du schema de la base. */
