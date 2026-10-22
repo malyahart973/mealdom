@@ -29,6 +29,7 @@ export const STORE_TYPES = [
  * @property {string} name
  * @property {StoreType} type
  * @property {string} commune
+ * @property {{ url: string, label: string } | null} [drive]  Commande en ligne (Drive) proposee par le magasin
  */
 
 /** @typedef {'available' | 'unavailable' | 'unknown'} Availability */

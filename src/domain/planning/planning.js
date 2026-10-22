@@ -7,14 +7,21 @@ import { mealPortions } from '../portions/portions.js';
 
 /** @typedef {import('../household/household.js').Household} Household */
 
-/** @typedef {'breakfast' | 'lunch' | 'dinner'} Slot */
+/** @typedef {'breakfast' | 'lunch' | 'snack' | 'dinner'} Slot */
 
 /** @type {{ id: Slot, label: string }[]} */
 export const SLOTS = [
   { id: 'breakfast', label: 'Petit-déjeuner' },
   { id: 'lunch', label: 'Déjeuner' },
+  { id: 'snack', label: 'Goûter' },
   { id: 'dinner', label: 'Dîner' },
 ];
+
+/**
+ * Remplacement d'un ingredient dans la recette d'un repas (ex. creme -> yaourt).
+ * La recette du catalogue n'est jamais modifiee.
+ * @typedef {{ from: string, to: string }} Substitution
+ */
 
 /**
  * @typedef {Object} Meal
@@ -28,6 +35,7 @@ export const SLOTS = [
  * @property {{ attendees: string[], guests: number } | null} nextLunch
  *   Diner cuisine en plus grande quantite pour le dejeuner du lendemain
  * @property {boolean} locked
+ * @property {Substitution[]} [substitutions]   Ingredients remplaces pour ce repas uniquement
  */
 
 /**
@@ -106,6 +114,10 @@ export function validateMeal(meal, meals, household, recipeIds) {
   if (meal.attendees.length + meal.guests === 0) errors.push('Indiquez au moins une personne à table.');
   const memberIds = new Set(household.members.map((m) => m.id));
   if (meal.attendees.some((id) => !memberIds.has(id))) errors.push('Une personne choisie ne fait plus partie du foyer.');
+
+  for (const sub of meal.substitutions ?? []) {
+    if (!sub.from || !sub.to || sub.from === sub.to) errors.push('Remplacement d’ingrédient invalide.');
+  }
 
   if (meal.nextLunch) {
     if (meal.slot !== 'dinner') errors.push('Seul un dîner peut servir au déjeuner du lendemain.');

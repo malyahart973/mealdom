@@ -283,7 +283,7 @@ export const WORLD_TROPICS_RECIPES = [
     'red_lentils 300 g; onion 1; carrot 1; cumin 2 tsp; turmeric 1 tsp; lemon 1; veg_stock 1; water 1.5 l; olive_oil 2 tbsp; bread 160 g',
     ['Faire revenir l’oignon et la carotte dans l’huile avec le cumin et le curcuma.', 'Ajouter les lentilles, l’eau et le cube, cuire 25 minutes.', 'Mixer et ajouter le jus de citron. Servir avec le pain.'],
     { equip: 'blender stovetop', tags: 'light budget make_ahead', vessel: 'one_pot' }),
-  r('baba_ganoush', 'Baba ganoush et pita', 'Caviar d’aubergines fumées au tahini et au citron.', 'middle_eastern', 'SL', 4, 10, 35,
+  r('baba_ganoush', 'Baba ganoush et pita', 'Caviar d’aubergines fumées au tahini et au citron.', 'middle_eastern', 'S', 4, 10, 35,
     'eggplant 3; tahini 3 tbsp; lemon 1; garlic 1 clove; olive_oil 2 tbsp; parsley 0.5 handful; pita 4; cucumber 1',
     ['Rôtir les aubergines entières 35 minutes à 220 °C jusqu’à ce qu’elles s’affaissent.', 'Récupérer la chair et l’écraser avec le tahini, le citron, l’ail et le sel.', 'Arroser d’huile, parsemer de persil.', 'Servir avec les pitas et le concombre.'],
     { equip: 'oven', tags: 'light' }),

@@ -110,6 +110,22 @@ export function totalMinutes(item) {
 }
 
 /**
+ * Recette avec des ingredients remplaces (pour un repas). Les quantites sont conservees :
+ * on remplace poids pour poids. La recette d'origine n'est pas modifiee.
+ * @param {Recipe} recipe
+ * @param {{ from: string, to: string }[]} substitutions
+ * @returns {Recipe}
+ */
+export function applySubstitutions(recipe, substitutions) {
+  if (!substitutions.length) return recipe;
+  const map = new Map(substitutions.map((s) => [s.from, s.to]));
+  return {
+    ...recipe,
+    ingredients: recipe.ingredients.map((l) => (map.has(l.ingredientId) ? { ...l, ingredientId: /** @type {string} */ (map.get(l.ingredientId)) } : l)),
+  };
+}
+
+/**
  * Repas ou la recette a sa place.
  * @param {Recipe} recipe
  * @returns {MealType[]}

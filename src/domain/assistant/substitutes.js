@@ -1,0 +1,98 @@
+/**
+ * Remplacements d'ingredients plausibles en cuisine (poids pour poids).
+ * Ils servent aux demandes « remplace X par Y », « produit indisponible »,
+ * « alternative moins chere » et « plus leger ». Le caractere moins cher ou plus
+ * leger n'est JAMAIS suppose : il est calcule avec les prix et les valeurs connus.
+ */
+
+/** @type {Record<string, string[]>} */
+export const SUBSTITUTES = {
+  chicken: ['chicken_breast', 'turkey', 'tofu'],
+  chicken_breast: ['turkey', 'chicken', 'tofu'],
+  turkey: ['chicken_breast', 'chicken'],
+  beef_steak: ['pork_loin', 'chicken_breast', 'tofu'],
+  beef_stew: ['lamb', 'chicken', 'pork_loin'],
+  ground_beef: ['ground_pork', 'turkey', 'red_lentils'],
+  ground_pork: ['ground_beef', 'turkey'],
+  pork_loin: ['chicken_breast', 'turkey', 'tofu'],
+  pork_belly: ['pork_loin', 'chicken'],
+  lamb: ['beef_stew', 'chicken'],
+  bacon: ['ham', 'smoked_chicken'],
+  ham: ['smoked_chicken', 'turkey'],
+  sausage: ['smoked_chicken', 'chorizo'],
+  chorizo: ['sausage', 'smoked_chicken'],
+  salmon: ['white_fish', 'cod'],
+  white_fish: ['cod', 'salmon'],
+  cod: ['white_fish', 'salmon'],
+  shrimp: ['white_fish', 'chicken_breast', 'tofu'],
+  tofu: ['chicken_breast', 'egg'],
+  cream: ['light_cream', 'coconut_milk'],
+  light_cream: ['cream', 'coconut_milk'],
+  coconut_milk: ['light_cream', 'coconut_cream'],
+  butter: ['olive_oil', 'vegetable_oil'],
+  milk: ['soy_milk'],
+  parmesan: ['emmental'],
+  emmental: ['cheddar', 'mozzarella'],
+  cheddar: ['emmental'],
+  mozzarella: ['emmental'],
+  feta: ['goat_cheese'],
+  goat_cheese: ['feta'],
+  ricotta: ['cottage_cheese', 'fromage_blanc'],
+  greek_yogurt: ['skyr', 'yogurt', 'fromage_blanc'],
+  yogurt: ['skyr', 'fromage_blanc'],
+  cashews: ['peanut', 'almonds'],
+  almonds: ['cashews', 'peanut'],
+  walnuts: ['almonds'],
+  peanut_butter: ['tahini'],
+  egg_noodles: ['ramen_noodles', 'rice_noodles'],
+  ramen_noodles: ['egg_noodles'],
+  udon: ['egg_noodles'],
+  rice_noodles: ['rice_vermicelli', 'egg_noodles'],
+  rice_jasmine: ['rice_white'],
+  rice_white: ['rice_jasmine', 'rice_brown'],
+  spinach: ['bok_choy', 'chinese_cabbage'],
+  bok_choy: ['spinach', 'chinese_cabbage'],
+  chinese_cabbage: ['cabbage', 'bok_choy'],
+  zucchini: ['christophine', 'eggplant'],
+  christophine: ['zucchini'],
+  eggplant: ['zucchini'],
+  pumpkin: ['sweet_potato', 'carrot'],
+  sweet_potato: ['potato', 'pumpkin'],
+  potato: ['sweet_potato'],
+  plantain: ['sweet_potato', 'potato'],
+  lime: ['lemon'],
+  lemon: ['lime'],
+  shallot: ['onion', 'red_onion'],
+  red_onion: ['onion', 'shallot'],
+  spring_onion: ['chives', 'leek'],
+  coriander: ['parsley'],
+  parsley: ['coriander'],
+  thai_basil: ['basil'],
+  basil: ['thai_basil'],
+  fish_sauce: ['soy_sauce'],
+  oyster_sauce: ['soy_sauce', 'hoisin_sauce'],
+  chickpeas_cooked: ['white_beans_cooked', 'red_beans_cooked'],
+  red_beans_cooked: ['black_beans_cooked', 'white_beans_cooked'],
+  black_beans_cooked: ['red_beans_cooked'],
+  white_beans_cooked: ['chickpeas_cooked'],
+  lentils_green: ['red_lentils'],
+  red_lentils: ['lentils_green'],
+  wheat_tortilla: ['pita'],
+  bread: ['wholemeal_bread'],
+  sugar_white: ['sugar_brown', 'honey'],
+  honey: ['maple_syrup', 'sugar_brown'],
+  quinoa: ['bulgur', 'couscous', 'rice_brown'],
+  couscous: ['bulgur', 'quinoa'],
+  bulgur: ['couscous', 'quinoa'],
+  berries: ['strawberries'],
+  mango: ['papaya', 'pineapple'],
+};
+
+/**
+ * Remplacements connus pour un ingredient.
+ * @param {string} ingredientId
+ * @returns {string[]}
+ */
+export function substitutesFor(ingredientId) {
+  return SUBSTITUTES[ingredientId] ?? [];
+}

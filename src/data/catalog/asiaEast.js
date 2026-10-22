@@ -426,7 +426,7 @@ export const ASIA_EAST_RECIPES = [
     'salmon 4; gochujang 2 tbsp; honey 2 tbsp; soy_sauce 1 tbsp; garlic 1 clove; broccoli 1; sesame_seeds 1 tsp',
     ['Préchauffer le four à 200 °C.', 'Mélanger le gochujang, le miel, la sauce soja et l’ail, en badigeonner le saumon.', 'Cuire 12 à 15 minutes avec le brocoli autour.', 'Parsemer de sésame.'],
     { preps: RICE, equip: 'oven', tags: 'light spicy', vessel: 'one_tray' }),
-  r('corn_cheese', 'Corn cheese', 'Maïs gratiné à la mozzarella, accompagnement préféré des barbecues coréens.', 'korean', 'SL', 4, 5, 10,
+  r('corn_cheese', 'Corn cheese', 'Maïs gratiné à la mozzarella, accompagnement préféré des barbecues coréens.', 'korean', 'S', 4, 5, 10,
     'corn 400 g; mozzarella 150 g; mayonnaise 3 tbsp; sugar_white 1 tsp; butter 10 g; spring_onion 1',
     ['Mélanger le maïs égoutté, la mayonnaise et le sucre.', 'Verser dans une poêle beurrée, couvrir de mozzarella.', 'Cuire à couvert 8 minutes jusqu’à ce que le fromage file. Parsemer de cive.'],
     { tags: 'gourmand kids', vessel: 'one_pan' }),

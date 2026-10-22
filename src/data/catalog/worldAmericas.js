@@ -54,7 +54,7 @@ export const WORLD_AMERICAS_RECIPES = [
     'chicken 1 kg; crushed_tomatoes 400 g; onion 1; garlic 3 clove; dark_chocolate 40 g; peanut_butter 2 tbsp; chili_powder 2 tsp; cumin 1 tsp; cinnamon pinch; raisins 30 g; chicken_stock 1; water 400 ml; sesame_seeds 1 tbsp; vegetable_oil 2 tbsp',
     ['Dorer le poulet et le réserver.', 'Faire revenir l’oignon, l’ail et les épices, ajouter les tomates, les raisins, l’eau et le cube, puis mixer.', 'Ajouter le chocolat et le beurre de cacahuète, remettre le poulet.', 'Mijoter 40 minutes et parsemer de sésame.'],
     { preps: RICE, equip: 'blender stovetop', tags: 'gourmand convivial', vessel: 'one_pot' }),
-  r('esquites', 'Esquites', 'Salade chaude de maïs, mayonnaise, citron vert, piment et fromage.', 'mexican', 'SL', 4, 10, 8,
+  r('esquites', 'Esquites', 'Salade chaude de maïs, mayonnaise, citron vert, piment et fromage.', 'mexican', 'S', 4, 10, 8,
     'corn 500 g; butter 15 g; mayonnaise 2 tbsp; lime 1; chili_powder 0.5 tsp; feta 60 g; coriander 0.5 handful',
     ['Dorer le maïs dans le beurre 6 minutes.', 'Hors du feu, mélanger avec la mayonnaise, le citron vert et le piment.', 'Parsemer de feta et de coriandre.'],
     { tags: 'convivial', vessel: 'one_pan' }),

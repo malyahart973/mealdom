@@ -7,6 +7,7 @@ import { getUnit, roundUpQuantity, cleanNumber } from '../units/units.js';
 import { convertUnit } from '../ingredients/conversion.js';
 import { mealPortionsFor } from '../planning/planning.js';
 import { preparationRequirements, scalePreparation } from '../batchCooking/batchCooking.js';
+import { applySubstitutions } from '../recipes/recipes.js';
 
 /** @typedef {import('../planning/planning.js').Meal} Meal */
 /** @typedef {import('../household/household.js').Household} Household */
@@ -69,8 +70,8 @@ function baseUnit(unitId) {
 }
 
 /**
- * Toutes les lignes d'ingredients des repas : ingredients des recettes (mis a l'echelle)
- * et ingredients des preparations (via les quantites du batch cooking).
+ * Toutes les lignes d'ingredients des repas : ingredients des recettes (mis a l'echelle,
+ * remplacements du repas compris) et ingredients des preparations (via le batch cooking).
  * @param {Meal[]} meals
  * @param {Household} household
  * @param {Map<string, Recipe>} recipes
@@ -81,8 +82,9 @@ export function mealNeedLines(meals, household, recipes, preparations) {
   /** @type {NeedLine[]} */
   const lines = [];
   for (const meal of meals) {
-    const recipe = recipes.get(meal.recipeId);
-    if (!recipe) continue;
+    const original = recipes.get(meal.recipeId);
+    if (!original) continue;
+    const recipe = applySubstitutions(original, meal.substitutions ?? []);
     const factor = mealPortionsFor(meal, household).total / recipe.servings;
     for (const l of recipe.ingredients) {
       lines.push({ ingredientId: l.ingredientId, quantity: l.quantity === null ? null : l.quantity * factor, unit: l.unit });
