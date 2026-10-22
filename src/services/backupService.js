@@ -5,6 +5,12 @@ import { loadHouseholdRecord } from '../db/repositories/householdRepository.js';
 import { getAllMeals } from '../db/repositories/mealRepository.js';
 import { getInventory, getPackages, getShoppingLists } from '../db/repositories/shoppingRepository.js';
 import { getStores, getPrices, getBudgetRecord, getExpenses } from '../db/repositories/budgetRepository.js';
+import { getConversations, getHistory, getPreferences } from '../db/repositories/assistantRepository.js';
+import { getDriveProducts, getDriveOrders } from '../db/repositories/driveRepository.js';
+import { getProgramRecord, getWeights } from '../db/repositories/programRepository.js';
+
+/** Reglages jamais exportes : la cle API de l'assistant reste sur l'appareil. */
+const PRIVATE_SETTINGS = new Set(['assistantApiKey']);
 
 const LAST_EXPORT_KEY = 'lastExportAt';
 
@@ -28,7 +34,7 @@ export async function isReminderDue() {
  */
 export async function exportData() {
   const now = new Date();
-  const [settings, household, meals, inventory, packages, shoppingLists, stores, prices, budget, expenses] = await Promise.all([
+  const [allSettings, household, meals, inventory, packages, shoppingLists, stores, prices, budget, expenses] = await Promise.all([
     getAllSettings(),
     loadHouseholdRecord(),
     getAllMeals(),
@@ -40,10 +46,23 @@ export async function exportData() {
     getBudgetRecord(),
     getExpenses(),
   ]);
+  const [conversations, changeHistory, preferences, driveProducts, driveOrders, program, weights] = await Promise.all([
+    getConversations(),
+    getHistory(),
+    getPreferences(),
+    getDriveProducts(),
+    getDriveOrders(),
+    getProgramRecord(),
+    getWeights(),
+  ]);
+  const settings = allSettings.filter((s) => !PRIVATE_SETTINGS.has(s.key));
   const file = buildExport({
     schemaVersion: SCHEMA_VERSION,
     applicationVersion: APP_VERSION,
-    data: { settings, household, meals, inventory, packages, shoppingLists, stores, prices, budget, expenses },
+    data: {
+      settings, household, meals, inventory, packages, shoppingLists, stores, prices, budget, expenses,
+      conversations, changeHistory, preferences, driveProducts, driveOrders, program, weights,
+    },
     now,
   });
   const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });

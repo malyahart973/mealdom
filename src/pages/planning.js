@@ -2,13 +2,17 @@ import { escapeHtml } from '../utils/html.js';
 import { formatIsoDay, formatIsoDayMonth, formatPortions } from '../utils/format.js';
 import { addDays, toIsoDate, weekDays, weekStart, parseIsoDate } from '../domain/planning/dates.js';
 import { SLOTS, mealPortionsFor, planningGrid } from '../domain/planning/planning.js';
-import { getMeals, getShowBreakfast, setShowBreakfast } from '../services/planningService.js';
+import { getMeals, getShowBreakfast, setShowBreakfast, getShowSnack, setShowSnack } from '../services/planningService.js';
+import { mountAssistant } from './assistantPanel.js';
 import { getHousehold } from '../services/householdService.js';
 
 /** @typedef {import('../domain/planning/planning.js').PlannedEntry} PlannedEntry */
 /** @typedef {import('../domain/household/household.js').Household} Household */
 
 const slotLabels = new Map(SLOTS.map((s) => [s.id, s.label]));
+
+/** L'assistant reste ouvert pendant la navigation dans le planning. */
+let assistantOpen = false;
 
 /**
  * @param {PlannedEntry} entry
@@ -26,7 +30,7 @@ function entryHtml(entry, household) {
   const portions = mealPortionsFor(entry.meal, household);
   const extra = entry.meal.nextLunch ? `, à cuisiner ${formatPortions(portions.total)} avec le déjeuner de demain` : '';
   return `<a class="slot__meal" href="${href}">
-    <span class="slot__name">${escapeHtml(entry.meal.recipeName)}${entry.meal.locked ? ' <span class="lock">Verrouillé</span>' : ''}</span>
+    <span class="slot__name">${escapeHtml(entry.meal.recipeName)}${entry.meal.locked ? ' <span class="lock">Verrouillé</span>' : ''}${entry.meal.substitutions?.length ? ' <span class="tag">Ingrédient remplacé</span>' : ''}</span>
     <span class="slot__meta">${escapeHtml(formatPortions(portions.meal) + extra)}</span>
   </a>`;
 }
@@ -39,7 +43,7 @@ function entryHtml(entry, household) {
 export async function renderPlanning(el, params) {
   const today = toIsoDate(new Date());
   const monday = weekStart(params.date && parseIsoDate(params.date) ? params.date : today);
-  const [meals, household, showBreakfast] = await Promise.all([getMeals(), getHousehold(), getShowBreakfast()]);
+  const [meals, household, showBreakfast, showSnack] = await Promise.all([getMeals(), getHousehold(), getShowBreakfast(), getShowSnack()]);
 
   if (household.members.length === 0) {
     el.innerHTML = `
@@ -51,12 +55,14 @@ export async function renderPlanning(el, params) {
     return;
   }
 
-  const slots = SLOTS.filter((s) => showBreakfast || s.id !== 'breakfast').map((s) => s.id);
+  const slots = SLOTS.filter((s) => (showBreakfast || s.id !== 'breakfast') && (showSnack || s.id !== 'snack')).map((s) => s.id);
   const grid = planningGrid(meals, weekDays(monday), slots);
 
   el.innerHTML = `
-    <section>
+    <div class="planning-layout${assistantOpen ? ' planning-layout--assistant' : ''}">
+    <section class="planning-layout__main">
       <h1 class="page-title">Planning</h1>
+      <p class="actions"><button type="button" class="button" data-action="assistant" aria-expanded="${assistantOpen}">${assistantOpen ? 'Fermer l’assistant' : 'Parler à l’assistant'}</button></p>
       <nav class="week-nav" aria-label="Changer de semaine">
         <a href="#/planning/semaine/${addDays(monday, -7)}" aria-label="Semaine précédente">‹</a>
         <span>Semaine du ${escapeHtml(formatIsoDayMonth(monday))}</span>
@@ -90,11 +96,44 @@ export async function renderPlanning(el, params) {
           .join('')}
       </ol>
       <label class="check"><input type="checkbox" data-action="breakfast"${showBreakfast ? ' checked' : ''} /> <span>Planifier aussi le petit-déjeuner</span></label>
+      <label class="check"><input type="checkbox" data-action="snack"${showSnack ? ' checked' : ''} /> <span>Planifier aussi le goûter</span></label>
     </section>
+    <aside class="planning-layout__assistant" data-assistant${assistantOpen ? '' : ' hidden'} aria-label="Assistant"></aside>
+    </div>
   `;
 
   el.querySelector('[data-action="breakfast"]')?.addEventListener('change', async (event) => {
     await setShowBreakfast(/** @type {HTMLInputElement} */ (event.target).checked);
     await renderPlanning(el, params);
   });
+  el.querySelector('[data-action="snack"]')?.addEventListener('change', async (event) => {
+    await setShowSnack(/** @type {HTMLInputElement} */ (event.target).checked);
+    await renderPlanning(el, params);
+  });
+
+  const dock = /** @type {HTMLElement} */ (el.querySelector('[data-assistant]'));
+  const openAssistant = () => mountAssistant(dock, { monday, onPlanChange: () => refreshGrid(el, params) });
+  el.querySelector('[data-action="assistant"]')?.addEventListener('click', async () => {
+    assistantOpen = !assistantOpen;
+    await renderPlanning(el, params);
+    if (assistantOpen) dock.scrollIntoView({ block: 'start' });
+  });
+  if (assistantOpen) await openAssistant();
+}
+
+/**
+ * Apres un changement accepte : seule la grille de la semaine est redessinee,
+ * la conversation reste a l'ecran.
+ * @param {HTMLElement} el
+ * @param {Record<string, string>} params
+ */
+async function refreshGrid(el, params) {
+  const holder = document.createElement('div');
+  const keep = assistantOpen;
+  assistantOpen = false;
+  await renderPlanning(holder, params);
+  assistantOpen = keep;
+  const fresh = holder.querySelector('.week');
+  const current = el.querySelector('.week');
+  if (fresh && current) current.replaceWith(fresh);
 }

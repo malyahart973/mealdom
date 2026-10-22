@@ -39,6 +39,7 @@ import { freeSlots } from './proposal.js';
  * @property {Weights} learnedWeights        Preferences apprises (poids reduits)
  * @property {Map<string, DriveProduct[]>} productsByIngredient
  * @property {Map<string, string>} cuisineRegion
+ * @property {Set<string>} [preferredCuisines]   Cuisines retenues dans les preferences (bonus leger)
  */
 
 /**
@@ -115,6 +116,7 @@ function bestRecipe(where, constraints, weights, env, ctx) {
     );
     let score = s.score + tieBreak(`${recipe.id}|${where.date}|${where.slot}`);
     if (env.preferCuisine && recipe.cuisine === env.preferCuisine) score += 3;
+    if (ctx.preferredCuisines?.has(recipe.cuisine)) score += 2;
     if (env.preferTag && hasTag(recipe, env.preferTag)) score += 6;
     if (!best || score > best.score) best = { recipe, score, reasons: s.reasons };
   }
@@ -434,6 +436,23 @@ export function learnedWeights(preferences) {
   const w = {};
   for (const p of preferences) if (p.active && p.kind === 'mode') w[/** @type {Mode} */ (p.value)] = 0.4;
   return w;
+}
+
+/**
+ * Cuisines preferees (preferences actives « cuisine » ou « region »).
+ * @param {{ kind: string, value: string, active: boolean }[]} preferences
+ * @param {Map<string, string>} cuisineRegion
+ * @returns {Set<string>}
+ */
+export function preferredCuisines(preferences, cuisineRegion) {
+  /** @type {Set<string>} */
+  const set = new Set();
+  for (const p of preferences) {
+    if (!p.active) continue;
+    if (p.kind === 'cuisine') set.add(p.value);
+    if (p.kind === 'region') for (const [c, r] of cuisineRegion) if (r === p.value) set.add(c);
+  }
+  return set;
 }
 
 /**

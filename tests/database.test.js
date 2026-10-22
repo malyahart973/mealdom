@@ -6,7 +6,8 @@ import { test, assertEqual } from './runner.js';
 import { migrations } from '../src/db/migrations.js';
 
 const hasIndexedDb = typeof indexedDB !== 'undefined';
-const ALL_STORES = ['budget', 'expenses', 'household', 'inventory', 'meals', 'packages', 'prices', 'settings', 'shoppingLists', 'stores'];
+const ALL_STORES = ['budget', 'changeHistory', 'conversations', 'driveOrders', 'driveProducts', 'expenses', 'household', 'inventory', 'meals', 'packages', 'preferences', 'prices', 'program', 'settings', 'shoppingLists', 'stores', 'weights'];
+const V5_STORES = ['budget', 'expenses', 'household', 'inventory', 'meals', 'packages', 'prices', 'settings', 'shoppingLists', 'stores'];
 
 /**
  * @template T
@@ -91,8 +92,24 @@ if (hasIndexedDb) {
     const v5 = await openDatabaseWith(name, migrations.slice(0, 5));
     const item = /** @type {{ quantity: number }} */ (await done(v5.transaction('inventory').objectStore('inventory').get('i1')));
     assertEqual(item.quantity, 500);
-    assertEqual([...v5.objectStoreNames].sort(), ALL_STORES);
+    assertEqual([...v5.objectStoreNames].sort(), V5_STORES);
     v5.close();
+    await done(indexedDB.deleteDatabase(name));
+  });
+
+  test('Migration v5 -> v6 : repas et budget conservés, assistant, Drive et programme ajoutés', async () => {
+    const name = `mealdom-test-v5-${Date.now()}`;
+    const v5 = await openDatabaseWith(name, migrations.slice(0, 5));
+    await write(v5, 'meals', { id: 'm1', date: '2026-10-19', slot: 'dinner' });
+    await write(v5, 'budget', { id: 'main', monthlyCents: 60000, weeklyCents: 15000, exceptional: [] });
+    v5.close();
+
+    const v6 = await openDatabaseWith(name, migrations.slice(0, 6));
+    assertEqual(await done(v6.transaction('meals').objectStore('meals').get('m1')), { id: 'm1', date: '2026-10-19', slot: 'dinner' });
+    const budget = /** @type {{ weeklyCents: number }} */ (await done(v6.transaction('budget').objectStore('budget').get('main')));
+    assertEqual(budget.weeklyCents, 15000);
+    assertEqual([...v6.objectStoreNames].sort(), ALL_STORES);
+    v6.close();
     await done(indexedDB.deleteDatabase(name));
   });
 

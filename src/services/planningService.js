@@ -10,6 +10,7 @@ import { recipesById } from './catalog.js';
 /** @typedef {import('../domain/planning/planning.js').Meal} Meal */
 
 const BREAKFAST_KEY = 'planningShowBreakfast';
+const SNACK_KEY = 'planningShowSnack';
 
 /** @returns {Promise<Meal[]>} */
 export function getMeals() {
@@ -62,4 +63,17 @@ export async function getShowBreakfast() {
  */
 export async function setShowBreakfast(value) {
   await setSetting(BREAKFAST_KEY, value);
+}
+
+/** @returns {Promise<boolean>} */
+export async function getShowSnack() {
+  return (await getSetting(SNACK_KEY)) === true;
+}
+
+/**
+ * @param {boolean} value
+ * @returns {Promise<void>}
+ */
+export async function setShowSnack(value) {
+  await setSetting(SNACK_KEY, value);
 }

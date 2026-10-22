@@ -35,6 +35,17 @@ export const migrations = [
     db.createObjectStore('budget', { keyPath: 'id' });
     db.createObjectStore('expenses', { keyPath: 'id' }).createIndex('date', 'date');
   },
+  // v6 (0.9.0) : assistant (conversations, historique des changements, preferences),
+  // Drive (produits releves, commandes), programme minceur et pesees
+  (db) => {
+    db.createObjectStore('conversations', { keyPath: 'week' });
+    db.createObjectStore('changeHistory', { keyPath: 'id' }).createIndex('week', 'week');
+    db.createObjectStore('preferences', { keyPath: 'id' });
+    db.createObjectStore('driveProducts', { keyPath: 'key' }).createIndex('storeId', 'storeId');
+    db.createObjectStore('driveOrders', { keyPath: 'id' });
+    db.createObjectStore('program', { keyPath: 'id' });
+    db.createObjectStore('weights', { keyPath: 'date' });
+  },
 ];
 
 /** Version actuelle du schema de la base. */
