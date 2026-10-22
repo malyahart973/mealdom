@@ -1,9 +1,31 @@
 # MealDom
 
 Application installable sur téléphone (PWA) pour organiser les repas du foyer :
-planning, recettes du monde, batch cooking, stock, liste de courses, budget et comparaison des magasins.
+planning, plus de 600 recettes du monde (dont plus de 250 asiatiques), batch cooking, stock, liste de courses,
+budget, comparaison des magasins, Drive Hyper U Cayenne, programme minceur avec suivi du poids,
+et un assistant conversationnel qui modifie le planning à la demande.
 
 Fonctionne sans compte et sans Internet. Les données restent sur l'appareil.
+Seule exception, facultative : avec une clé API Anthropic, l'assistant envoie les demandes à l'IA Claude.
+
+## Assistant : qui fait quoi
+
+- **L'IA propose, explique et calcule** : elle comprend la demande, lit le planning et les prix au moyen
+  d'outils en lecture seule, puis propose des opérations (remplacer un repas, changer un ingrédient, ajuster les portions...).
+- **Le moteur de l'application vérifie et exécute** : chaque opération est validée par les mêmes règles que la saisie
+  manuelle (foyer, allergies, verrouillage), chiffrée avec les prix enregistrés, puis montrée en avant/après.
+  Rien ne change avant « Accepter » ; chaque changement accepté peut être annulé.
+- L'IA n'a aucun accès direct à la base et ne peut pas commander. Une commande Drive se valide séparément, après
+  vérification des prix, quantités, disponibilités et du magasin.
+- Sans clé (ou hors ligne), le moteur local comprend les demandes courantes et fait les mêmes propositions.
+- Aucune promotion, aucun prix, aucune disponibilité n'est inventé : ils viennent des relevés (datés) ou d'un import.
+
+## Drive Hyper U Cayenne
+
+Hyper U ne publie pas d'accès pour les applications. MealDom ne lit donc pas le site du Drive : les prix,
+formats et promotions sont relevés sur le site (saisie ou import CSV) avec leur date. Un prix de plus de 48 h
+est signalé « à revérifier ». MealDom prépare le panier, contrôle la commande et la fait valider explicitement ;
+la commande se passe ensuite sur le site du Drive.
 
 ## Technique
 
@@ -38,7 +60,11 @@ src/
     shopping/         Besoins de la semaine, agrégation, stock, conditionnements, liste de courses
     stores/           Magasins, prix relevés, disponibilité, coût estimé des courses
     budget/           Montants en centimes, budget, dépenses réelles, prévision
-  data/               Données de référence (ingrédients, cuisines, préparations, recettes, portions)
+    nutrition/        Valeurs nutritionnelles, programme minceur (besoins, portions), suivi du poids
+    drive/            Produits Drive, promotions, chiffrage vérifié/estimé, contrôle de commande
+    assistant/        Compréhension des demandes, moteur de propositions, opérations, préférences, outils de l'IA
+  data/               Données de référence (ingrédients, valeurs nutritionnelles, cuisines, préparations, portions)
+    catalog/          Catalogue de recettes par famille (petit-déjeuner, goûter, Asie, monde, léger)
   db/                 Base locale et accès aux données
   utils/              Petits outils communs
   styles/main.css     Style
@@ -60,6 +86,7 @@ tests/                Tests des règles métier (ouvrir tests/index.html)
 
 ## Historique
 
+- **0.9.0** — Assistant conversationnel (IA Claude facultative + moteur local hors ligne) : demandes libres, modes combinables (promotions, gourmand, économie, équilibre, rapidité, anti-gaspillage...), aperçu avant/après chiffré, Accepter/Modifier/Annuler, historique et annulation, préférences retenues. Catalogue de 602 recettes (petit-déjeuner, repas, goûter). Programme minceur (besoins, objectifs par repas, portions en grammes) et suivi du poids avec courbe. Drive Hyper U Cayenne (relevés, promotions, panier vérifié, commande validée explicitement). Goûter dans le planning. Base v6.
 - **0.8.0** — Magasins et prix relevés, coût estimé des courses, budget mensuel/hebdomadaire/exceptionnel, dépenses réelles, prévision de fin de mois. Base v5.
 - **0.7.0** — Stock, liste de courses de la semaine (agrégation, déduction du stock, conditionnements, rayons, cases à cocher hors ligne, articles ajoutés à la main). Bouton Retour dans la barre du haut. Base v4.
 - **0.6.0** — Batch cooking de la semaine (préparations partagées, quantités, ordre, cuissons en parallèle). 2 préparations et 2 recettes ajoutées. Vérification des mises à jour au retour dans l'application.

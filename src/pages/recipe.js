@@ -1,5 +1,5 @@
 import { escapeHtml } from '../utils/html.js';
-import { formatMinutes } from '../utils/format.js';
+import { formatMinutes, formatNumber } from '../utils/format.js';
 import { formatQuantity } from '../utils/quantity.js';
 import { ALLERGENS, PRODUCT_LABEL_WARNING } from '../domain/ingredients/allergens.js';
 import { equipmentLabel } from '../domain/recipes/equipment.js';
@@ -7,10 +7,16 @@ import {
   DIFFICULTY_LABELS,
   VESSEL_LABELS,
   findSharedPreparations,
+  MEAL_TYPES,
+  RECIPE_TAGS,
   recipeAllergens,
+  recipeMealTypes,
   totalMinutes,
 } from '../domain/recipes/recipes.js';
-import { recipes, recipesById, preparationsById, ingredientsById, cuisineLabels } from '../services/catalog.js';
+import { recipes, recipesById, preparationsById, ingredientsById, cuisineLabels, nutritionContext } from '../services/catalog.js';
+import { recipeNutrition, roundNutrients, portionLines } from '../domain/nutrition/nutrition.js';
+import { personalPortion } from '../domain/nutrition/program.js';
+import { programSummary } from '../services/programService.js';
 import { getHousehold } from '../services/householdService.js';
 import { evaluateRecipeForHousehold } from '../domain/household/compatibility.js';
 import { DIETS } from '../domain/household/household.js';
@@ -20,6 +26,24 @@ import { DIETS } from '../domain/household/household.js';
 
 const allergenLabels = new Map(ALLERGENS.map((a) => [a.id, a.label]));
 const dietLabels = new Map(DIETS.map((d) => [d.id, d.label.toLowerCase()]));
+const mealTypeLabels = new Map(MEAL_TYPES.map((t) => [t.id, t.label]));
+const tagLabels = new Map(RECIPE_TAGS.map((t) => [t.id, t.label]));
+
+/**
+ * Quantites en grammes d'une portion personnelle.
+ * @param {import('../domain/recipes/recipes.js').Recipe} recipe
+ * @param {number} portions
+ * @returns {string}
+ */
+function gramsHtml(recipe, portions) {
+  return `<ul class="ingredients">${portionLines(recipe, portions, nutritionContext)
+    .map((l) => {
+      const name = l.kind === 'ingredient' ? ingredientsById.get(l.id)?.name ?? l.id : (preparationsById.get(l.id)?.name ?? l.id).toLowerCase();
+      const qty = l.grams !== null ? `${l.grams} g` : formatQuantity(l.quantity, l.unit);
+      return `<li><span class="ingredients__qty">${escapeHtml(qty)}</span><span>${escapeHtml(name)}</span></li>`;
+    })
+    .join('')}</ul>`;
+}
 
 /**
  * "Léa", "Léa et Marc", "Léa, Marc et Sam"
@@ -92,7 +116,34 @@ export async function renderRecipe(el, params) {
     return;
   }
 
-  const household = await getHousehold();
+  const [household, program] = await Promise.all([getHousehold(), programSummary()]);
+  const nutrition = recipeNutrition(recipe, nutritionContext);
+  const perPortion = roundNutrients(nutrition.perPortion);
+  const types = recipeMealTypes(recipe);
+  /** @type {{ slot: 'breakfast' | 'lunch' | 'snack' | 'dinner', label: string, kcal: number, portion: ReturnType<typeof personalPortion> }[]} */
+  const personal = program
+    ? MEAL_TYPES.filter((t) => types.includes(t.id) && program.program.mealSplit[t.id] > 0).map((t) => ({
+        slot: t.id,
+        label: t.label,
+        kcal: program.meals[t.id].kcal,
+        portion: personalPortion(nutrition.perPortion, program.meals[t.id].kcal),
+      }))
+    : [];
+  const personalHtml = personal.length
+    ? `<section class="portion-box" aria-labelledby="portion-title">
+        <h2 id="portion-title">Votre portion (programme minceur)</h2>
+        ${personal
+          .map(
+            (p, i) => `<details class="prep"${i === 0 ? ' open' : ''}>
+              <summary>${escapeHtml(p.label)} : ${escapeHtml(formatNumber(p.portion.portions))} portion, environ ${p.portion.kcal} kcal et ${p.portion.protein} g de protéines</summary>
+              ${p.portion.fits ? '' : `<p class="hint">${p.portion.portions >= 1.6 ? 'Recette légère pour ce repas : ajoutez un laitage, un fruit ou du pain complet pour atteindre' : 'Recette riche pour ce repas : même une demi-portion dépasse'} l’objectif de ${p.kcal} kcal.</p>`}
+              ${gramsHtml(recipe, p.portion.portions)}
+            </details>`,
+          )
+          .join('')}
+        <p class="hint">Quantités crues, en grammes, pour votre assiette : pesez-les ou servez-vous en conséquence. Les légumes peuvent être augmentés à volonté.</p>
+      </section>`
+    : '';
   const fit = evaluateRecipeForHousehold(recipe, household, { ingredients: ingredientsById, preparations: preparationsById });
   const fitHtml =
     fit.status === 'compatible'
@@ -147,7 +198,9 @@ export async function renderRecipe(el, params) {
         <div><dt>Cuisson</dt><dd>${escapeHtml(formatMinutes(recipe.cookMinutes))}</dd></div>
         <div><dt>Difficulté</dt><dd>${escapeHtml(DIFFICULTY_LABELS[recipe.difficulty])}</dd></div>
         ${recipe.vessel ? `<div><dt>Vaisselle</dt><dd>${escapeHtml(VESSEL_LABELS[recipe.vessel])}</dd></div>` : ''}
+        <div><dt>Repas</dt><dd>${escapeHtml(types.map((t) => mealTypeLabels.get(t)).join(', '))}</dd></div>
       </dl>
+      ${(recipe.tags ?? []).length ? `<p>${(recipe.tags ?? []).map((t) => `<span class="tag">${escapeHtml(tagLabels.get(t) ?? t)}</span>`).join(' ')}</p>` : ''}
 
       ${fitHtml}
       <div class="allergens" role="note">
@@ -155,11 +208,25 @@ export async function renderRecipe(el, params) {
         <p class="hint">${escapeHtml(PRODUCT_LABEL_WARNING)}</p>
       </div>
 
+      ${personalHtml}
+
       <h2>Ingrédients pour ${recipe.servings} portions</h2>
       ${ingredientsHtml(recipe.ingredients)}
       ${recipe.preparations.length ? `<h2>Préparé à l’avance</h2>${preparationsHtml}` : ''}
 
       ${methodsHtml(recipe.methods, 'h2')}
+
+      <h2>Valeurs nutritionnelles d’une portion</h2>
+      <dl class="facts">
+        <div><dt>Énergie</dt><dd>${Math.round(perPortion.kcal)} kcal</dd></div>
+        <div><dt>Protéines</dt><dd>${escapeHtml(formatNumber(perPortion.protein))} g</dd></div>
+        <div><dt>Glucides</dt><dd>${escapeHtml(formatNumber(perPortion.carbs))} g</dd></div>
+        <div><dt>Lipides</dt><dd>${escapeHtml(formatNumber(perPortion.fat))} g</dd></div>
+        <div><dt>Fibres</dt><dd>${escapeHtml(formatNumber(perPortion.fiber))} g</dd></div>
+      </dl>
+      <p class="hint">Estimation calculée à partir des tables de composition des aliments (valeurs moyennes, ingrédients crus)${
+        nutrition.complete ? '' : ' ; certains ingrédients en petite quantité ou « selon le goût » ne sont pas comptés'
+      }. Les produits que vous achetez peuvent différer : l’étiquette fait foi.</p>
 
       ${recipe.tips.length ? `<h2>Bon à savoir</h2>${recipe.tips.map((t) => `<p>${escapeHtml(t)}</p>`).join('')}` : ''}
 

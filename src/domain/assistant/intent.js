@@ -382,9 +382,10 @@ export function mergeRequests(previous, next) {
  * @param {Request} r
  * @param {(iso: string) => string} dayLabel
  * @param {Map<string, string>} slotLabels
+ * @param {Map<string, string>} [placeLabels]  Noms des cuisines et des regions (ex. japanese -> japonaise, asia -> Asie)
  * @returns {string}
  */
-export function describeRequest(r, dayLabel, slotLabels) {
+export function describeRequest(r, dayLabel, slotLabels, placeLabels) {
   /** @type {string[]} */
   const parts = [];
   const modeLabels = new Map(MODES.map((m) => [m.id, m.label.toLowerCase()]));
@@ -399,7 +400,8 @@ export function describeRequest(r, dayLabel, slotLabels) {
   if (r.guests) parts.push(r.guests.mode === 'add' ? `${r.guests.count} invité(s) en plus` : `${r.guests.count} personnes à table`);
   if (r.convivial) parts.push('repas convivial');
   if (r.leftovers) parts.push('utiliser les restes');
-  if (r.cuisine || r.region) parts.push(`cuisine ${r.cuisine ?? r.region}`);
+  const place = r.cuisine ?? r.region;
+  if (place) parts.push(`cuisine : ${placeLabels?.get(place) ?? place}`);
   if (r.keepMeals) parts.push('garder les mêmes repas');
   if (r.days.length) parts.push(`jours : ${r.days.map(dayLabel).join(', ')}`);
   if (r.slots.length) parts.push(`repas : ${r.slots.map((s) => (slotLabels.get(s) ?? s).toLowerCase()).join(', ')}`);

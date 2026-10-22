@@ -1,10 +1,12 @@
 import { escapeHtml } from '../utils/html.js';
-import { formatIsoDay, formatMinutes, formatPortions } from '../utils/format.js';
+import { formatIsoDay, formatMinutes, formatPortions, formatNumber } from '../utils/format.js';
 import { addDays, parseIsoDate } from '../domain/planning/dates.js';
 import { SLOTS, mealPortionsFor } from '../domain/planning/planning.js';
 import { filterRecipes } from '../domain/recipes/recipeFiltering.js';
-import { totalMinutes } from '../domain/recipes/recipes.js';
-import { recipes, recipesById, filterContext } from '../services/catalog.js';
+import { totalMinutes, recipeMealTypes } from '../domain/recipes/recipes.js';
+import { personalPortion } from '../domain/nutrition/program.js';
+import { recipes, recipesById, filterContext, ingredientsById, nutritionByRecipe } from '../services/catalog.js';
+import { programSummary } from '../services/programService.js';
 import { getHousehold } from '../services/householdService.js';
 import { getMeals, saveMeal, deleteMeal, newMealId } from '../services/planningService.js';
 
@@ -29,6 +31,9 @@ function attendeesHtml(name, household, checked) {
     .join('');
 }
 
+/** Nombre de recettes affichees dans le choix avant de devoir preciser la recherche. */
+const MAX_CHOICES = 40;
+
 /**
  * Nombre entier saisi (vide = 0, invalide = -1 pour etre refuse par la validation).
  * @param {HTMLInputElement | null} input
@@ -47,7 +52,7 @@ function readCount(input) {
  * @param {Record<string, string>} params
  */
 export async function renderMeal(el, params) {
-  const [meals, household] = await Promise.all([getMeals(), getHousehold()]);
+  const [meals, household, program] = await Promise.all([getMeals(), getHousehold(), programSummary()]);
   const existing = params.id ? meals.find((m) => m.id === params.id) : undefined;
 
   if (params.id && !existing) {
@@ -123,7 +128,23 @@ export async function renderMeal(el, params) {
           </div>
         </fieldset>
 
+        ${
+          meal.substitutions?.length
+            ? `<fieldset class="field checks"${disabled}>
+                <legend>Ingrédients remplacés</legend>
+                ${meal.substitutions
+                  .map(
+                    (sub) => `<label class="check"><input type="checkbox" name="substitution" value="${escapeHtml(sub.from)}" checked />
+                      <span>${escapeHtml(ingredientsById.get(sub.from)?.name ?? sub.from)} remplacé par ${escapeHtml(ingredientsById.get(sub.to)?.name ?? sub.to)}</span></label>`,
+                  )
+                  .join('')}
+                <p class="hint">Décochez pour revenir à l’ingrédient d’origine (la liste de courses suivra).</p>
+              </fieldset>`
+            : ''
+        }
+
         <p class="portions" data-output="portions" aria-live="polite"></p>
+        <p class="hint" data-output="personal" aria-live="polite"></p>
 
         <label class="check"><input type="checkbox" name="locked"${meal.locked ? ' checked' : ''} />
           <span>Verrouiller ce repas (il ne pourra plus être modifié par erreur)</span></label>
@@ -144,6 +165,7 @@ export async function renderMeal(el, params) {
   const nextLunchBlock = /** @type {HTMLElement} */ (el.querySelector('[data-block="next-lunch"]'));
   const nextLunchGroup = /** @type {HTMLElement} */ (el.querySelector('[data-group="next-lunch"]'));
   const portionsOut = /** @type {HTMLElement} */ (el.querySelector('[data-output="portions"]'));
+  const personalOut = /** @type {HTMLElement} */ (el.querySelector('[data-output="personal"]'));
 
   /** @param {string} name */
   const field = (name) => /** @type {HTMLInputElement | null} */ (form.elements.namedItem(name));
@@ -166,27 +188,38 @@ export async function renderMeal(el, params) {
       guests: readCount(field('guests')),
       nextLunch: wantsLunch ? { attendees: checked('lunchAttendees'), guests: readCount(field('lunchGuests')) } : null,
       locked: Boolean(field('locked')?.checked),
+      ...(meal.substitutions ? { substitutions: meal.substitutions.filter((sub) => checked('substitution').includes(sub.from)) } : {}),
     };
   };
 
   const renderRecipeChoices = () => {
     const current = selectedRecipeId;
-    let options = filterRecipes(recipes, { query, household }, filterContext);
+    const slot = /** @type {Slot} */ (field('slot')?.value ?? meal.slot);
+    const matching = filterRecipes(recipes, { query, household }, filterContext).filter((r) => recipeMealTypes(r).includes(slot));
+    let options = matching.slice(0, MAX_CHOICES);
     const currentRecipe = recipesById.get(current);
     if (currentRecipe && !options.includes(currentRecipe)) options = [currentRecipe, ...options];
+    const more = matching.length - options.filter((r) => matching.includes(r)).length;
     list.innerHTML = options.length
-      ? options
+      ? `${options
           .map(
             (r) => `<label class="check choice"><input type="radio" name="recipe" value="${escapeHtml(r.id)}"${
               r.id === current ? ' checked' : ''
             }${disabled} /> <span>${escapeHtml(r.name)} <span class="hint">${escapeHtml(formatMinutes(totalMinutes(r)))}</span></span></label>`,
           )
-          .join('')
-      : '<p class="hint">Aucune recette adaptée ne correspond à cette recherche.</p>';
+          .join('')}${more > 0 ? `<p class="hint">Et ${more} autres recettes : précisez la recherche (nom, ingrédient, cuisine).</p>` : ''}`
+      : '<p class="hint">Aucune recette adaptée à ce repas ne correspond à cette recherche.</p>';
   };
 
   const refresh = () => {
     const draft = readDraft();
+    const target = program ? program.meals[draft.slot] : null;
+    const values = draft.recipeId ? nutritionByRecipe().get(draft.recipeId) : undefined;
+    const followed = program && (program.program.memberId === null || draft.attendees.includes(program.program.memberId));
+    if (target && values && followed && program && program.program.mealSplit[draft.slot] > 0) {
+      const portion = personalPortion(values, target.kcal);
+      personalOut.textContent = `Programme minceur : votre portion est de ${formatNumber(portion.portions)} portion (environ ${portion.kcal} kcal pour un objectif de ${target.kcal} kcal). Les grammes sont sur la fiche recette.`;
+    } else personalOut.textContent = '';
     nextLunchGroup.hidden = draft.slot !== 'dinner';
     nextLunchBlock.hidden = !draft.nextLunch;
     if (draft.guests < 0 || (draft.nextLunch && draft.nextLunch.guests < 0)) {
@@ -202,7 +235,9 @@ export async function renderMeal(el, params) {
   list.addEventListener('change', (event) => {
     const input = /** @type {HTMLInputElement} */ (event.target);
     if (input.name === 'recipe') selectedRecipeId = input.value;
+    refresh();
   });
+  field('slot')?.addEventListener('change', renderRecipeChoices);
   search.addEventListener('input', () => {
     query = search.value;
     renderRecipeChoices();

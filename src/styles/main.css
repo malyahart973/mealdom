@@ -14,6 +14,7 @@
   --muted: #56685e;
   --line: #d6e1d9;
   --danger: #a3302a;
+  --chart-series: #2a78d6;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -42,6 +43,7 @@
     --muted: #9fb2a7;
     --line: #2a3d33;
     --danger: #ef8a83;
+    --chart-series: #3987e5;
   }
 }
 
@@ -1113,7 +1115,7 @@ a.button {
   margin-bottom: var(--space-3);
 }
 
-.stock-form input:not([type="checkbox"]),
+.stock-form input:not([type="checkbox"]):not([type="radio"]),
 .stock-form select {
   width: 100%;
   min-height: 3rem;
@@ -1239,4 +1241,475 @@ h3 {
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* ---------- Badges (fiabilite des prix, statut) ---------- */
+
+.badge {
+  display: inline-block;
+  margin: 0;
+  padding: 0.125rem var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.badge--ok,
+.badge--verified {
+  border-color: var(--leaf);
+  color: var(--leaf);
+}
+
+.badge--estimated {
+  border-color: var(--maracuja);
+  color: var(--ink);
+}
+
+.badge--not_comparable {
+  border-style: dashed;
+}
+
+.alert--ok {
+  border-left-color: var(--leaf);
+  color: var(--ink);
+}
+
+/* ---------- Planning avec l'assistant ---------- */
+
+@media (min-width: 64rem) {
+  .view:has(.planning-layout--assistant) {
+    max-width: 80rem;
+  }
+
+  .planning-layout--assistant {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 28rem);
+    gap: var(--space-6);
+    align-items: start;
+  }
+
+  .planning-layout--assistant .planning-layout__assistant {
+    position: sticky;
+    top: var(--space-4);
+    max-height: calc(100dvh - var(--space-8));
+    overflow-y: auto;
+  }
+}
+
+.planning-layout__assistant {
+  margin-top: var(--space-6);
+}
+
+/* ---------- Assistant ---------- */
+
+.assistant {
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.assistant__head h2 {
+  margin: 0 0 var(--space-1);
+  font-size: 1.125rem;
+}
+
+.chat {
+  list-style: none;
+  margin: var(--space-4) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.chat__msg {
+  max-width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+}
+
+.chat__msg p {
+  margin: 0 0 var(--space-2);
+}
+
+.chat__msg p:last-of-type {
+  margin-bottom: 0;
+}
+
+.chat__msg--user {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--leaf);
+  color: #fff;
+  border-bottom-right-radius: var(--space-1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .chat__msg--user {
+    color: var(--paper);
+  }
+}
+
+.chat__msg--assistant {
+  align-self: stretch;
+  background: var(--paper);
+  border-bottom-left-radius: var(--space-1);
+}
+
+.chat__source {
+  display: inline-block;
+  margin-top: var(--space-2);
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.chat__busy {
+  margin: 0 0 var(--space-3);
+  color: var(--muted);
+  font-style: italic;
+}
+
+.chat__busy[hidden] {
+  display: none;
+}
+
+.chat__busy::before {
+  content: "";
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: var(--space-2);
+  border: 2px solid var(--line);
+  border-top-color: var(--leaf);
+  border-radius: 50%;
+  vertical-align: -0.0625rem;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat__busy::before {
+    animation: none;
+  }
+}
+
+.chat__form {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.chat__form textarea {
+  flex: 1;
+  min-height: 3rem;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.chat__suggestions,
+.chat__history {
+  margin-top: var(--space-4);
+}
+
+.chat__suggestions summary,
+.chat__history summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* ---------- Propositions ---------- */
+
+.proposal {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--maracuja);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+}
+
+.proposal__head h3 {
+  margin: 0 0 var(--space-1);
+}
+
+.proposal h4 {
+  margin: var(--space-4) 0 var(--space-1);
+  font-size: 0.9375rem;
+}
+
+.proposal ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.proposal__changes li,
+.proposal__reasons li,
+.proposal__notes li {
+  margin-bottom: var(--space-1);
+}
+
+.proposal__notes {
+  color: var(--muted);
+}
+
+.proposal__cost {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.proposal__ingredients summary {
+  cursor: pointer;
+}
+
+.proposal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-top: var(--space-4);
+}
+
+.proposal__actions .check {
+  flex-basis: 100%;
+}
+
+.proposal__links {
+  margin: var(--space-3) 0 0;
+  font-size: 0.875rem;
+}
+
+/* ---------- Recettes : filtres ---------- */
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.field--inline {
+  margin: 0;
+}
+
+.field--inline label {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.field--inline select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+/* ---------- Programme minceur ---------- */
+
+.portion-box {
+  margin: var(--space-6) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--leaf);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+}
+
+.portion-box h2 {
+  margin-top: 0;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+}
+
+.split label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.split input {
+  width: 4rem !important;
+  min-height: 2.75rem !important;
+  text-align: right;
+}
+
+.meter {
+  height: 0.625rem;
+  margin: var(--space-2) 0;
+  border-radius: 999px;
+  background: var(--leaf-soft);
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--leaf);
+}
+
+.status {
+  padding: var(--space-3) var(--space-4);
+  border-left: 5px solid var(--leaf);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+}
+
+.status--too_fast,
+.status--gaining {
+  border-left-color: var(--maracuja);
+}
+
+.status--not_enough_data,
+.status--stalled {
+  border-left-color: var(--line);
+}
+
+/* ---------- Tableau ---------- */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  padding: var(--space-2) var(--space-2) var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+/* ---------- Courbe de poids ---------- */
+
+.chart {
+  margin: var(--space-2) 0;
+}
+
+.chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin-bottom: var(--space-2);
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.chart__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.chart__plot {
+  position: relative;
+}
+
+.chart__plot svg {
+  display: block;
+  overflow: visible;
+}
+
+.chart__plot svg:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+.chart__grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.chart__tick {
+  fill: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__goal {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.chart__line {
+  stroke: var(--chart-series);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.chart__dot {
+  fill: var(--chart-series);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.chart__cross {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.chart__focus {
+  fill: var(--chart-series);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.chart__tip {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+  font-size: 0.8125rem;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.chart__tip[hidden] {
+  display: none;
+}
+
+.chart__tip strong {
+  font-size: 1rem;
+}
+
+.chart__tip span {
+  color: var(--muted);
 }

@@ -2,7 +2,6 @@ import { toIsoDate, weekStart, parseIsoDate } from '../domain/planning/dates.js'
 import { getHousehold } from '../services/householdService.js';
 import { mountAssistant } from './assistantPanel.js';
 import { ingredientsById } from '../services/catalog.js';
-import { escapeHtml } from '../utils/html.js';
 
 /**
  * Ecran Assistant en plein ecran.
@@ -27,6 +26,6 @@ export async function renderAssistant(el, params) {
   await mountAssistant(/** @type {HTMLElement} */ (el.querySelector('[data-assistant]')), {
     monday,
     focusIngredientId: focus,
-    initialText: focus ? `Trouve une alternative moins chère à ce produit (${escapeHtml(ingredientsById.get(focus)?.name ?? '')})` : '',
+    initialText: focus ? `Trouve une alternative moins chère à ce produit (${ingredientsById.get(focus)?.name ?? ''})` : '',
   });
 }

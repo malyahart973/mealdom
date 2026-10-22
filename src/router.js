@@ -14,6 +14,11 @@ import { renderStock } from './pages/stock.js';
 import { renderStores } from './pages/stores.js';
 import { renderStore } from './pages/store.js';
 import { renderBudget } from './pages/budget.js';
+import { renderAssistant } from './pages/assistant.js';
+import { renderAssistantPreferences } from './pages/assistantPreferences.js';
+import { renderDrive } from './pages/drive.js';
+import { renderProgram } from './pages/program.js';
+import { renderWeight } from './pages/weight.js';
 
 /**
  * @typedef {Object} Route
@@ -73,6 +78,32 @@ const routes = [
     parent: () => '/foyer',
   },
   { pattern: /^\/parametres$/, title: 'Paramètres', tab: '/plus', render: renderSettings, parent: () => '/plus' },
+  { pattern: /^\/assistant$/, title: 'Assistant', tab: '/planning', render: renderAssistant, parent: () => '/planning' },
+  {
+    pattern: /^\/assistant\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/,
+    title: 'Assistant',
+    tab: '/planning',
+    render: renderAssistant,
+    parent: (p) => `/planning/semaine/${p.date}`,
+  },
+  {
+    pattern: /^\/assistant\/produit\/(?<ingredientId>[^/]+)$/,
+    title: 'Assistant',
+    tab: '/courses',
+    render: renderAssistant,
+    parent: () => '/courses',
+  },
+  { pattern: /^\/assistant\/preferences$/, title: 'Préférences de l’assistant', tab: '/plus', render: renderAssistantPreferences, parent: () => '/plus' },
+  { pattern: /^\/drive$/, title: 'Drive', tab: '/courses', render: renderDrive, parent: () => '/courses' },
+  {
+    pattern: /^\/drive\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/,
+    title: 'Drive',
+    tab: '/courses',
+    render: renderDrive,
+    parent: (p) => `/courses/semaine/${p.date}`,
+  },
+  { pattern: /^\/programme$/, title: 'Programme minceur', tab: '/plus', render: renderProgram, parent: () => '/plus' },
+  { pattern: /^\/poids$/, title: 'Suivi du poids', tab: '/plus', render: renderWeight, parent: () => '/plus' },
 ];
 
 /**

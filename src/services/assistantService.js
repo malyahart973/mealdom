@@ -17,7 +17,7 @@ import { TOOL_NAMES } from '../domain/assistant/tools.js';
 import { recipeCost } from '../domain/assistant/scoring.js';
 import { compareQuotes } from '../domain/drive/quote.js';
 import { isFresh, activePromotions, promotionStatus } from '../domain/drive/drive.js';
-import { buildNutritionIndex, recipeNutrition, roundNutrients } from '../domain/nutrition/nutrition.js';
+import { roundNutrients } from '../domain/nutrition/nutrition.js';
 import { programFitScore } from '../domain/nutrition/program.js';
 import { evaluateRecipeForHousehold } from '../domain/household/compatibility.js';
 import { allIngredientIds, totalMinutes, recipeMealTypes, hasTag } from '../domain/recipes/recipes.js';
@@ -35,10 +35,9 @@ import { getBudget, saveBudget } from './budgetService.js';
 import { loadPriceData, quoteForMeals, productsByIngredient, unitPrices, saveDriveSettings } from './driveService.js';
 import { programSummary } from './programService.js';
 import { callClaude, responseText, LlmError, DEFAULT_MODEL } from './llmService.js';
-import { recipes, recipesById, ingredientsById, preparationsById, cuisineLabels } from './catalog.js';
+import { recipes, recipesById, ingredientsById, preparationsById, cuisineLabels, nutritionContext, nutritionByRecipe as recipeNutritionMap } from './catalog.js';
 import { INGREDIENTS } from '../data/ingredients.js';
-import { NUTRITION } from '../data/nutrition.js';
-import { CUISINES } from '../data/cuisines.js';
+import { CUISINES, REGIONS } from '../data/cuisines.js';
 import { formatIsoDay } from '../utils/format.js';
 
 /** @typedef {import('../domain/assistant/conversation.js').Conversation} Conversation */
@@ -56,12 +55,14 @@ import { formatIsoDay } from '../utils/format.js';
 /** @typedef {import('./llmService.js').ContentBlock} ContentBlock */
 
 const finder = makeIngredientFinder(buildNameIndex(INGREDIENTS), ingredientsById);
-const nutrition = buildNutritionIndex(NUTRITION);
 const cuisineRegion = new Map(CUISINES.map((c) => [c.id, c.region]));
 const slotLabels = new Map(SLOTS.map((s) => [s.id, s.label]));
+/** Noms des cuisines et des regions, pour resumer la demande. */
+/** @type {Map<string, string>} */
+const placeLabels = new Map();
+for (const c of CUISINES) placeLabels.set(c.id, c.label.toLowerCase());
+for (const r of REGIONS) placeLabels.set(r.id, r.label);
 
-/** Valeurs nutritionnelles par portion, calculees une seule fois. */
-const nutritionByRecipe = new Map(recipes.map((r) => [r.id, recipeNutrition(r, { ingredients: ingredientsById, preparations: preparationsById, nutrition }).perPortion]));
 
 /** Nombre maximal d'echanges outil/modele par message du client. */
 const MAX_TOOL_ROUNDS = 8;
@@ -123,8 +124,8 @@ async function loadEnvironment(monday) {
     household,
     ingredients: ingredientsById,
     preparations: preparationsById,
-    nutrition,
-    nutritionByRecipe,
+    nutrition: nutritionContext.nutrition,
+    nutritionByRecipe: recipeNutritionMap(),
     unitPrices: unitPrices(priceData.products, priceData.prices, now),
     promoIngredients,
     stockIngredients: new Set(inventory.filter((i) => i.quantity > 0).map((i) => i.ingredientId)),
@@ -198,7 +199,7 @@ async function reviewOperations(operations, env) {
   const changedBefore = env.meals.filter((m) => diff.meals.some((d) => d.date === m.date && d.slot === m.slot));
   /** @param {Meal[]} list */
   const avgKcal = (list) => {
-    const values = list.map((m) => nutritionByRecipe.get(m.recipeId)?.kcal).filter((v) => v !== undefined);
+    const values = list.map((m) => recipeNutritionMap().get(m.recipeId)?.kcal).filter((v) => v !== undefined);
     return values.length ? Math.round(values.reduce((a, b) => a + /** @type {number} */ (b), 0) / values.length) : null;
   };
   const verifiedShareAfter = qa.quote.totalCents > 0 ? qa.quote.verifiedCents / qa.quote.totalCents : 0;
@@ -333,7 +334,7 @@ async function createProposal(conv, operations, summary, notes, author, request,
  * @returns {string}
  */
 function engineReply(req, proposal, notes) {
-  const lines = [describeRequest(req, (d) => formatIsoDay(d), slotLabels)];
+  const lines = [describeRequest(req, (d) => formatIsoDay(d), slotLabels, placeLabels)];
   if (proposal && proposal.status === 'pending' && proposal.review) {
     const n = proposal.review.applied.length;
     lines.push(`Voici ma proposition (${n} modification${n > 1 ? 's' : ''}). Vérifiez l’aperçu ci-dessous puis acceptez, modifiez ou annulez.`);
@@ -388,7 +389,7 @@ export async function sendMessage(monday, text, opts = {}) {
   if (!handled) {
     const result = proposeChanges(merged, { ...env.engine });
     let proposal = null;
-    if (result.operations.length) proposal = await createProposal(conv, result.operations, describeRequest(merged, (d) => formatIsoDay(d), slotLabels), result.notes, 'engine', merged, env);
+    if (result.operations.length) proposal = await createProposal(conv, result.operations, describeRequest(merged, (d) => formatIsoDay(d), slotLabels, placeLabels), result.notes, 'engine', merged, env);
     conv.messages.push(message('assistant', engineReply(merged, proposal, result.notes), 'engine', proposal?.status === 'pending' ? proposal.id : null));
     // Le modele IA sera informe de ce qui s'est passe hors ligne.
     conv.pendingEvents.push(`Hors connexion IA, le client a demandé : « ${clean} ». Le moteur local a répondu${proposal ? ` avec une proposition (${proposal.summary})` : ''}.`);
@@ -486,7 +487,7 @@ async function executeTool(name, input, conv, env, merged) {
             suitsHousehold: fit.status === 'compatible',
             ingredients: recipe.ingredients.map((l) => ({ id: l.ingredientId, name: ingredientsById.get(l.ingredientId)?.name, quantity: l.quantity, unit: l.unit })),
             preparations: recipe.preparations.map((p) => ({ id: p.preparationId, name: preparationsById.get(p.preparationId)?.name, quantity: p.quantity, unit: p.unit })),
-            perPortion: roundNutrients(nutritionByRecipe.get(recipe.id) ?? { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }),
+            perPortion: roundNutrients(recipeNutritionMap().get(recipe.id) ?? { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }),
           },
         };
       }
@@ -501,7 +502,7 @@ async function executeTool(name, input, conv, env, merged) {
         const req = applyPreferences(mergeRequests(merged, parseRequest(request, { today: env.today, monday: env.monday, ...finder })), env.preferences);
         const result = proposeChanges(req, env.engine);
         if (!result.operations.length) return { result: { operations: [], notes: result.notes, needsClarification: result.needsClarification } };
-        const proposal = await createProposal(conv, result.operations, describeRequest(req, (d) => formatIsoDay(d), slotLabels), result.notes, 'engine', req, env);
+        const proposal = await createProposal(conv, result.operations, describeRequest(req, (d) => formatIsoDay(d), slotLabels, placeLabels), result.notes, 'engine', req, env);
         return { proposal, result: { proposalId: proposal.id, operations: describeOperations(proposal.operations, env), notes: proposal.notes, review: proposal.review ? reviewForModel(proposal.review) : null } };
       }
       case 'propose_changes': {
@@ -563,7 +564,7 @@ function planningForModel(env) {
       past: m.date < env.today,
       cooksAlsoNextLunch: Boolean(m.nextLunch),
       substitutions: m.substitutions ?? [],
-      kcalPerPortion: Math.round(nutritionByRecipe.get(m.recipeId)?.kcal ?? 0),
+      kcalPerPortion: Math.round(recipeNutritionMap().get(m.recipeId)?.kcal ?? 0),
     })),
     freeSlots: freeSlots(env.meals, env.days.filter((d) => d >= env.today), env.activeSlots),
     household: {
@@ -619,13 +620,13 @@ function searchRecipes(args, env) {
       return evaluateRecipeForHousehold(r, env.household, env.scoring).status === 'compatible';
     })
     .map((r) => {
-      const n = nutritionByRecipe.get(r.id);
+      const n = recipeNutritionMap().get(r.id);
       return { r, fit: target && n ? programFitScore(n, target) : 0 };
     })
     .sort((a, b) => b.fit - a.fit)
     .slice(0, limit);
   return found.map(({ r }) => {
-    const n = nutritionByRecipe.get(r.id);
+    const n = recipeNutritionMap().get(r.id);
     const cost = recipeCost(r, env.scoring);
     return {
       id: r.id,

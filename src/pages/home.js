@@ -5,7 +5,8 @@ import { getHousehold } from '../services/householdService.js';
 import { getMeals } from '../services/planningService.js';
 import { SLOTS, plannedEntries, slotKey, mealPortionsFor } from '../domain/planning/planning.js';
 import { toIsoDate } from '../domain/planning/dates.js';
-import { formatPortions } from '../utils/format.js';
+import { formatPortions, formatNumber } from '../utils/format.js';
+import { programSummary } from '../services/programService.js';
 
 /**
  * Ecran Accueil.
@@ -13,7 +14,7 @@ import { formatPortions } from '../utils/format.js';
  */
 export async function renderHome(el) {
   const today = formatDayLong(new Date());
-  const [reminder, household, meals] = await Promise.all([isReminderDue(), getHousehold(), getMeals()]);
+  const [reminder, household, meals, program] = await Promise.all([isReminderDue(), getHousehold(), getMeals(), programSummary()]);
   const todayIso = toIsoDate(new Date());
   const entries = plannedEntries(meals);
   const todayMeals = SLOTS.map((s) => ({ slot: s, entry: entries.get(slotKey(todayIso, s.id)) })).filter((x) => x.entry);
@@ -41,7 +42,19 @@ export async function renderHome(el) {
           : `<p class="today__empty">Aucun repas prévu aujourd'hui.</p>
              <p><a href="#/planning">Planifier la semaine</a></p>`
       }
+      <p><a class="button button--secondary" href="#/assistant">Demander à l’assistant</a></p>
     </section>
+    ${
+      program
+        ? `<section class="notice" aria-labelledby="program-title">
+            <h2 id="program-title">Programme minceur</h2>
+            <p>Objectif du jour : <strong>${program.targets.kcal} kcal</strong>, dont ${program.targets.proteinG} g de protéines.
+              ${program.entries.length ? `Dernière pesée : ${escapeHtml(formatNumber(program.progress.currentKg))} kg, ${escapeHtml(formatNumber(Math.max(0, program.progress.lostKg)))} kg perdus sur ${escapeHtml(formatNumber(program.progress.startKg - program.progress.goalKg))}.` : 'Aucune pesée enregistrée.'}</p>
+            <div class="meter" aria-hidden="true"><span style="width:${program.progress.percent}%"></span></div>
+            <p><a class="button" href="#/poids">Noter mon poids</a> <a href="#/programme">Mon programme</a></p>
+          </section>`
+        : ''
+    }
     ${
       household.members.length === 0
         ? `<section class="notice" aria-labelledby="household-title">

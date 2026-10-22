@@ -86,6 +86,7 @@ export async function renderShopping(el, params) {
               ? `<a class="shop__pkg" href="#/courses/conditionnement/${encodeURIComponent(l.ingredientId)}/${monday}">${l.packages ? 'Modifier le conditionnement' : 'Conditionnement'}</a>`
               : ''
           }
+          <a class="shop__pkg" href="#/assistant/produit/${encodeURIComponent(l.ingredientId)}">Moins cher ?</a>
         </li>`,
         )
         .join('')}</ul>`;
@@ -126,7 +127,7 @@ export async function renderShopping(el, params) {
                     ? `Coût estimé : environ ${escapeHtml(formatCents(estimate.totalCents))}.`
                     : `Coût estimé : au moins ${escapeHtml(formatCents(estimate.totalCents))} (prix inconnu pour ${estimate.missing.length} article${estimate.missing.length > 1 ? 's' : ''}). <a href="#/magasins">Ajouter des prix</a>`
               }</p>
-              <p><a href="#/budget">Enregistrer le montant payé</a></p></div>`
+              <p><a href="#/drive/semaine/${monday}">Préparer le panier Drive</a> · <a href="#/assistant/semaine/${monday}">Réduire le coût avec l’assistant</a> · <a href="#/budget">Enregistrer le montant payé</a></p></div>`
       }
       ${aislesHtml}
 
