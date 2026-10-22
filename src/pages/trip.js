@@ -1,0 +1,282 @@
+import { escapeHtml } from '../utils/html.js';
+import { formatIsoDay, formatIsoDayMonth, formatMinutes, formatTime } from '../utils/format.js';
+import { parseDecimal } from '../utils/units-select.js';
+import { addDays, parseIsoDate, toIsoDate, weekStart } from '../domain/planning/dates.js';
+import { formatCents } from '../domain/budget/money.js';
+import { tripCostCents, MAX_STORES_PER_TRIP } from '../domain/trips/trips.js';
+import { SLOTS } from '../domain/planning/planning.js';
+import { ingredientsById } from '../services/catalog.js';
+import { saveStore } from '../services/budgetService.js';
+import { getCarSettings, saveCarSettings, weekGrouping, getTrip, saveTrip, deleteTrip, mealsBefore, downloadTripCalendar } from '../services/tripService.js';
+
+/** @typedef {import('../domain/trips/trips.js').GroupingPlan} GroupingPlan */
+/** @typedef {import('../domain/trips/trips.js').ShoppingTrip} ShoppingTrip */
+/** @typedef {import('../domain/stores/stores.js').Store} Store */
+
+const slotLabels = new Map(SLOTS.map((s) => [s.id, s.label.toLowerCase()]));
+
+/** Plans affiches dans le tableau de comparaison. */
+const MAX_PLANS_SHOWN = 6;
+
+/** @param {number | null | undefined} v */
+const decimalInput = (v) => (v === null || v === undefined ? '' : String(v).replace('.', ','));
+
+/**
+ * Ecran Organiser les courses : regrouper les magasins, compter les trajets, planifier la sortie.
+ * @param {HTMLElement} el
+ * @param {Record<string, string>} params
+ */
+export async function renderTrip(el, params) {
+  const today = toIsoDate(new Date());
+  const monday = weekStart(params.date && parseIsoDate(params.date) ? params.date : today);
+  const [{ mealCount, lines, grouping, stores, car, fewerTrips }, trip] = await Promise.all([weekGrouping(monday), getTrip(monday)]);
+  const storesById = new Map(stores.map((s) => [s.id, s]));
+  const storeName = (/** @type {string} */ id) => storesById.get(id)?.name ?? 'Magasin supprimé';
+  const lineName = new Map(lines.map((l) => [l.key, ingredientsById.get(l.ingredientId)?.name ?? l.ingredientId]));
+  const rec = grouping.recommended;
+  const before = trip ? await mealsBefore(trip) : [];
+  const defaultDate = addDays(monday, -2) >= today ? addDays(monday, -2) : today;
+  const missingDistance = stores.filter((s) => (s.distanceKm ?? null) === null);
+
+  /** @param {GroupingPlan} p */
+  const planStores = (p) => p.storeIds.map(storeName).join(' + ');
+  /** @param {GroupingPlan} p */
+  const tripText = (p) =>
+    p.unknownTrips.length === p.storeIds.length ? 'non chiffré' : `${formatCents(p.tripCents)}${p.unknownTrips.length ? ' (incomplet)' : ''}`;
+
+  const planCard = (/** @type {GroupingPlan} */ p) => `
+    <div class="proposal trip-plan">
+      <h3>${escapeHtml(planStores(p))}</h3>
+      <p class="hint">${escapeHtml(grouping.reason)}</p>
+      <dl class="budget-card">
+        <div><dt>Articles</dt><dd>${escapeHtml(formatCents(p.itemsCents))}</dd></div>
+        <div><dt>Trajets (aller-retour)</dt><dd>${escapeHtml(tripText(p))}</dd></div>
+        <div><dt>Total</dt><dd>${escapeHtml(formatCents(p.totalCents))}</dd></div>
+        <div><dt>Temps de route</dt><dd>${p.minutes === null ? '—' : escapeHtml(formatMinutes(p.minutes))}</dd></div>
+      </dl>
+      <p><span class="badge badge--${p.level === 'verified' ? 'verified' : 'estimated'}">${p.level === 'verified' ? 'Prix Drive vérifiés' : 'Estimation'}</span>
+        ${p.covered} article(s) chiffré(s) sur ${grouping.toBuyCount}${p.missingKeys.length ? ` ; ${p.missingKeys.length} sans prix dans ${p.storeIds.length > 1 ? 'ces magasins' : 'ce magasin'}` : ''}.</p>
+      ${p.storeIds
+        .map((id) => {
+          const keys = [...p.assignment].filter(([, s]) => s === id).map(([k]) => k);
+          return `<details class="proposal__ingredients"><summary>${escapeHtml(storeName(id))} : ${keys.length} article(s)</summary>
+            <ul>${keys.map((k) => `<li>${escapeHtml(lineName.get(k) ?? k)}</li>`).join('')}</ul></details>`;
+        })
+        .join('')}
+      ${p.missingKeys.length ? `<details class="proposal__ingredients"><summary>Sans prix connu : ${p.missingKeys.length} article(s)</summary><ul>${p.missingKeys.map((k) => `<li>${escapeHtml(lineName.get(k) ?? k)}</li>`).join('')}</ul></details>` : ''}
+      <button type="button" class="button button--secondary" data-use-plan="${escapeHtml(p.storeIds.join(','))}">Planifier cette sortie</button>
+    </div>`;
+
+  const otherPlans = grouping.plans.filter((p) => p !== rec).slice(0, MAX_PLANS_SHOWN);
+  const stops = trip?.storeIds ?? rec?.storeIds ?? [];
+  const tripStores = (trip?.storeIds ?? []).map((id) => storesById.get(id)).filter((s) => s !== undefined);
+  const tripMinutes = tripStores.every((s) => (s.travelMinutes ?? null) !== null) ? tripStores.reduce((n, s) => n + 2 * (s.travelMinutes ?? 0), 0) : null;
+  const tripCosts = tripStores.map((s) => tripCostCents(s, car));
+  const tripCost = tripCosts.every((c) => c !== null) ? tripCosts.reduce((n, c) => n + (c ?? 0), 0) : null;
+
+  /** @param {number} index */
+  const stopSelect = (index) => `<select data-stop="${index}" aria-label="Arrêt ${index + 1}">
+      <option value="">${index === 0 ? 'Choisir un magasin' : 'Aucun'}</option>
+      ${stores.map((s) => `<option value="${escapeHtml(s.id)}"${stops[index] === s.id ? ' selected' : ''}>${escapeHtml(s.name)}</option>`).join('')}
+    </select>`;
+
+  el.innerHTML = `
+    <section>
+      <h1 class="page-title">Organiser les courses</h1>
+      <nav class="week-nav" aria-label="Changer de semaine">
+        <a href="#/courses/organisation/semaine/${addDays(monday, -7)}" aria-label="Semaine précédente">‹</a>
+        <span>Semaine du ${escapeHtml(formatIsoDayMonth(monday))}</span>
+        <a href="#/courses/organisation/semaine/${addDays(monday, 7)}" aria-label="Semaine suivante">›</a>
+      </nav>
+
+      ${
+        trip
+          ? `<div class="batch-summary trip-summary">
+              <p><strong>Courses prévues ${escapeHtml(formatIsoDay(trip.date))} à ${escapeHtml(formatTime(trip.time))}</strong> :
+                ${trip.storeIds.map((id, i) => `${i ? 'puis ' : ''}${escapeHtml(storeName(id))}`).join(', ')}.</p>
+              ${trip.driveSlot ? `<p>Retrait Drive ${escapeHtml(formatIsoDay(trip.driveSlot.date))}, de ${escapeHtml(formatTime(trip.driveSlot.start))} à ${escapeHtml(formatTime(trip.driveSlot.end))}.</p>` : ''}
+              <p class="hint">${tripMinutes !== null ? `Environ ${escapeHtml(formatMinutes(tripMinutes))} de route` : 'Temps de route inconnu'}${tripCost !== null ? `, ${escapeHtml(formatCents(tripCost))} de carburant` : ''}.${trip.note ? ` ${escapeHtml(trip.note)}` : ''}</p>
+              ${
+                before.length
+                  ? `<div class="fit fit--ko"><p><strong>${before.length} repas avant les courses</strong> : vérifiez que vous avez déjà leurs ingrédients.</p>
+                      <ul>${before.map((m) => `<li>${escapeHtml(formatIsoDay(m.date))}, ${escapeHtml(slotLabels.get(m.slot) ?? m.slot)} : ${escapeHtml(m.recipeName)}</li>`).join('')}</ul></div>`
+                  : ''
+              }
+              <div class="form-actions">
+                <button type="button" class="button" data-action="calendar">Ajouter à mon agenda</button>
+                <button type="button" class="button button--danger" data-action="delete-trip">Supprimer</button>
+              </div>
+              <p class="hint">Le fichier agenda ajoute la sortie (et le retrait Drive) dans le calendrier du téléphone, avec un rappel.</p>
+            </div>`
+          : ''
+      }
+
+      <h2>Regrouper les courses</h2>
+      ${
+        mealCount === 0
+          ? `<p class="empty">Aucun repas planifié cette semaine : rien à acheter.</p>`
+          : stores.length === 0
+            ? `<p>Ajoutez vos magasins et quelques prix pour comparer : <a href="#/magasins">Magasins</a> ou <a href="#/drive">Drive Hyper U Cayenne</a>.</p>`
+            : `<p>${grouping.toBuyCount} article(s) à acheter.${grouping.unpricedKeys.length ? ` ${grouping.unpricedKeys.length} n’ont de prix dans aucun magasin : ils ne sont pas comptés.` : ''}
+                ${fewerTrips ? 'Objectif du foyer « limiter les trajets » : un magasin de plus doit faire économiser au moins ' : 'Un magasin de plus n’est conseillé que s’il fait économiser au moins '}${escapeHtml(formatCents(grouping.threshold))}${missingDistance.length || car.consumptionL100 === null ? '. Indiquez les distances et votre voiture (en bas de page) pour compter aussi le coût des trajets.' : ', trajets compris.'}</p>
+              ${rec ? planCard(rec) : `<p class="empty">${escapeHtml(grouping.reason)}</p>`}
+              ${
+                otherPlans.length
+                  ? `<h3>Autres possibilités</h3>
+                    <table class="table">
+                      <thead><tr><th scope="col">Magasins</th><th scope="col">Chiffrés</th><th scope="col">Trajets</th><th scope="col">Total</th></tr></thead>
+                      <tbody>${otherPlans
+                        .map(
+                          (p) => `<tr><td>${escapeHtml(planStores(p))}${p.perItem ? '<br /><span class="hint">article par article</span>' : ''}</td>
+                            <td>${p.covered}/${grouping.toBuyCount}</td><td>${escapeHtml(tripText(p))}</td><td>${escapeHtml(formatCents(p.totalCents))}</td></tr>`,
+                        )
+                        .join('')}</tbody>
+                    </table>`
+                  : ''
+              }
+              <p class="hint">Chaque magasin compte pour un aller-retour depuis chez vous (MealDom ne calcule pas d’itinéraire). Seuls les prix relevés sont utilisés, jamais de prix inventés. Pour comparer, relevez les prix des mêmes articles dans plusieurs magasins.</p>`
+      }
+
+      <h2>Planifier la sortie</h2>
+      <div class="alert" role="alert" data-alert="trip" hidden></div>
+      <form class="stock-form" data-form="trip" novalidate>
+        <div class="field when">
+          <div><label for="trip-date">Jour</label><input id="trip-date" type="date" value="${escapeHtml(trip?.date ?? defaultDate)}" /></div>
+          <div><label for="trip-time">Départ</label><input id="trip-time" type="time" value="${escapeHtml(trip?.time ?? '09:30')}" /></div>
+        </div>
+        <fieldset class="field"><legend>Ordre de passage</legend>
+          ${Array.from({ length: MAX_STORES_PER_TRIP }, (_, i) => stopSelect(i)).join('')}
+          <p class="hint">Conseil : finissez par le magasin des produits frais et surgelés, et prévoyez une glacière.</p>
+        </fieldset>
+        <label class="check"><input type="checkbox" id="trip-has-slot"${trip?.driveSlot ? ' checked' : ''} /> <span>J’ai réservé un créneau de retrait au Drive</span></label>
+        <div class="field when" data-block="slot"${trip?.driveSlot ? '' : ' hidden'}>
+          <div><label for="slot-date">Date</label><input id="slot-date" type="date" value="${escapeHtml(trip?.driveSlot?.date ?? trip?.date ?? defaultDate)}" /></div>
+          <div><label for="slot-start">De</label><input id="slot-start" type="time" value="${escapeHtml(trip?.driveSlot?.start ?? '10:00')}" /></div>
+          <div><label for="slot-end">À</label><input id="slot-end" type="time" value="${escapeHtml(trip?.driveSlot?.end ?? '10:30')}" /></div>
+        </div>
+        <div class="field"><label for="trip-note">Note (facultatif)</label><input id="trip-note" type="text" maxlength="200" autocomplete="off" value="${escapeHtml(trip?.note ?? '')}" placeholder="ex. sacs, glacière, carte de fidélité" /></div>
+        <div class="form-actions"><button type="submit" class="button">Enregistrer la sortie</button></div>
+      </form>
+
+      <h2>Trajets</h2>
+      <div class="alert" role="alert" data-alert="travel" hidden></div>
+      <form class="stock-form" data-form="car" novalidate>
+        <label class="check"><input type="checkbox" id="car-none"${car.consumptionL100 === 0 ? ' checked' : ''} /> <span>Je fais mes courses sans voiture (à pied, à vélo, en bus)</span></label>
+        <div class="field when" data-block="car"${car.consumptionL100 === 0 ? ' hidden' : ''}>
+          <div><label for="car-consumption">Consommation (L/100 km)</label><input id="car-consumption" type="text" inputmode="decimal" autocomplete="off" value="${car.consumptionL100 ? escapeHtml(decimalInput(car.consumptionL100)) : ''}" placeholder="ex. 6,5" /></div>
+          <div><label for="car-fuel">Prix du litre (€)</label><input id="car-fuel" type="text" inputmode="decimal" autocomplete="off" value="${car.fuelCentsPerLiter ? escapeHtml(decimalInput(Math.round(car.fuelCentsPerLiter * 10) / 1000)) : ''}" placeholder="ex. 1,859" /></div>
+        </div>
+        <p class="hint">En Guyane, le prix des carburants est fixé chaque mois par la préfecture : reprenez celui affiché à la pompe.</p>
+        ${
+          stores.length
+            ? `<table class="table travel-table">
+                <thead><tr><th scope="col">Magasin</th><th scope="col">Distance (km, aller)</th><th scope="col">Temps (min, aller)</th></tr></thead>
+                <tbody>${stores
+                  .map(
+                    (s) => `<tr><td>${escapeHtml(s.name)}</td>
+                      <td><input type="text" inputmode="decimal" data-km="${escapeHtml(s.id)}" value="${escapeHtml(decimalInput(s.distanceKm))}" aria-label="Distance jusqu’à ${escapeHtml(s.name)}" /></td>
+                      <td><input type="text" inputmode="numeric" data-min="${escapeHtml(s.id)}" value="${s.travelMinutes ?? ''}" aria-label="Temps jusqu’à ${escapeHtml(s.name)}" /></td></tr>`,
+                  )
+                  .join('')}</tbody>
+              </table>
+              ${missingDistance.length ? `<p class="hint">Distance inconnue pour ${missingDistance.length} magasin(s) : leur trajet n’est pas compté.</p>` : ''}`
+            : ''
+        }
+        <div class="form-actions"><button type="submit" class="button button--secondary">Enregistrer les trajets</button></div>
+      </form>
+    </section>`;
+
+  /** @param {string} name @param {string[]} messages */
+  const say = (name, messages) => {
+    const box = /** @type {HTMLElement} */ (el.querySelector(`[data-alert="${name}"]`));
+    box.hidden = messages.length === 0;
+    box.innerHTML = messages.map((m) => `<p>${escapeHtml(m)}</p>`).join('');
+    if (messages.length) box.scrollIntoView({ block: 'center' });
+  };
+  /** @param {string} sel */
+  const val = (sel) => /** @type {HTMLInputElement} */ (el.querySelector(sel)).value.trim();
+
+  el.querySelectorAll('[data-use-plan]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const ids = (b.getAttribute('data-use-plan') ?? '').split(',');
+      el.querySelectorAll('[data-stop]').forEach((select, i) => {
+        /** @type {HTMLSelectElement} */ (select).value = ids[i] ?? '';
+      });
+      el.querySelector('[data-form="trip"]')?.scrollIntoView({ block: 'start' });
+    }),
+  );
+
+  const slotBox = /** @type {HTMLInputElement} */ (el.querySelector('#trip-has-slot'));
+  slotBox.addEventListener('change', () => {
+    /** @type {HTMLElement} */ (el.querySelector('[data-block="slot"]')).hidden = !slotBox.checked;
+  });
+  const noCar = /** @type {HTMLInputElement} */ (el.querySelector('#car-none'));
+  noCar.addEventListener('change', () => {
+    /** @type {HTMLElement} */ (el.querySelector('[data-block="car"]')).hidden = noCar.checked;
+  });
+
+  el.querySelector('[data-form="trip"]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const ids = [...el.querySelectorAll('[data-stop]')].map((s) => /** @type {HTMLSelectElement} */ (s).value).filter((id, i, all) => id && all.indexOf(id) === i);
+    /** @type {ShoppingTrip} */
+    const next = {
+      week: monday,
+      date: val('#trip-date'),
+      time: val('#trip-time'),
+      storeIds: ids,
+      driveSlot: slotBox.checked ? { date: val('#slot-date'), start: val('#slot-start'), end: val('#slot-end') } : null,
+      note: val('#trip-note'),
+      updatedAt: '',
+    };
+    const errors = await saveTrip(next);
+    if (errors.length) say('trip', errors);
+    else {
+      await renderTrip(el, params);
+      window.scrollTo({ top: 0 });
+    }
+  });
+
+  el.querySelector('[data-action="delete-trip"]')?.addEventListener('click', async () => {
+    if (!window.confirm('Supprimer la sortie courses de cette semaine ?')) return;
+    await deleteTrip(monday);
+    await renderTrip(el, params);
+  });
+
+  el.querySelector('[data-action="calendar"]')?.addEventListener('click', async () => {
+    if (!trip) return;
+    const details = [
+      `Ordre de passage : ${trip.storeIds.map(storeName).join(', ')}`,
+      ...(rec && rec.storeIds.join() === trip.storeIds.join()
+        ? trip.storeIds.map((id) => `${storeName(id)} : ${[...rec.assignment].filter(([, s]) => s === id).map(([k]) => lineName.get(k)).join(', ')}`)
+        : []),
+    ];
+    await downloadTripCalendar(trip, tripMinutes, details);
+  });
+
+  el.querySelector('[data-form="car"]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const consumptionText = val('#car-consumption');
+    const fuelText = val('#car-fuel');
+    const consumption = noCar.checked ? 0 : consumptionText ? parseDecimal(consumptionText) : null;
+    const fuelEuros = fuelText ? parseDecimal(fuelText) : null;
+    const errors = await saveCarSettings({
+      consumptionL100: consumption,
+      fuelCentsPerLiter: noCar.checked ? car.fuelCentsPerLiter : fuelEuros === null ? null : Math.round(fuelEuros * 1000) / 10,
+    });
+    for (const store of stores) {
+      const kmText = /** @type {HTMLInputElement} */ (el.querySelector(`[data-km="${CSS.escape(store.id)}"]`)).value.trim();
+      const minText = /** @type {HTMLInputElement} */ (el.querySelector(`[data-min="${CSS.escape(store.id)}"]`)).value.trim();
+      /** @type {Store} */
+      const updated = {
+        ...store,
+        distanceKm: kmText ? parseDecimal(kmText) : null,
+        travelMinutes: minText ? (/^\d+$/.test(minText) ? Number(minText) : Number.NaN) : null,
+      };
+      if (updated.distanceKm === store.distanceKm && updated.travelMinutes === store.travelMinutes) continue;
+      const storeErrors = await saveStore(updated);
+      errors.push(...storeErrors.map((e) => `${store.name} : ${e}`));
+    }
+    if (errors.length) say('travel', errors);
+    else await renderTrip(el, params);
+  });
+}

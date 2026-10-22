@@ -1713,3 +1713,36 @@ h3 {
 .chart__tip span {
   color: var(--muted);
 }
+
+/* ---------- Organiser les courses ---------- */
+
+.trip-plan {
+  border-left-color: var(--leaf);
+}
+
+.trip-plan h3 {
+  margin-top: 0;
+}
+
+.trip-summary {
+  margin-bottom: var(--space-6);
+}
+
+.travel-table input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+[data-stop] + [data-stop] {
+  margin-top: var(--space-2);
+}
+
+.stock-form input[type="time"] {
+  width: 100%;
+}

@@ -116,6 +116,10 @@ const APP_FILES = [
   './src/pages/program.js',
   './src/pages/weight.js',
   './src/pages/weightChart.js',
+  './src/domain/trips/trips.js',
+  './src/db/repositories/tripRepository.js',
+  './src/services/tripService.js',
+  './src/pages/trip.js',
 ];
 
 self.addEventListener('install', (event) => {

@@ -8,6 +8,7 @@ import { getStores, getPrices, getBudgetRecord, getExpenses } from '../db/reposi
 import { getConversations, getHistory, getPreferences } from '../db/repositories/assistantRepository.js';
 import { getDriveProducts, getDriveOrders } from '../db/repositories/driveRepository.js';
 import { getProgramRecord, getWeights } from '../db/repositories/programRepository.js';
+import { getTrips } from '../db/repositories/tripRepository.js';
 
 /** Reglages jamais exportes : la cle API de l'assistant reste sur l'appareil. */
 const PRIVATE_SETTINGS = new Set(['assistantApiKey']);
@@ -46,7 +47,7 @@ export async function exportData() {
     getBudgetRecord(),
     getExpenses(),
   ]);
-  const [conversations, changeHistory, preferences, driveProducts, driveOrders, program, weights] = await Promise.all([
+  const [conversations, changeHistory, preferences, driveProducts, driveOrders, program, weights, shoppingTrips] = await Promise.all([
     getConversations(),
     getHistory(),
     getPreferences(),
@@ -54,6 +55,7 @@ export async function exportData() {
     getDriveOrders(),
     getProgramRecord(),
     getWeights(),
+    getTrips(),
   ]);
   const settings = allSettings.filter((s) => !PRIVATE_SETTINGS.has(s.key));
   const file = buildExport({
@@ -61,7 +63,7 @@ export async function exportData() {
     applicationVersion: APP_VERSION,
     data: {
       settings, household, meals, inventory, packages, shoppingLists, stores, prices, budget, expenses,
-      conversations, changeHistory, preferences, driveProducts, driveOrders, program, weights,
+      conversations, changeHistory, preferences, driveProducts, driveOrders, program, weights, shoppingTrips,
     },
     now,
   });

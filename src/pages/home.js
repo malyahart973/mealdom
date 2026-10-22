@@ -1,12 +1,13 @@
-import { formatDayLong } from '../utils/format.js';
+import { formatDayLong, formatPortions, formatNumber, formatIsoDay, formatTime } from '../utils/format.js';
 import { escapeHtml } from '../utils/html.js';
 import { exportData, isReminderDue } from '../services/backupService.js';
 import { getHousehold } from '../services/householdService.js';
 import { getMeals } from '../services/planningService.js';
 import { SLOTS, plannedEntries, slotKey, mealPortionsFor } from '../domain/planning/planning.js';
 import { toIsoDate } from '../domain/planning/dates.js';
-import { formatPortions, formatNumber } from '../utils/format.js';
 import { programSummary } from '../services/programService.js';
+import { nextTrip } from '../services/tripService.js';
+import { getStores } from '../services/budgetService.js';
 
 /**
  * Ecran Accueil.
@@ -14,7 +15,8 @@ import { programSummary } from '../services/programService.js';
  */
 export async function renderHome(el) {
   const today = formatDayLong(new Date());
-  const [reminder, household, meals, program] = await Promise.all([isReminderDue(), getHousehold(), getMeals(), programSummary()]);
+  const [reminder, household, meals, program, trip, stores] = await Promise.all([isReminderDue(), getHousehold(), getMeals(), programSummary(), nextTrip(), getStores()]);
+  const storeNames = new Map(stores.map((s) => [s.id, s.name]));
   const todayIso = toIsoDate(new Date());
   const entries = plannedEntries(meals);
   const todayMeals = SLOTS.map((s) => ({ slot: s, entry: entries.get(slotKey(todayIso, s.id)) })).filter((x) => x.entry);
@@ -44,6 +46,15 @@ export async function renderHome(el) {
       }
       <p><a class="button button--secondary" href="#/assistant">Demander à l’assistant</a></p>
     </section>
+    ${
+      trip
+        ? `<section class="notice" aria-labelledby="trip-title">
+            <h2 id="trip-title">Courses ${trip.date === todayIso ? 'aujourd’hui' : escapeHtml(formatIsoDay(trip.date))} à ${escapeHtml(formatTime(trip.time))}</h2>
+            <p>${trip.storeIds.map((id, i) => `${i ? 'puis ' : ''}${escapeHtml(storeNames.get(id) ?? 'magasin')}`).join(', ')}${trip.driveSlot ? `. Retrait Drive de ${escapeHtml(formatTime(trip.driveSlot.start))} à ${escapeHtml(formatTime(trip.driveSlot.end))}` : ''}.</p>
+            <p><a class="button" href="#/courses/semaine/${escapeHtml(trip.week)}">Ma liste de courses</a> <a href="#/courses/organisation/semaine/${escapeHtml(trip.week)}">Détails</a></p>
+          </section>`
+        : ''
+    }
     ${
       program
         ? `<section class="notice" aria-labelledby="program-title">

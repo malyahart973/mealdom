@@ -270,6 +270,22 @@ export const IMPORT_COLUMNS = [
 ];
 
 /**
+ * Modele de fichier d'import, a ouvrir avec un tableur. Les lignes d'exemple (reference "EXEMPLE...")
+ * montrent le format et ne sont jamais importees : leurs prix ne sont pas de vrais releves.
+ * Le marqueur UTF-8 en tete permet a Excel d'afficher correctement les accents.
+ * @returns {string}
+ */
+export function importTemplate() {
+  const rows = [
+    IMPORT_COLUMNS.join(';'),
+    'EXEMPLE-1;Riz long grain 1 kg;U;1;kg;1,89;oui;riz blanc;;;;;;;',
+    'EXEMPLE-2;Filets de poulet 500 g;U;500;g;6,49;oui;blanc de poulet;label_rouge;percent;20;-20 % immédiatement;2026-10-20;2026-10-26;non',
+    'EXEMPLE-3;Lait de coco 400 ml;;400;ml;1,35;oui;lait de coco;;n_for_m;3 pour 2;3 achetés pour 2 payés;2026-10-20;2026-11-02;oui',
+  ];
+  return `\uFEFF${rows.join('\r\n')}\r\n`;
+}
+
+/**
  * Montant "3,20" ou "3.20" en centimes (NaN si illisible).
  * @param {string} text
  * @returns {number}
@@ -294,10 +310,12 @@ export function parseDriveCsv(text, ctx) {
   /** @type {string[]} */
   const errors = [];
   let unlinked = 0;
-  const rows = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  // Le marqueur d'encodage UTF-8 ajoute par Excel ne fait pas partie de la premiere colonne.
+  const rows = text.replace(/^\uFEFF/, '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   rows.forEach((row, i) => {
     const cols = row.split(';').map((c) => c.trim());
     if (i === 0 && cols[0].toLowerCase() === 'reference') return; // en-tete
+    if (/^exemple/i.test(cols[0])) return; // lignes d'exemple du modele : jamais importees comme de vrais prix
     const get = (/** @type {string} */ name) => cols[IMPORT_COLUMNS.indexOf(name)] ?? '';
     const ingredientName = get('ingredient');
     const ingredientId = ingredientName ? ctx.findIngredient(ingredientName) : null;

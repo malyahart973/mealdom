@@ -127,6 +127,7 @@ export async function renderShopping(el, params) {
                     ? `Coût estimé : environ ${escapeHtml(formatCents(estimate.totalCents))}.`
                     : `Coût estimé : au moins ${escapeHtml(formatCents(estimate.totalCents))} (prix inconnu pour ${estimate.missing.length} article${estimate.missing.length > 1 ? 's' : ''}). <a href="#/magasins">Ajouter des prix</a>`
               }</p>
+              <p><a class="button button--secondary" href="#/courses/organisation/semaine/${monday}">Organiser les courses (magasins, trajets, jour)</a></p>
               <p><a href="#/drive/semaine/${monday}">Préparer le panier Drive</a> · <a href="#/assistant/semaine/${monday}">Réduire le coût avec l’assistant</a> · <a href="#/budget">Enregistrer le montant payé</a></p></div>`
       }
       ${aislesHtml}

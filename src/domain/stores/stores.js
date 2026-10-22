@@ -30,6 +30,8 @@ export const STORE_TYPES = [
  * @property {StoreType} type
  * @property {string} commune
  * @property {{ url: string, label: string } | null} [drive]  Commande en ligne (Drive) proposee par le magasin
+ * @property {number | null} [distanceKm]     Distance depuis le domicile, aller simple
+ * @property {number | null} [travelMinutes]  Temps de trajet, aller simple
  */
 
 /** @typedef {'available' | 'unavailable' | 'unknown'} Availability */
@@ -76,6 +78,10 @@ export function validateStore(store) {
   if (!store.name.trim()) errors.push('Indiquez le nom du magasin.');
   if (store.name.trim().length > 40) errors.push('Le nom est trop long (40 caractères au plus).');
   if (!STORE_TYPES.some((t) => t.id === store.type)) errors.push('Choisissez un type de magasin.');
+  const km = store.distanceKm ?? null;
+  const minutes = store.travelMinutes ?? null;
+  if (km !== null && !(km >= 0 && km <= 300)) errors.push('Indiquez une distance en kilomètres (aller simple), par exemple 6,5.');
+  if (minutes !== null && !(Number.isInteger(minutes) && minutes >= 0 && minutes <= 300)) errors.push('Indiquez un temps de trajet en minutes (aller simple), par exemple 15.');
   return errors;
 }
 

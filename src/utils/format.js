@@ -66,6 +66,16 @@ export function formatIsoDayMonth(isoDay) {
 }
 
 /**
+ * Heure lisible : "09:30" -> "9 h 30", "10:00" -> "10 h".
+ * @param {string} time  HH:MM
+ * @returns {string}
+ */
+export function formatTime(time) {
+  const [h, m] = time.split(':');
+  return m === '00' ? `${Number(h)} h` : `${Number(h)} h ${m}`;
+}
+
+/**
  * "3 portions", "2,5 portions", "1 portion".
  * @param {number} portions
  * @returns {string}

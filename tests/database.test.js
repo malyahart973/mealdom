@@ -6,7 +6,7 @@ import { test, assertEqual } from './runner.js';
 import { migrations } from '../src/db/migrations.js';
 
 const hasIndexedDb = typeof indexedDB !== 'undefined';
-const ALL_STORES = ['budget', 'changeHistory', 'conversations', 'driveOrders', 'driveProducts', 'expenses', 'household', 'inventory', 'meals', 'packages', 'preferences', 'prices', 'program', 'settings', 'shoppingLists', 'stores', 'weights'];
+const ALL_STORES = ['budget', 'changeHistory', 'conversations', 'driveOrders', 'driveProducts', 'expenses', 'household', 'inventory', 'meals', 'packages', 'preferences', 'prices', 'program', 'settings', 'shoppingLists', 'shoppingTrips', 'stores', 'weights'];
 const V5_STORES = ['budget', 'expenses', 'household', 'inventory', 'meals', 'packages', 'prices', 'settings', 'shoppingLists', 'stores'];
 
 /**
@@ -108,8 +108,23 @@ if (hasIndexedDb) {
     assertEqual(await done(v6.transaction('meals').objectStore('meals').get('m1')), { id: 'm1', date: '2026-10-19', slot: 'dinner' });
     const budget = /** @type {{ weeklyCents: number }} */ (await done(v6.transaction('budget').objectStore('budget').get('main')));
     assertEqual(budget.weeklyCents, 15000);
-    assertEqual([...v6.objectStoreNames].sort(), ALL_STORES);
+    assertEqual([...v6.objectStoreNames].sort(), ALL_STORES.filter((s) => s !== 'shoppingTrips'));
     v6.close();
+    await done(indexedDB.deleteDatabase(name));
+  });
+
+  test('Migration v6 -> v7 : pesées et produits Drive conservés, sorties courses ajoutées', async () => {
+    const name = `mealdom-test-v6-${Date.now()}`;
+    const v6 = await openDatabaseWith(name, migrations.slice(0, 6));
+    await write(v6, 'weights', { date: '2026-10-22', kg: 71.4, note: '' });
+    await write(v6, 'stores', { id: 's1', name: 'Hyper U Cayenne', type: 'hypermarket', commune: 'Cayenne' });
+    v6.close();
+
+    const v7 = await openDatabaseWith(name, migrations.slice(0, 7));
+    assertEqual(await done(v7.transaction('weights').objectStore('weights').get('2026-10-22')), { date: '2026-10-22', kg: 71.4, note: '' });
+    assertEqual(await done(v7.transaction('stores').objectStore('stores').get('s1')), { id: 's1', name: 'Hyper U Cayenne', type: 'hypermarket', commune: 'Cayenne' });
+    assertEqual([...v7.objectStoreNames].sort(), ALL_STORES);
+    v7.close();
     await done(indexedDB.deleteDatabase(name));
   });
 

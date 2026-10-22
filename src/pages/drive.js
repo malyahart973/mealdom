@@ -4,7 +4,7 @@ import { formatQuantity } from '../utils/quantity.js';
 import { measurableUnitOptions, parseDecimal } from '../utils/units-select.js';
 import { addDays, parseIsoDate, toIsoDate, weekStart } from '../domain/planning/dates.js';
 import { formatCents, parseAmountToCents, centsToInput } from '../domain/budget/money.js';
-import { QUALITIES, IMPORT_COLUMNS, DRIVE_FRESH_HOURS, isFresh, promotionStatus, orderText } from '../domain/drive/drive.js';
+import { QUALITIES, IMPORT_COLUMNS, DRIVE_FRESH_HOURS, isFresh, promotionStatus, orderText, importTemplate } from '../domain/drive/drive.js';
 import { AVAILABILITY } from '../domain/stores/stores.js';
 import { buildNameIndex, findIngredientId } from '../domain/ingredients/ingredients.js';
 import { ingredientsById } from '../services/catalog.js';
@@ -101,7 +101,8 @@ export async function renderDrive(el, params) {
   el.innerHTML = `
     <section>
       <h1 class="page-title">Drive – ${escapeHtml(store.name)}</h1>
-      <p><a class="button button--secondary" href="${escapeHtml(store.drive.url)}" target="_blank" rel="noopener">Ouvrir le site ${escapeHtml(store.drive.label)}</a></p>
+      <p><a class="button button--secondary" href="${escapeHtml(store.drive.url)}" target="_blank" rel="noopener">Ouvrir le site ${escapeHtml(store.drive.label)}</a>
+        <a class="button button--secondary" href="#/courses/organisation/semaine/${monday}">Organiser les courses</a></p>
       <p class="hint">Choisissez le magasin Hyper U Cayenne sur le site. MealDom n’y accède pas lui-même : vérifiez les prix sur le site, puis notez-les ici (ou importez-les).</p>
 
       <dl class="budget-card">
@@ -226,7 +227,13 @@ export async function renderDrive(el, params) {
       </form>
 
       <h2>Importer un fichier</h2>
-      <p class="hint">Fichier CSV (séparateur « ; »), une ligne par produit, colonnes : ${escapeHtml(IMPORT_COLUMNS.join(' ; '))}. Les promotions s’écrivent par exemple « percent ; 20 » ou « n_for_m ; 3 pour 2 ». Un nom d’ingrédient non reconnu laisse le produit « non relié ».</p>
+      <ol class="steps">
+        <li>Téléchargez le modèle et ouvrez-le avec Excel, Google Sheets ou LibreOffice.</li>
+        <li>Remplacez les lignes « EXEMPLE » par les produits relevés sur le site du Drive : une ligne par produit, avec sa référence (code produit ou EAN), son prix et « oui » dans la colonne disponible.</li>
+        <li>Enregistrez au format « CSV UTF-8 (séparateur point-virgule) », puis choisissez le fichier ci-dessous.</li>
+      </ol>
+      <p><button type="button" class="button button--secondary" data-action="template">Télécharger le modèle</button></p>
+      <p class="hint">Colonnes : ${escapeHtml(IMPORT_COLUMNS.join(' ; '))}. Les promotions s’écrivent par exemple « percent ; 20 » ou « n_for_m ; 3 pour 2 ». Un nom d’ingrédient non reconnu laisse le produit « non relié ». Les lignes dont la référence commence par EXEMPLE ne sont jamais importées.</p>
       <div class="alert" role="alert" data-alert="import" hidden></div>
       <form class="stock-form" data-form="import" novalidate>
         <div class="field"><label for="dp-file">Fichier</label><input id="dp-file" type="file" accept=".csv,text/csv,text/plain" /></div>
@@ -372,6 +379,17 @@ export async function renderDrive(el, params) {
     const errors = await saveDriveProduct(product);
     if (errors.length) say('product', errors);
     else await renderDrive(el, params);
+  });
+
+  el.querySelector('[data-action="template"]')?.addEventListener('click', () => {
+    const url = URL.createObjectURL(new Blob([importTemplate()], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'modele-prix-drive.csv';
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
 
   el.querySelector('[data-form="import"]')?.addEventListener('submit', async (event) => {

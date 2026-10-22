@@ -63,6 +63,7 @@ src/
     nutrition/        Valeurs nutritionnelles, programme minceur (besoins, portions), suivi du poids
     drive/            Produits Drive, promotions, chiffrage vérifié/estimé, contrôle de commande
     assistant/        Compréhension des demandes, moteur de propositions, opérations, préférences, outils de l'IA
+    trips/            Coût des trajets, regroupement des achats par magasin, sortie courses et agenda
   data/               Données de référence (ingrédients, valeurs nutritionnelles, cuisines, préparations, portions)
     catalog/          Catalogue de recettes par famille (petit-déjeuner, goûter, Asie, monde, léger)
   db/                 Base locale et accès aux données
@@ -86,6 +87,7 @@ tests/                Tests des règles métier (ouvrir tests/index.html)
 
 ## Historique
 
+- **0.10.0** — Organiser les courses : regroupement des achats sur 1 à 3 magasins (prix relevés + Drive), coût des trajets (distance, consommation, prix du carburant), objectif « limiter les trajets », sortie courses de la semaine avec ordre de passage et créneau de retrait Drive, repas prévus avant les courses, ajout à l'agenda du téléphone, rappel sur l'accueil. Modèle de fichier CSV pour l'import des prix Drive. Base v7.
 - **0.9.0** — Assistant conversationnel (IA Claude facultative + moteur local hors ligne) : demandes libres, modes combinables (promotions, gourmand, économie, équilibre, rapidité, anti-gaspillage...), aperçu avant/après chiffré, Accepter/Modifier/Annuler, historique et annulation, préférences retenues. Catalogue de 602 recettes (petit-déjeuner, repas, goûter). Programme minceur (besoins, objectifs par repas, portions en grammes) et suivi du poids avec courbe. Drive Hyper U Cayenne (relevés, promotions, panier vérifié, commande validée explicitement). Goûter dans le planning. Base v6.
 - **0.8.0** — Magasins et prix relevés, coût estimé des courses, budget mensuel/hebdomadaire/exceptionnel, dépenses réelles, prévision de fin de mois. Base v5.
 - **0.7.0** — Stock, liste de courses de la semaine (agrégation, déduction du stock, conditionnements, rayons, cases à cocher hors ligne, articles ajoutés à la main). Bouton Retour dans la barre du haut. Base v4.

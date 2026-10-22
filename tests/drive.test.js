@@ -10,6 +10,7 @@ import {
   validatePromotion,
   activePromotions,
   HYPER_U_CAYENNE,
+  importTemplate,
 } from '../src/domain/drive/drive.js';
 import { quoteShoppingLines, compareQuotes } from '../src/domain/drive/quote.js';
 import { INGREDIENTS } from '../src/data/ingredients.js';
@@ -134,6 +135,15 @@ test('Import CSV : nom inconnu = produit non relié (jamais deviné)', () => {
 test('Import CSV : ligne sans prix rejetée avec son numéro', () => {
   const r = parseDriveCsv('X1;Riz;;1;kg;;oui;riz;;;;;;;', { storeId: 'hu', checkedAt: NOW.toISOString(), findIngredient: (n) => findIngredientId(n, nameIndex), ingredients });
   if (r.products.length !== 0 || !r.errors[0].startsWith('Ligne 1')) throw new Error(JSON.stringify(r));
+});
+test('Modèle CSV : les lignes d’exemple ne sont jamais importées comme de vrais prix', () => {
+  const r = parseDriveCsv(importTemplate(), { storeId: 'hu', checkedAt: NOW.toISOString(), findIngredient: (n) => findIngredientId(n, nameIndex), ingredients });
+  assertEqual([r.products.length, r.errors], [0, []]);
+});
+test('Modèle CSV rempli (avec le marqueur UTF-8 d’Excel) : en-tête ignoré, lignes lues', () => {
+  const filled = importTemplate().replace('EXEMPLE-1', '3256').replace('EXEMPLE-3', '3257');
+  const r = parseDriveCsv(filled, { storeId: 'hu', checkedAt: NOW.toISOString(), findIngredient: (n) => findIngredientId(n, nameIndex), ingredients });
+  assertEqual([r.errors, r.products.map((p) => p.ingredientId), r.products[1].promotion?.buy, r.products[1].promotion?.requiresCard], [[], ['rice_white', 'coconut_milk'], 3, true]);
 });
 
 // --- Commande ---

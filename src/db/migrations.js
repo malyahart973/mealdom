@@ -46,6 +46,10 @@ export const migrations = [
     db.createObjectStore('program', { keyPath: 'id' });
     db.createObjectStore('weights', { keyPath: 'date' });
   },
+  // v7 (0.10.0) : sorties courses (une par semaine : jour, magasins, creneau Drive)
+  (db) => {
+    db.createObjectStore('shoppingTrips', { keyPath: 'week' });
+  },
 ];
 
 /** Version actuelle du schema de la base. */

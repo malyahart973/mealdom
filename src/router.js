@@ -19,6 +19,7 @@ import { renderAssistantPreferences } from './pages/assistantPreferences.js';
 import { renderDrive } from './pages/drive.js';
 import { renderProgram } from './pages/program.js';
 import { renderWeight } from './pages/weight.js';
+import { renderTrip } from './pages/trip.js';
 
 /**
  * @typedef {Object} Route
@@ -62,6 +63,14 @@ const routes = [
     tab: '/courses',
     render: renderPackage,
     parent: (p) => `/courses/semaine/${p.week}`,
+  },
+  { pattern: /^\/courses\/organisation$/, title: 'Organiser les courses', tab: '/courses', render: renderTrip, parent: () => '/courses' },
+  {
+    pattern: /^\/courses\/organisation\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/,
+    title: 'Organiser les courses',
+    tab: '/courses',
+    render: renderTrip,
+    parent: (p) => `/courses/semaine/${p.date}`,
   },
   { pattern: /^\/plus$/, title: 'Plus', tab: '/plus', render: renderMore },
   { pattern: /^\/stock$/, title: 'Stock', tab: '/plus', render: renderStock, parent: () => '/plus' },
