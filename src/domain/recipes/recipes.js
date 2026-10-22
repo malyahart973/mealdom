@@ -41,6 +41,35 @@ import { getUnit } from '../units/units.js';
 
 /** @typedef {'one_pot' | 'one_pan' | 'one_tray'} Vessel */
 
+/** @typedef {'breakfast' | 'lunch' | 'dinner' | 'snack'} MealType */
+
+/**
+ * Etiquettes utilisees par les suggestions et l'assistant.
+ * @typedef {'gourmand' | 'light' | 'budget' | 'convivial' | 'spicy' | 'make_ahead' | 'kids'} RecipeTag
+ */
+
+/** @type {{ id: MealType, label: string }[]} */
+export const MEAL_TYPES = [
+  { id: 'breakfast', label: 'Petit-déjeuner' },
+  { id: 'lunch', label: 'Déjeuner' },
+  { id: 'snack', label: 'Goûter' },
+  { id: 'dinner', label: 'Dîner' },
+];
+
+/** @type {{ id: RecipeTag, label: string }[]} */
+export const RECIPE_TAGS = [
+  { id: 'gourmand', label: 'Gourmand' },
+  { id: 'light', label: 'Léger' },
+  { id: 'budget', label: 'Économique' },
+  { id: 'convivial', label: 'Convivial' },
+  { id: 'spicy', label: 'Épicé' },
+  { id: 'make_ahead', label: 'Se prépare à l’avance' },
+  { id: 'kids', label: 'Apprécié des enfants' },
+];
+
+/** Recette rapide : 30 minutes au plus, preparation et cuisson comprises. */
+export const QUICK_MINUTES = 30;
+
 /**
  * @typedef {Object} Recipe
  * @property {string} id
@@ -58,6 +87,8 @@ import { getUnit } from '../units/units.js';
  * @property {string[]} tips
  * @property {RecipeSource} source
  * @property {RecipeStatus} status
+ * @property {MealType[]} [mealTypes]      Repas ou la recette a sa place (defaut : dejeuner et diner)
+ * @property {RecipeTag[]} [tags]
  */
 
 /** @type {Record<Vessel, string>} */
@@ -76,6 +107,24 @@ export const DIFFICULTY_LABELS = { easy: 'Facile', medium: 'Moyen', hard: 'Diffi
  */
 export function totalMinutes(item) {
   return item.prepMinutes + item.cookMinutes;
+}
+
+/**
+ * Repas ou la recette a sa place.
+ * @param {Recipe} recipe
+ * @returns {MealType[]}
+ */
+export function recipeMealTypes(recipe) {
+  return recipe.mealTypes && recipe.mealTypes.length ? recipe.mealTypes : ['lunch', 'dinner'];
+}
+
+/**
+ * @param {Recipe} recipe
+ * @param {RecipeTag} tag
+ * @returns {boolean}
+ */
+export function hasTag(recipe, tag) {
+  return (recipe.tags ?? []).includes(tag);
 }
 
 /**
@@ -242,5 +291,7 @@ export function validateRecipe(recipe, refs) {
   checkMethods(recipe.methods, refs, errors);
   const s = recipe.source;
   if (!s || !s.author || !s.license || !s.addedAt) errors.push('Provenance incomplète (auteur, licence, date).');
+  for (const m of recipe.mealTypes ?? []) if (!MEAL_TYPES.some((t) => t.id === m)) errors.push(`Repas inconnu : ${m}`);
+  for (const t of recipe.tags ?? []) if (!RECIPE_TAGS.some((x) => x.id === t)) errors.push(`Étiquette inconnue : ${t}`);
   return errors;
 }
