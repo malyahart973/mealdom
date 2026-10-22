@@ -1573,20 +1573,20 @@ h3 {
   background: var(--leaf);
 }
 
-.status {
+.weight-status {
   padding: var(--space-3) var(--space-4);
   border-left: 5px solid var(--leaf);
   border-radius: var(--radius-small);
   background: var(--surface);
 }
 
-.status--too_fast,
-.status--gaining {
+.weight-status--too_fast,
+.weight-status--gaining {
   border-left-color: var(--maracuja);
 }
 
-.status--not_enough_data,
-.status--stalled {
+.weight-status--not_enough_data,
+.weight-status--stalled {
   border-left-color: var(--line);
 }
 

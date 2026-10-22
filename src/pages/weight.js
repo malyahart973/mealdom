@@ -56,7 +56,7 @@ export async function renderWeight(el) {
             <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}" aria-label="Progression vers l’objectif">
               <span style="width:${progress.percent}%"></span></div>
             <p class="hint">${progress.percent} % du chemin entre ${escapeHtml(formatNumber(progress.startKg))} kg et ${escapeHtml(formatNumber(progress.goalKg))} kg.</p>
-            <p class="status status--${progress.status}">${escapeHtml(statusText(progress))}</p>`
+            <p class="weight-status weight-status--${progress.status}">${escapeHtml(statusText(progress))}</p>`
           : `<p>Notez vos pesées ici. Pour voir votre objectif et votre progression, <a href="#/programme">renseignez votre programme</a>.</p>`
       }
 
