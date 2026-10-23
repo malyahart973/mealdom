@@ -53,6 +53,7 @@ export async function renderSettings(el) {
           ${ai.hasKey ? '<button type="button" class="button button--danger" data-action="forget-key">Supprimer la clé</button>' : ''}
         </div>
       </form>
+      <p class="hint">Le bouton micro de l’assistant utilise la reconnaissance vocale de votre téléphone ou navigateur (Google ou Apple) : votre voix est traitée par ce service, puis le texte reste modifiable avant l’envoi. Vous pouvez aussi utiliser le micro du clavier.</p>
       <p><a href="#/assistant/preferences">Préférences retenues par l’assistant</a></p>
     </section>
   `;

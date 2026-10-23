@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/html.js';
+import { isSpeechAvailable, startDictation } from '../utils/speech.js';
 import { formatIsoDay, formatNumber } from '../utils/format.js';
 import { formatQuantity } from '../utils/quantity.js';
 import { formatCents } from '../domain/budget/money.js';
@@ -29,6 +30,7 @@ export const SUGGESTIONS = [
   'Une semaine légère pour mon programme',
   'Je veux privilégier les produits en promotion',
   'Rends les repas plus gourmands',
+  'Ajuste les courses à mon budget',
   'Réduis mon budget de 15 %',
   'Je veux manger plus de légumes',
   'Des repas en moins de 30 minutes',
@@ -201,8 +203,16 @@ export async function mountAssistant(root, opts) {
       <form class="chat__form" novalidate>
         <label for="chat-input" class="visually-hidden">Votre demande</label>
         <textarea id="chat-input" rows="2" maxlength="1000" placeholder="Ex. : des repas gourmands, en promotion, en moins de 30 minutes">${escapeHtml(opts.initialText ?? '')}</textarea>
+        ${
+          isSpeechAvailable()
+            ? `<button type="button" class="button button--secondary chat__mic" data-mic aria-pressed="false" aria-label="Dicter ma demande" title="Dicter ma demande">
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+              </button>`
+            : ''
+        }
         <button type="submit" class="button">Envoyer</button>
       </form>
+      <p class="hint chat__listening" role="status" hidden>J’écoute… Parlez, puis relisez avant d’envoyer.</p>
       <details class="chat__suggestions">
         <summary>Idées de demandes</summary>
         <div class="chips">${SUGGESTIONS.map((s) => `<button type="button" class="chip" data-suggest="${escapeHtml(s)}">${escapeHtml(s)}</button>`).join('')}</div>
@@ -262,6 +272,34 @@ export async function mountAssistant(root, opts) {
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     send(input.value);
+  });
+  const mic = /** @type {HTMLButtonElement | null} */ (root.querySelector('[data-mic]'));
+  const listening = /** @type {HTMLElement} */ (root.querySelector('.chat__listening'));
+  /** @type {import('../utils/speech.js').SpeechHandle | null} */
+  let dictation = null;
+  mic?.addEventListener('click', () => {
+    if (dictation) {
+      dictation.stop();
+      return;
+    }
+    const before = input.value.trim();
+    showError('');
+    dictation = startDictation({
+      onText: (text) => {
+        input.value = before ? `${before} ${text}` : text;
+      },
+      onEnd: (error) => {
+        dictation = null;
+        mic.setAttribute('aria-pressed', 'false');
+        listening.hidden = true;
+        if (error) showError(error);
+        input.focus();
+      },
+    });
+    if (dictation) {
+      mic.setAttribute('aria-pressed', 'true');
+      listening.hidden = false;
+    }
   });
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {

@@ -10,6 +10,7 @@ import { INGREDIENTS } from '../data/ingredients.js';
 import { ingredientsById } from '../services/catalog.js';
 import { getStores, getPrices, saveStore, deleteStore, savePrice, deletePrice } from '../services/budgetService.js';
 import { storeTypeOptions } from './stores.js';
+import { photoFieldHtml, mountPhotoField } from './photoField.js';
 
 /** @typedef {import('../domain/stores/stores.js').Price} Price */
 /** @typedef {import('../domain/stores/stores.js').Availability} Availability */
@@ -63,6 +64,7 @@ export async function renderStore(el, params) {
 
       <h2 data-heading="price">Ajouter un prix</h2>
       <form class="stock-form" data-form="price" novalidate>
+        ${photoFieldHtml('price-photo')}
         <div class="field">
           <label for="price-ingredient">Produit</label>
           <input id="price-ingredient" type="text" list="price-names" autocomplete="off" placeholder="ex. riz blanc" />
@@ -135,6 +137,20 @@ export async function renderStore(el, params) {
     alertBox.innerHTML = errors.map((e) => `<p>${escapeHtml(e)}</p>`).join('');
     if (errors.length) alertBox.scrollIntoView({ block: 'center' });
   };
+
+  mountPhotoField(el, 'price-photo', (r) => {
+    /** @param {string} sel @param {string} value */
+    const set = (sel, value) => {
+      if (value) input(sel).value = value;
+    };
+    set('#price-ingredient', r.ingredientId ? ingredientsById.get(r.ingredientId)?.name ?? '' : '');
+    set('#price-label', [r.brand, r.name].filter(Boolean).join(' ').slice(0, 40));
+    set('#price-quantity', r.packageQuantity === null ? '' : String(r.packageQuantity).replace('.', ','));
+    set('#price-unit', r.packageUnit ?? '');
+    set('#price-amount', r.priceCents === null ? '' : centsToInput(r.priceCents));
+    set('#price-date', today);
+    set('#price-availability', 'available');
+  });
 
   section.addEventListener('click', async (event) => {
     const target = /** @type {HTMLElement} */ (event.target);

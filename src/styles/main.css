@@ -1746,3 +1746,82 @@ h3 {
 .stock-form input[type="time"] {
   width: 100%;
 }
+
+/* ---------- Dictee vocale ---------- */
+
+.chat__mic {
+  flex: none;
+  min-width: 3rem;
+  padding: 0 var(--space-3);
+}
+
+.chat__mic[aria-pressed="true"] {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat__mic[aria-pressed="true"] {
+    animation: none;
+  }
+}
+
+.chat__listening {
+  margin: var(--space-2) 0 0;
+}
+
+.chat__listening[hidden] {
+  display: none;
+}
+
+/* ---------- Photo d'un produit ---------- */
+
+.photo-field__button {
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.photo-field input[type="file"]:focus-visible + .photo-field__button {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+.photo-field__result {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  margin-top: var(--space-3);
+}
+
+.photo-field__result[hidden] {
+  display: none;
+}
+
+.photo-field__preview {
+  width: 6rem;
+  height: 6rem;
+  object-fit: cover;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--line);
+}
+
+.photo-field__status {
+  margin: 0 0 var(--space-1);
+  font-weight: 600;
+}
+
+.photo-field__warnings {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}

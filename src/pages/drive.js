@@ -9,6 +9,8 @@ import { AVAILABILITY } from '../domain/stores/stores.js';
 import { buildNameIndex, findIngredientId } from '../domain/ingredients/ingredients.js';
 import { ingredientsById } from '../services/catalog.js';
 import { INGREDIENTS } from '../data/ingredients.js';
+import { fitBudget } from '../services/assistantService.js';
+import { photoFieldHtml, mountPhotoField } from './photoField.js';
 import {
   getDriveSettings,
   saveDriveSettings,
@@ -139,6 +141,8 @@ export async function renderDrive(el, params) {
               <div class="${quote.missing.length ? 'over' : ''}"><dt>Sans prix</dt><dd>${quote.missing.length}</dd></div>
             </dl>
             ${quote.allVerified ? '<p><span class="badge badge--ok">Tout le panier est chiffré avec des prix Drive vérifiés.</span></p>' : '<p class="hint">Le total n’est une valeur sûre que si tous les articles sont « Vérifié Drive ». Les autres montants sont des estimations.</p>'}
+            <p><button type="button" class="button" data-action="fit-budget">Ajuster au budget</button></p>
+            <p class="hint">Produits moins chers d’abord (marques U et Prix Mini à prix égal), puis, si besoin, des repas plus économiques. Vous validez la proposition dans l’assistant.</p>
             <ul class="shop">${quote.lines
               .map((l) => {
                 const [label, cls] = kindLabels[l.kind];
@@ -196,6 +200,7 @@ export async function renderDrive(el, params) {
       <h2 data-heading="product">Ajouter un produit relevé sur le Drive</h2>
       <div class="alert" role="alert" data-alert="product" hidden></div>
       <form class="stock-form" data-form="product" novalidate>
+        ${photoFieldHtml('dp-photo')}
         <div class="field"><label for="dp-ref">Référence (code produit ou EAN, sur le site)</label><input id="dp-ref" type="text" maxlength="40" autocomplete="off" /></div>
         <div class="field"><label for="dp-name">Nom du produit</label><input id="dp-name" type="text" maxlength="80" autocomplete="off" placeholder="ex. Riz long grain 1 kg" /></div>
         <div class="field"><label for="dp-brand">Marque (facultatif)</label><input id="dp-brand" type="text" maxlength="40" autocomplete="off" /></div>
@@ -260,6 +265,13 @@ export async function renderDrive(el, params) {
     const value = /** @type {HTMLSelectElement} */ (event.target).value;
     await saveDriveSettings({ preference: value === 'quality' || value === 'promotions' || value === 'store_brand' ? value : 'cheapest' });
     await renderDrive(el, params);
+  });
+  el.querySelector('[data-action="fit-budget"]')?.addEventListener('click', async (event) => {
+    const button = /** @type {HTMLButtonElement} */ (event.target);
+    button.disabled = true;
+    button.textContent = 'Calcul en cours…';
+    await fitBudget(monday);
+    window.location.hash = `#/assistant/semaine/${monday}`;
   });
   el.querySelector('[data-action="prepare"]')?.addEventListener('click', async () => {
     await prepareOrder(monday);
@@ -334,6 +346,22 @@ export async function renderDrive(el, params) {
       /** @type {HTMLInputElement} */ (el.querySelector('#dp-promo-card')).checked = Boolean(edit.promotion?.requiresCard);
       el.querySelector('[data-heading="product"]')?.scrollIntoView({ block: 'start' });
     }
+  });
+
+  mountPhotoField(el, 'dp-photo', (r) => {
+    /** @param {string} sel @param {string} value */
+    const set = (sel, value) => {
+      if (value) /** @type {HTMLInputElement} */ (el.querySelector(sel)).value = value;
+    };
+    set('#dp-ref', r.barcode);
+    set('#dp-name', r.name);
+    set('#dp-brand', r.brand);
+    set('#dp-ingredient', r.ingredientId ? ingredientName(r.ingredientId) : '');
+    set('#dp-qty', r.packageQuantity === null ? '' : String(r.packageQuantity).replace('.', ','));
+    set('#dp-unit', r.packageUnit ?? '');
+    set('#dp-price', r.priceCents === null ? '' : centsToInput(r.priceCents));
+    set('#dp-promo-label', r.promotionText);
+    set('#dp-avail', 'available');
   });
 
   el.querySelector('[data-form="product"]')?.addEventListener('submit', async (event) => {

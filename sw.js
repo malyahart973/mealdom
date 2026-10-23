@@ -120,6 +120,11 @@ const APP_FILES = [
   './src/db/repositories/tripRepository.js',
   './src/services/tripService.js',
   './src/pages/trip.js',
+  './src/domain/assistant/budgetFit.js',
+  './src/utils/speech.js',
+  './src/domain/drive/productPhoto.js',
+  './src/services/photoService.js',
+  './src/pages/photoField.js',
 ];
 
 self.addEventListener('install', (event) => {

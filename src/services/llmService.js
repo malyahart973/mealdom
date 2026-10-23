@@ -31,11 +31,13 @@ export class LlmError extends Error {
 }
 
 /**
- * Un appel a l'API. Le prompt systeme et les outils sont fixes : ils sont mis en cache.
- * @param {{ apiKey: string, model: string, messages: ApiMessage[], signal?: AbortSignal }} params
+ * Envoie une requete a l'API Messages et traduit les erreurs pour le client.
+ * @param {string} apiKey
+ * @param {Record<string, unknown>} body
+ * @param {AbortSignal | undefined} signal
  * @returns {Promise<ApiResponse>}
  */
-export async function callClaude({ apiKey, model, messages, signal }) {
+async function post(apiKey, body, signal) {
   if (!apiKey) throw new LlmError('no_key', 'Aucune clé API n’est enregistrée.');
   if (!navigator.onLine) throw new LlmError('offline', 'Pas de connexion Internet.');
   let response;
@@ -50,16 +52,7 @@ export async function callClaude({ apiKey, model, messages, signal }) {
         'anthropic-beta': FALLBACK_BETA,
         'anthropic-dangerous-direct-browser-access': 'true',
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: 16000,
-        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-        tools: TOOL_DEFINITIONS,
-        tool_choice: { type: 'auto' },
-        output_config: { effort: 'medium' },
-        fallbacks: 'default',
-        messages,
-      }),
+      body: JSON.stringify({ ...body, fallbacks: 'default' }),
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
@@ -68,8 +61,8 @@ export async function callClaude({ apiKey, model, messages, signal }) {
   if (!response.ok) {
     let detail = '';
     try {
-      const body = /** @type {{ error?: { message?: string } }} */ (await response.json());
-      detail = body.error?.message ?? '';
+      const data = /** @type {{ error?: { message?: string } }} */ (await response.json());
+      detail = data.error?.message ?? '';
     } catch {
       // corps illisible : on garde le code HTTP
     }
@@ -81,6 +74,60 @@ export async function callClaude({ apiKey, model, messages, signal }) {
   const data = /** @type {ApiResponse} */ (await response.json());
   if (data.stop_reason === 'refusal') throw new LlmError('refusal', 'Le service IA n’a pas pu traiter cette demande.');
   return data;
+}
+
+/**
+ * Un tour de conversation de l'assistant. Le prompt systeme et les outils sont fixes : ils sont mis en cache.
+ * @param {{ apiKey: string, model: string, messages: ApiMessage[], signal?: AbortSignal }} params
+ * @returns {Promise<ApiResponse>}
+ */
+export function callClaude({ apiKey, model, messages, signal }) {
+  return post(
+    apiKey,
+    {
+      model,
+      max_tokens: 16000,
+      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      tools: TOOL_DEFINITIONS,
+      tool_choice: { type: 'auto' },
+      output_config: { effort: 'medium' },
+      messages,
+    },
+    signal,
+  );
+}
+
+/**
+ * Lecture d'une image avec une reponse JSON conforme au schema (sortie structuree).
+ * @param {{ apiKey: string, model: string, system: string, schema: Record<string, unknown>, imageBase64: string, mediaType: string, instruction: string, signal?: AbortSignal }} params
+ * @returns {Promise<unknown>}
+ */
+export async function readImage({ apiKey, model, system, schema, imageBase64, mediaType, instruction, signal }) {
+  const data = await post(
+    apiKey,
+    {
+      model,
+      max_tokens: 4000,
+      system,
+      output_config: { effort: 'low', format: { type: 'json_schema', schema } },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+            { type: 'text', text: instruction },
+          ],
+        },
+      ],
+    },
+    signal,
+  );
+  if (data.stop_reason === 'max_tokens') throw new LlmError('unknown', 'La lecture de la photo a été interrompue. Réessayez.');
+  try {
+    return JSON.parse(responseText(data.content));
+  } catch {
+    throw new LlmError('unknown', 'La réponse du service IA est illisible. Réessayez.');
+  }
 }
 
 /**

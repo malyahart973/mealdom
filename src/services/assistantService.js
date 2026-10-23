@@ -14,7 +14,8 @@ import { applyOperations, parseOperations, planDiff, freeSlots } from '../domain
 import { learnFromRequest, applyPreferences, describePreferences, upsertPreference } from '../domain/assistant/preferences.js';
 import { createConversation, isBigChange } from '../domain/assistant/conversation.js';
 import { TOOL_NAMES } from '../domain/assistant/tools.js';
-import { recipeCost } from '../domain/assistant/scoring.js';
+import { recipeCost, isEligible } from '../domain/assistant/scoring.js';
+import { fitToBudget, rankThrifty } from '../domain/assistant/budgetFit.js';
 import { compareQuotes } from '../domain/drive/quote.js';
 import { isFresh, activePromotions, promotionStatus } from '../domain/drive/drive.js';
 import { roundNutrients } from '../domain/nutrition/nutrition.js';
@@ -32,7 +33,7 @@ import { getSetting, setSetting } from '../db/repositories/settingsRepository.js
 import { getMeals, getShowBreakfast, getShowSnack, newMealId } from './planningService.js';
 import { getHousehold } from './householdService.js';
 import { getBudget, saveBudget } from './budgetService.js';
-import { loadPriceData, quoteForMeals, productsByIngredient, unitPrices, saveDriveSettings } from './driveService.js';
+import { loadPriceData, quoteForMeals, weekQuoter, productsByIngredient, unitPrices, saveDriveSettings } from './driveService.js';
 import { programSummary } from './programService.js';
 import { callClaude, responseText, LlmError, DEFAULT_MODEL } from './llmService.js';
 import { recipes, recipesById, ingredientsById, preparationsById, cuisineLabels, nutritionContext, nutritionByRecipe as recipeNutritionMap } from './catalog.js';
@@ -363,6 +364,11 @@ export async function sendMessage(monday, text, opts = {}) {
   conv.messages.push(message('user', clean, null, null));
 
   const parsed = parseRequest(clean, { today: env.today, monday, focusIngredientId: opts.focusIngredientId ?? null, ...finder });
+  if (BUDGET_FIT.test(normalizeText(clean))) {
+    await fitBudgetTurn(conv, env, parsed.budgetCents);
+    await saveConversation(conv);
+    return conv;
+  }
   if (parsed.undo) {
     const result = await undoLast(monday);
     conv.messages.push(message('assistant', result.message, 'engine', null));
@@ -395,6 +401,73 @@ export async function sendMessage(monday, text, opts = {}) {
     conv.pendingEvents.push(`Hors connexion IA, le client a demandé : « ${clean} ». Le moteur local a répondu${proposal ? ` avec une proposition (${proposal.summary})` : ''}.`);
   }
   if (merged.understood && !merged.undo) conv.context = merged;
+  await saveConversation(conv);
+  return conv;
+}
+
+// ---------------------------------------------------------------------------
+// Ajuster les courses au budget (prix reels du Drive et des releves)
+// ---------------------------------------------------------------------------
+
+/** Demandes explicites d'ajustement au budget : « ajuste mes courses au budget », « tenir dans mon budget ». */
+const BUDGET_FIT = /ajust\w*\b.{0,40}\bbudget|\b(tenir|rentrer|rester)\s+dans\s+(mon|le|ce)\s+budget/;
+
+/**
+ * Calcule et ajoute a la conversation la proposition qui fait passer les courses sous le budget.
+ * @param {Conversation} conv
+ * @param {Env} env
+ * @param {number | null} budgetOverride  Budget donne dans la demande (« ajuste a 80 € »)
+ */
+async function fitBudgetTurn(conv, env, budgetOverride) {
+  const budgetCents = budgetOverride ?? env.budget.weeklyCents;
+  if (budgetCents === null) {
+    conv.messages.push(message('assistant', 'Aucun budget hebdomadaire n’est défini. Fixez-le dans l’écran Budget, ou dites par exemple « ajuste mes courses à un budget de 80 € ».', 'engine', null));
+    return;
+  }
+  const quoter = await weekQuoter(env.monday, env.priceData);
+  const compatibleIds = new Set(recipes.filter((r) => evaluateRecipeForHousehold(r, env.household, env.scoring).status === 'compatible').map((r) => r.id));
+  /** @type {import('../domain/assistant/scoring.js').Constraints} */
+  const base = { slot: null, maxMinutes: null, avoid: [], include: [], cuisine: null, cuisines: null, excludeRecipeIds: new Set(), maxCostIndex: null, compatibleIds };
+  const result = fitToBudget({
+    meals: env.meals,
+    days: env.days,
+    today: env.today,
+    budgetCents,
+    preferred: new Map(Object.entries(env.priceData.settings.preferredProducts)),
+    preference: env.priceData.settings.preference,
+    quote: (meals, preferred, preference) => quoter(meals, preferred, preference).quote,
+    candidates: (meal, exclude) =>
+      rankThrifty(
+        recipes.filter((r) => isEligible(r, { ...base, slot: meal.slot, excludeRecipeIds: exclude }, env.scoring)),
+        (r) => recipeCost(r, env.scoring).index,
+      ),
+    recipesById,
+    nameOf: (id) => ingredientsById.get(id)?.name ?? id,
+  });
+  /** @type {Operation[]} */
+  const operations = budgetOverride !== null && budgetOverride !== env.budget.weeklyCents
+    ? [{ type: 'set_weekly_budget', cents: budgetOverride, reason: 'Budget de la semaine demandé.' }, ...result.operations]
+    : result.operations;
+  const summary = `Ajuster les courses au budget de ${formatCents(budgetCents)}`;
+  const proposal = operations.length ? await createProposal(conv, operations, summary, result.notes.slice(1), 'engine', null, env) : null;
+  const lines = [result.notes[0]];
+  if (proposal && proposal.status === 'pending') {
+    lines.push(`Voici ma proposition (${proposal.operations.length} modification${proposal.operations.length > 1 ? 's' : ''}) : d’abord des produits moins chers, puis, si besoin, des repas plus économiques. Vérifiez l’aperçu puis acceptez, modifiez ou annulez.`);
+  } else lines.push(...result.notes.slice(1));
+  conv.messages.push(message('assistant', lines.join('\n'), 'engine', proposal?.status === 'pending' ? proposal.id : null));
+  conv.pendingEvents.push(`Le client a demandé d’ajuster les courses au budget de ${formatCents(budgetCents)}. Le moteur a répondu : ${result.notes[0]}`);
+}
+
+/**
+ * Ajustement au budget lance depuis un bouton (ecran Drive ou Courses).
+ * @param {string} monday
+ * @returns {Promise<Conversation>}
+ */
+export async function fitBudget(monday) {
+  const conv = await getConversation(monday);
+  const env = await loadEnvironment(monday);
+  conv.messages.push(message('user', 'Ajuste les courses de la semaine à mon budget.', null, null));
+  await fitBudgetTurn(conv, env, null);
   await saveConversation(conv);
   return conv;
 }

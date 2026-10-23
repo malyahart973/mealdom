@@ -194,6 +194,41 @@ export async function loadPriceData() {
 }
 
 /**
+ * Chiffreur de la semaine : foyer, stock et conditionnements sont lus une fois, puis
+ * n'importe quelle version du planning est chiffree sans relire la base
+ * (sert a comparer des variantes, par exemple pour tenir un budget).
+ * @param {string} monday
+ * @param {{ products: DriveProduct[], prices: import('../domain/stores/stores.js').Price[], settings: DriveSettings }} data
+ */
+export async function weekQuoter(monday, data) {
+  const days = new Set(weekDays(monday));
+  const [household, inventory, packages] = await Promise.all([getHousehold(), getInventory(), getPackages()]);
+  const now = new Date();
+  const today = toIsoDate(now);
+  /**
+   * @param {Meal[]} meals
+   * @param {Map<string, string>} preferred
+   * @param {ProductPreference} preference
+   */
+  return (meals, preferred, preference) => {
+    const weekMeals = meals.filter((m) => days.has(m.date));
+    const needs = aggregateNeeds(mealNeedLines(weekMeals, household, recipesById, preparationsById), ingredientsById);
+    const lines = buildShoppingLines(needs, inventory, packages, ingredientsById);
+    const quote = quoteShoppingLines(lines, {
+      products: data.products,
+      prices: data.prices,
+      ingredients: ingredientsById,
+      today,
+      now,
+      hasLoyaltyCard: data.settings.hasLoyaltyCard,
+      preference,
+      preferredProducts: preferred,
+    });
+    return { lines, quote };
+  };
+}
+
+/**
  * Devis des courses d'une liste de repas pour une semaine (stock et conditionnements deduits).
  * @param {Meal[]} meals
  * @param {string} monday
@@ -201,23 +236,8 @@ export async function loadPriceData() {
  * @param {Record<string, string>} [preferredProducts]
  */
 export async function quoteForMeals(meals, monday, data, preferredProducts) {
-  const days = new Set(weekDays(monday));
-  const [household, inventory, packages] = await Promise.all([getHousehold(), getInventory(), getPackages()]);
-  const weekMeals = meals.filter((m) => days.has(m.date));
-  const needs = aggregateNeeds(mealNeedLines(weekMeals, household, recipesById, preparationsById), ingredientsById);
-  const lines = buildShoppingLines(needs, inventory, packages, ingredientsById);
-  const now = new Date();
-  const quote = quoteShoppingLines(lines, {
-    products: data.products,
-    prices: data.prices,
-    ingredients: ingredientsById,
-    today: toIsoDate(now),
-    now,
-    hasLoyaltyCard: data.settings.hasLoyaltyCard,
-    preference: data.settings.preference,
-    preferredProducts: new Map(Object.entries(preferredProducts ?? data.settings.preferredProducts)),
-  });
-  return { lines, quote };
+  const quoter = await weekQuoter(monday, data);
+  return quoter(meals, new Map(Object.entries(preferredProducts ?? data.settings.preferredProducts)), data.settings.preference);
 }
 
 /**
