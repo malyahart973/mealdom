@@ -7,6 +7,7 @@ import { AISLES } from '../domain/ingredients/ingredients.js';
 import { ingredientsById } from '../services/catalog.js';
 import { getHousehold } from '../services/householdService.js';
 import { saveShoppingList, newId } from '../services/shoppingService.js';
+import { shoppingListText } from '../domain/shopping/shopping.js';
 import { weekShoppingEstimate, getStores } from '../services/budgetService.js';
 import { formatCents } from '../domain/budget/money.js';
 import { loadAvailability } from '../services/territoryService.js';
@@ -128,6 +129,14 @@ export async function renderShopping(el, params) {
         <a href="#/courses/semaine/${addDays(monday, 7)}" aria-label="Semaine suivante">›</a>
       </nav>
       ${
+        mealCount > 0 || state.extras.length
+          ? `<p class="share-row"><button type="button" class="button" data-action="share">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+              Partager la liste</button></p>
+            <div class="alert alert--ok" role="status" data-alert="share" hidden></div>`
+          : ''
+      }
+      ${
         mealCount === 0
           ? `<p class="empty">Aucun repas planifié cette semaine.</p>
              <p>La liste se remplit toute seule à partir du planning, en tenant compte de votre stock.</p>
@@ -191,6 +200,29 @@ export async function renderShopping(el, params) {
     } else if (extraId) {
       state.extras = state.extras.map((x) => (x.id === extraId ? { ...x, checked: input.checked } : x));
       await save();
+    }
+  });
+
+  el.querySelector('[data-action="share"]')?.addEventListener('click', async () => {
+    const { text } = shoppingListText(lines, state, {
+      title: `Liste de courses – semaine du ${formatIsoDayMonth(monday)}`,
+      aisles: AISLES,
+      name,
+      describe: buyText,
+    });
+    const box = /** @type {HTMLElement} */ (el.querySelector('[data-alert="share"]'));
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Liste de courses', text });
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      box.textContent = 'Liste copiée : collez-la dans WhatsApp, un SMS ou vos notes.';
+      box.hidden = false;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return; // partage annule par l'utilisateur
+      box.textContent = 'Le partage n’est pas disponible sur ce navigateur.';
+      box.hidden = false;
     }
   });
 

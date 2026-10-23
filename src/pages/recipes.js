@@ -2,7 +2,7 @@ import { escapeHtml } from '../utils/html.js';
 import { formatMinutes } from '../utils/format.js';
 import { filterRecipes } from '../domain/recipes/recipeFiltering.js';
 import { totalMinutes, recipeMealTypes, hasTag, MEAL_TYPES, RECIPE_TAGS, QUICK_MINUTES, VESSEL_LABELS } from '../domain/recipes/recipes.js';
-import { recipes, cuisineLabels, filterContext, nutritionByRecipe, preparationsById } from '../services/catalog.js';
+import { recipes, cuisineLabels, filterContext, nutritionByRecipe, preparationsById, ingredientsById } from '../services/catalog.js';
 import { CUISINES, REGIONS } from '../data/cuisines.js';
 import { getHousehold } from '../services/householdService.js';
 import { loadAvailability } from '../services/territoryService.js';
@@ -62,9 +62,16 @@ function selectHtml(name, label, options, selected, all) {
 
 /**
  * Ecran Recettes : recherche et filtres (repas, region, cuisine, style, foyer, recipient, rapidite).
+ * Adresse #/recettes/avec/<ingredient> : recettes qui utilisent cet ingredient.
  * @param {HTMLElement} el
+ * @param {Record<string, string>} [params]
  */
-export async function renderRecipes(el) {
+export async function renderRecipes(el, params = {}) {
+  const focus = params.ingredientId ? ingredientsById.get(params.ingredientId) : undefined;
+  if (focus) {
+    state.query = focus.name;
+    state.shown = PAGE_SIZE;
+  }
   const [household, availability] = await Promise.all([getHousehold(), loadAvailability()]);
   /** Recettes avec un ingredient rare ou introuvable (alternative possible ou non). */
   const hard = new Set(

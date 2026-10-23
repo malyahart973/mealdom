@@ -3,7 +3,8 @@ import { formatNumber } from '../utils/format.js';
 import { formatQuantity } from '../utils/quantity.js';
 import { measurableUnitOptions, parseDecimal } from '../utils/units-select.js';
 import { getUnit } from '../domain/units/units.js';
-import { LOCATIONS } from '../domain/shopping/shopping.js';
+import { LOCATIONS, expiryStatus, itemsToUseFirst } from '../domain/shopping/shopping.js';
+import { formatIsoDayMonth } from '../utils/format.js';
 import { buildNameIndex, findIngredientId } from '../domain/ingredients/ingredients.js';
 import { convertUnit } from '../domain/ingredients/conversion.js';
 import { toIsoDate, weekStart } from '../domain/planning/dates.js';
@@ -20,7 +21,29 @@ const nameIndex = buildNameIndex(INGREDIENTS);
  * @param {HTMLElement} el
  */
 export async function renderStock(el) {
-  const [inventory, { needs }] = await Promise.all([getInventory(), weekNeeds(weekStart(toIsoDate(new Date())))]);
+  const today = toIsoDate(new Date());
+  const [inventory, { needs }] = await Promise.all([getInventory(), weekNeeds(weekStart(today))]);
+  /** @param {string} id */
+  const nameOf = (id) => ingredientsById.get(id)?.name ?? id;
+  /**
+   * Badge de date limite.
+   * @param {InventoryItem} item
+   * @returns {string}
+   */
+  const expiryBadge = (item) => {
+    const { status, days } = expiryStatus(item, today);
+    if (!status || !item.expiresOn) return '';
+    const text =
+      status === 'expired'
+        ? `Date dépassée depuis ${-(days ?? 0)} j`
+        : status === 'today'
+          ? 'À consommer aujourd’hui'
+          : status === 'soon'
+            ? `À consommer d’ici ${days} j`
+            : `Jusqu’au ${formatIsoDayMonth(item.expiresOn)}`;
+    return `<span class="expiry expiry--${status}">${escapeHtml(text)}</span>`;
+  };
+  const first = itemsToUseFirst(inventory, today);
 
   /**
    * Quantite prevue cette semaine pour cet article, dans son unite.
@@ -50,13 +73,14 @@ export async function renderStock(el) {
       <ul class="stock">${items
         .map(
           (i) => `<li>
-            <span class="stock__name">${escapeHtml(ingredientsById.get(i.ingredientId)?.name ?? i.ingredientId)}</span>
+            <span class="stock__name">${escapeHtml(ingredientsById.get(i.ingredientId)?.name ?? i.ingredientId)} ${expiryBadge(i)}</span>
             <span class="stock__qty">
               <input type="text" inputmode="decimal" data-qty="${escapeHtml(i.id)}" value="${escapeHtml(formatNumber(i.quantity))}" aria-label="Quantité" />
               <span>${escapeHtml(getUnit(i.unit)?.label ?? i.unit)}</span>
               <button type="button" class="icon-button" data-remove="${escapeHtml(i.id)}" aria-label="Retirer du stock">×</button>
             </span>
             ${planned(i) ? `<span class="hint stock__plan">${escapeHtml(planned(i))}</span>` : ''}
+            <label class="stock__date">À consommer avant <input type="date" data-exp="${escapeHtml(i.id)}" value="${escapeHtml(i.expiresOn ?? '')}" /></label>
           </li>`,
         )
         .join('')}</ul>`;
@@ -66,6 +90,20 @@ export async function renderStock(el) {
     <section>
       <h1 class="page-title">Stock</h1>
       <p class="hint">Ce que vous avez déjà à la maison. MealDom le déduit de la liste de courses.</p>
+      ${
+        first.length
+          ? `<section class="use-first" aria-labelledby="use-first-title">
+              <h2 id="use-first-title">À consommer en priorité</h2>
+              <ul class="local-list">${first
+                .map(
+                  (i) => `<li><span><strong>${escapeHtml(nameOf(i.ingredientId))}</strong> ${expiryBadge(i)}</span>
+                    ${expiryStatus(i, today).status === 'expired' ? '' : `<a class="button button--small button--secondary" href="#/recettes/avec/${encodeURIComponent(i.ingredientId)}">Recettes</a>`}</li>`,
+                )
+                .join('')}</ul>
+              <p class="hint">L’assistant privilégie ces produits dans ses propositions. Date dépassée : si c’est une date limite de consommation (« à consommer jusqu’au »), ne consommez pas le produit ; si c’est « à consommer de préférence avant », vérifiez son aspect et son odeur.</p>
+            </section>`
+          : ''
+      }
       <div class="alert" role="alert" hidden></div>
       <form class="stock-form" data-form="stock" novalidate>
         <div class="field">
@@ -78,6 +116,10 @@ export async function renderStock(el) {
         <div class="field when">
           <input id="stock-quantity" type="text" inputmode="decimal" autocomplete="off" placeholder="Quantité" aria-label="Quantité" />
           <select id="stock-unit" aria-label="Unité">${measurableUnitOptions('g')}</select>
+        </div>
+        <div class="field">
+          <label for="stock-expiry">À consommer avant (facultatif)</label>
+          <input id="stock-expiry" type="date" min="${today}" />
         </div>
         <div class="field">
           <select id="stock-location" aria-label="Emplacement">${LOCATIONS.map((l) => `<option value="${l.id}">${escapeHtml(l.label)}</option>`).join('')}</select>
@@ -108,6 +150,7 @@ export async function renderStock(el) {
       quantity: parseDecimal(/** @type {HTMLInputElement} */ (el.querySelector('#stock-quantity')).value),
       unit: /** @type {HTMLSelectElement} */ (el.querySelector('#stock-unit')).value,
       location: /** @type {InventoryItem['location']} */ (/** @type {HTMLSelectElement} */ (el.querySelector('#stock-location')).value),
+      expiresOn: /** @type {HTMLInputElement} */ (el.querySelector('#stock-expiry')).value || null,
     };
     const errors = await saveInventoryItem(item);
     if (errors.length) return showErrors(errors);
@@ -116,6 +159,15 @@ export async function renderStock(el) {
 
   section.addEventListener('change', async (event) => {
     const input = /** @type {HTMLInputElement} */ (event.target);
+    const expId = input.getAttribute('data-exp');
+    if (expId) {
+      const item = inventory.find((i) => i.id === expId);
+      if (!item) return;
+      const errors = await saveInventoryItem({ ...item, expiresOn: input.value || null });
+      if (errors.length) return showErrors(errors);
+      await renderStock(el);
+      return;
+    }
     const id = input.getAttribute('data-qty');
     if (!id) return;
     const item = inventory.find((i) => i.id === id);

@@ -1,5 +1,5 @@
 import { test, assertEqual } from './runner.js';
-import { aggregateNeeds, buildShoppingLines, mealNeedLines, validateInventoryItem, validatePackage } from '../src/domain/shopping/shopping.js';
+import { aggregateNeeds, buildShoppingLines, mealNeedLines, validateInventoryItem, validatePackage, shoppingListText, expiryStatus, itemsToUseFirst } from '../src/domain/shopping/shopping.js';
 import { createDefaultHousehold, upsertMember } from '../src/domain/household/household.js';
 import { DEFAULT_PORTION_RULES } from '../src/data/portionRules.js';
 import { INGREDIENTS } from '../src/data/ingredients.js';
@@ -119,4 +119,40 @@ test('Conditionnement : contenu nul refusé', () => {
 });
 test('Conditionnement : unité « au goût » refusée', () => {
   if (validatePackage({ ...riceBag, unit: 'to_taste' }, ingredients).length === 0) throw new Error('accepté');
+});
+
+test('Partage : liste par rayon, articles déjà pris exclus, ajouts à la main en fin', () => {
+  /** @param {string} id @param {string} aisle @returns {import('../src/domain/shopping/shopping.js').ShoppingLine} */
+  const l = (id, aisle) => ({ key: id, ingredientId: id, need: 1, unit: 'kg', inStock: 0, toBuy: 1, packages: null, buyQuantity: 1, covered: false, aisle: /** @type {any} */ (aisle) });
+  const { text, count } = shoppingListText([l('tomato', 'fruits_vegetables'), l('rice_white', 'grocery'), l('onion', 'fruits_vegetables')], { week: 'w', checked: ['onion'], extras: [{ id: 'x', label: 'Papier toilette', checked: false }] }, {
+    title: 'Liste de courses',
+    aisles: [{ id: 'fruits_vegetables', label: 'Fruits et légumes' }, { id: 'grocery', label: 'Épicerie' }],
+    name: (id) => ({ tomato: 'Tomate', rice_white: 'Riz blanc', onion: 'Oignon' })[id] ?? id,
+    describe: () => '1 kg',
+  });
+  assertEqual([count, text], [3, 'Liste de courses\n\nFRUITS ET LÉGUMES\n- Tomate : 1 kg\n\nÉPICERIE\n- Riz blanc : 1 kg\n\nEN PLUS\n- Papier toilette']);
+});
+
+test('Péremption : périmé, aujourd’hui, bientôt (3 jours), plus tard, sans date', () => {
+  /** @param {string | null} d @returns {InventoryItem} */
+  const item = (d) => ({ id: d ?? 'x', ingredientId: 'milk', quantity: 1, unit: 'l', location: 'fridge', expiresOn: d });
+  assertEqual(
+    ['2026-10-20', '2026-10-23', '2026-10-26', '2026-10-27', null].map((d) => expiryStatus(item(d), '2026-10-23')),
+    [{ status: 'expired', days: -3 }, { status: 'today', days: 0 }, { status: 'soon', days: 3 }, { status: 'ok', days: 4 }, { status: null, days: null }],
+  );
+});
+
+test('Péremption : produits à consommer en priorité, les plus urgents d’abord, stock vide exclu', () => {
+  /** @type {InventoryItem[]} */
+  const items = [
+    { id: 'a', ingredientId: 'milk', quantity: 1, unit: 'l', location: 'fridge', expiresOn: '2026-10-25' },
+    { id: 'b', ingredientId: 'yogurt', quantity: 4, unit: 'piece', location: 'fridge', expiresOn: '2026-10-22' },
+    { id: 'c', ingredientId: 'cream', quantity: 0, unit: 'ml', location: 'fridge', expiresOn: '2026-10-23' },
+    { id: 'd', ingredientId: 'rice_white', quantity: 1, unit: 'kg', location: 'pantry', expiresOn: '2027-05-01' },
+  ];
+  assertEqual(itemsToUseFirst(items, '2026-10-23').map((i) => i.id), ['b', 'a']);
+});
+
+test('Péremption : date limite invalide refusée', () => {
+  assertEqual(validateInventoryItem({ id: 'x', ingredientId: 'milk', quantity: 1, unit: 'l', location: 'fridge', expiresOn: '23/10/2026' }, ingredients).length, 1);
 });

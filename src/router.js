@@ -54,6 +54,7 @@ const routes = [
     parent: (p) => `/planning/semaine/${p.date}`,
   },
   { pattern: /^\/recettes$/, title: 'Recettes', tab: '/recettes', render: renderRecipes },
+  { pattern: /^\/recettes\/avec\/(?<ingredientId>[^/]+)$/, title: 'Recettes', tab: '/recettes', render: renderRecipes, parent: () => '/stock' },
   { pattern: /^\/recettes\/(?<id>[^/]+)$/, title: 'Recette', tab: '/recettes', render: renderRecipe, parent: () => '/recettes' },
   { pattern: /^\/courses$/, title: 'Courses', tab: '/courses', render: renderShopping },
   { pattern: /^\/courses\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/, title: 'Courses', tab: '/courses', render: renderShopping },

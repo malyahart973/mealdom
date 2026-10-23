@@ -3,7 +3,7 @@ import { proposeChanges, learnedWeights } from '../src/domain/assistant/engine.j
 import { applyOperations, planDiff, parseOperations } from '../src/domain/assistant/proposal.js';
 import { parseRequest, makeIngredientFinder, mergeRequests } from '../src/domain/assistant/intent.js';
 import { learnFromRequest, applyPreferences, LEARN_THRESHOLD } from '../src/domain/assistant/preferences.js';
-import { recipeContains } from '../src/domain/assistant/scoring.js';
+import { recipeContains, scoreRecipe } from '../src/domain/assistant/scoring.js';
 import { buildNutritionIndex, recipeNutrition } from '../src/domain/nutrition/nutrition.js';
 import { createDefaultHousehold, upsertMember } from '../src/domain/household/household.js';
 import { evaluateRecipeForHousehold } from '../src/domain/household/compatibility.js';
@@ -231,4 +231,13 @@ test('Préférence désactivée par le client : jamais réactivée automatiqueme
 test('Préférence « éviter le porc » appliquée aux demandes suivantes', () => {
   const prefs = learnFromRequest([], ask('Retiens : pas de porc'), 'x', cuisineLabels);
   assertEqual(applyPreferences(ask('Repas rapides'), prefs).avoid.map((a) => a.category), ['pork']);
+});
+
+test('Anti-gaspillage : une recette qui utilise un produit à consommer vite passe devant', () => {
+  const recipe = /** @type {import('../src/domain/recipes/recipes.js').Recipe} */ (recipesById.get('chili_con_carne'));
+  const env = { slot: null, medianCostIndex: 1, maxMinutes: null, weekCuisines: [], weekRecipeIds: [], weekIngredients: new Set() };
+  const base = engineCtx([]).scoring;
+  const plain = scoreRecipe(recipe, {}, env, base);
+  const boosted = scoreRecipe(recipe, {}, env, { ...base, expiringIngredients: new Set(['ground_beef']) });
+  assertEqual([boosted.score > plain.score, boosted.reasons.some((r) => r.includes('à consommer vite'))], [true, true]);
 });

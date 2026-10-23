@@ -24,6 +24,7 @@ import { evaluateRecipeForHousehold } from '../domain/household/compatibility.js
 import { allIngredientIds, totalMinutes, recipeMealTypes, hasTag } from '../domain/recipes/recipes.js';
 import { buildNameIndex, normalizeText } from '../domain/ingredients/ingredients.js';
 import { SLOTS, mealPortionsFor } from '../domain/planning/planning.js';
+import { expiryStatus, itemsToUseFirst } from '../domain/shopping/shopping.js';
 import { weekDays, toIsoDate } from '../domain/planning/dates.js';
 import { formatCents } from '../domain/budget/money.js';
 import { conversationStore, historyStore, preferenceStore, getHistory, getPreferences } from '../db/repositories/assistantRepository.js';
@@ -133,7 +134,8 @@ async function loadEnvironment(monday) {
     nutritionByRecipe: recipeNutritionMap(),
     unitPrices: unitPrices(priceData.products, priceData.prices, now),
     promoIngredients,
-    stockIngredients: new Set(inventory.filter((i) => i.quantity > 0).map((i) => i.ingredientId)),
+    stockIngredients: new Set(inventory.filter((i) => i.quantity > 0 && expiryStatus(i, today).status !== 'expired').map((i) => i.ingredientId)),
+    expiringIngredients: new Set(itemsToUseFirst(inventory, today).filter((i) => expiryStatus(i, today).status !== 'expired').map((i) => i.ingredientId)),
     programTargets: program ? program.meals : null,
     availability,
   };

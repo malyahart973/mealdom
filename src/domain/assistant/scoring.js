@@ -37,6 +37,7 @@ import { substitutesFor } from './substitutes.js';
  * @property {Map<string, UnitPrice>} unitPrices
  * @property {Set<string>} promoIngredients                  Promotions actives et verifiees
  * @property {Set<string>} stockIngredients
+ * @property {Set<string>} [expiringIngredients]           En stock et proches de leur date limite (non perimes)
  * @property {Partial<Record<Slot, { kcal: number, proteinG: number }>> | null} programTargets
  * @property {import('../ingredients/territory.js').AvailabilityOf} [availability]
  *   Disponibilite locale (Guyane) : recettes impossibles exclues, ingredients rares penalises
@@ -261,6 +262,14 @@ export function scoreRecipe(recipe, weights, env, ctx) {
     const minutes = totalMinutes(recipe);
     score += 10 * w('quick') * Math.max(0, 1 - minutes / (max * 2));
     if (minutes <= max) reasons.push(`prête en ${minutes} minutes`);
+  }
+  // Produits du stock a consommer vite : toujours un petit bonus, plus fort en mode anti-gaspillage.
+  if (ctx.expiringIngredients?.size) {
+    const used = allIngredientIds(recipe, ctx.preparations).filter((id) => ctx.expiringIngredients?.has(id));
+    if (used.length) {
+      score += Math.min(2, used.length) * (3 + 5 * w('antiwaste'));
+      reasons.push(`utilise ${used.map((id) => ctx.ingredients.get(id)?.name ?? id).join(', ')} à consommer vite`);
+    }
   }
   if (w('antiwaste')) {
     const ids = allIngredientIds(recipe, ctx.preparations).filter((id) => !ctx.ingredients.get(id)?.notPurchased);

@@ -24,6 +24,7 @@ import { applySubstitutions } from '../recipes/recipes.js';
  * @property {number} quantity
  * @property {string} unit
  * @property {'pantry' | 'fridge' | 'freezer'} location
+ * @property {string | null} [expiresOn]   Date limite (AAAA-MM-JJ), facultative
  */
 
 /** @type {{ id: InventoryItem['location'], label: string }[]} */
@@ -259,6 +260,7 @@ export function validateInventoryItem(item, ingredients) {
   if (!unit || unit.kind === 'qualitative') errors.push('Choisissez une unité.');
   if (!Number.isFinite(item.quantity) || item.quantity < 0) errors.push('Indiquez une quantité positive.');
   if (!LOCATIONS.some((l) => l.id === item.location)) errors.push('Choisissez un emplacement.');
+  if (item.expiresOn && !/^\d{4}-\d{2}-\d{2}$/.test(item.expiresOn)) errors.push('Date limite invalide.');
   return errors;
 }
 
@@ -277,4 +279,59 @@ export function validatePackage(pkg, ingredients) {
   if (!unit || unit.kind === 'qualitative' || unit.kind === 'package') errors.push('Choisissez une unité de contenu (g, kg, ml, L, pièce...).');
   if (!Number.isFinite(pkg.quantity) || pkg.quantity <= 0) errors.push('Indiquez la quantité contenue.');
   return errors;
+}
+
+/**
+ * Texte de la liste de courses a partager (messagerie, SMS, notes), classe par rayon.
+ * Les articles deja coches (dans le panier) ne sont pas repris.
+ * @param {ShoppingLine[]} lines
+ * @param {ShoppingListState} state
+ * @param {{ title: string, aisles: { id: string, label: string }[], name: (ingredientId: string) => string, describe: (line: ShoppingLine) => string }} ctx
+ * @returns {{ text: string, count: number }}
+ */
+export function shoppingListText(lines, state, ctx) {
+  const toBuy = lines.filter((l) => !l.covered && !state.checked.includes(l.key));
+  /** @type {string[]} */
+  const parts = [ctx.title];
+  for (const aisle of ctx.aisles) {
+    const items = toBuy.filter((l) => l.aisle === aisle.id);
+    if (!items.length) continue;
+    parts.push('', aisle.label.toUpperCase(), ...items.map((l) => `- ${ctx.name(l.ingredientId)} : ${ctx.describe(l)}`));
+  }
+  const extras = state.extras.filter((x) => !x.checked);
+  if (extras.length) parts.push('', 'EN PLUS', ...extras.map((x) => `- ${x.label}`));
+  const count = toBuy.length + extras.length;
+  if (count === 0) parts.push('', 'Tout est déjà dans le panier.');
+  return { text: parts.join('\n'), count };
+}
+
+/** Un produit est « a consommer vite » dans les 3 jours qui precedent sa date limite. */
+export const EXPIRY_SOON_DAYS = 3;
+
+/**
+ * Etat d'un article du stock par rapport a sa date limite.
+ * @param {InventoryItem} item
+ * @param {string} today
+ * @returns {{ status: 'expired' | 'today' | 'soon' | 'ok' | null, days: number | null }}
+ */
+export function expiryStatus(item, today) {
+  if (!item.expiresOn) return { status: null, days: null };
+  const days = Math.round((Date.parse(`${item.expiresOn}T12:00:00`) - Date.parse(`${today}T12:00:00`)) / 86400000);
+  if (Number.isNaN(days)) return { status: null, days: null };
+  if (days < 0) return { status: 'expired', days };
+  if (days === 0) return { status: 'today', days };
+  return { status: days <= EXPIRY_SOON_DAYS ? 'soon' : 'ok', days };
+}
+
+/**
+ * Articles a consommer en priorite (perimes ou proches de leur date limite), les plus urgents d'abord.
+ * Seuls les articles encore en stock comptent.
+ * @param {InventoryItem[]} items
+ * @param {string} today
+ * @returns {InventoryItem[]}
+ */
+export function itemsToUseFirst(items, today) {
+  return items
+    .filter((i) => i.quantity > 0 && ['expired', 'today', 'soon'].includes(expiryStatus(i, today).status ?? ''))
+    .sort((a, b) => String(a.expiresOn).localeCompare(String(b.expiresOn)));
 }

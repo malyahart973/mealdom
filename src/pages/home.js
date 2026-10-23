@@ -7,6 +7,9 @@ import { SLOTS, plannedEntries, slotKey, mealPortionsFor } from '../domain/plann
 import { toIsoDate } from '../domain/planning/dates.js';
 import { programSummary } from '../services/programService.js';
 import { nextTrip } from '../services/tripService.js';
+import { getInventory } from '../services/shoppingService.js';
+import { itemsToUseFirst, expiryStatus } from '../domain/shopping/shopping.js';
+import { ingredientsById } from '../services/catalog.js';
 import { getStores } from '../services/budgetService.js';
 
 /**
@@ -15,7 +18,7 @@ import { getStores } from '../services/budgetService.js';
  */
 export async function renderHome(el) {
   const today = formatDayLong(new Date());
-  const [reminder, household, meals, program, trip, stores] = await Promise.all([isReminderDue(), getHousehold(), getMeals(), programSummary(), nextTrip(), getStores()]);
+  const [reminder, household, meals, program, trip, stores, inventory] = await Promise.all([isReminderDue(), getHousehold(), getMeals(), programSummary(), nextTrip(), getStores(), getInventory()]);
   const storeNames = new Map(stores.map((s) => [s.id, s.name]));
   const todayIso = toIsoDate(new Date());
   const entries = plannedEntries(meals);
@@ -46,6 +49,17 @@ export async function renderHome(el) {
       }
       <p><a class="button button--secondary" href="#/assistant">Demander à l’assistant</a></p>
     </section>
+    ${(() => {
+      const first = itemsToUseFirst(inventory, todayIso);
+      if (!first.length) return '';
+      const expired = first.filter((i) => expiryStatus(i, todayIso).status === 'expired').length;
+      const names = first.slice(0, 4).map((i) => ingredientsById.get(i.ingredientId)?.name ?? i.ingredientId);
+      return `<section class="notice" aria-labelledby="expiry-title">
+          <h2 id="expiry-title">À consommer vite</h2>
+          <p>${escapeHtml(names.join(', '))}${first.length > 4 ? '…' : ''}${expired ? ` (dont ${expired} date dépassée)` : ''}.</p>
+          <p><a class="button" href="#/stock">Voir le stock</a></p>
+        </section>`;
+    })()}
     ${
       trip
         ? `<section class="notice" aria-labelledby="trip-title">
