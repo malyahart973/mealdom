@@ -11,6 +11,7 @@ import {
   activePromotions,
   HYPER_U_CAYENNE,
   importTemplate,
+  isStoreBrand,
 } from '../src/domain/drive/drive.js';
 import { quoteShoppingLines, compareQuotes } from '../src/domain/drive/quote.js';
 import { INGREDIENTS } from '../src/data/ingredients.js';
@@ -95,6 +96,20 @@ test('Produit indisponible jamais choisi', () => {
 });
 test('Choix « qualité » : le produit bio passe devant', () => assertEqual(chooseProduct(need, products, { ...choiceCtx, preference: 'quality' }).choice?.product.id, 'bio'));
 test('Produit choisi par le client respecté', () => assertEqual(chooseProduct(need, products, { ...choiceCtx, preferredId: 'cheap' }).choice?.product.id, 'cheap'));
+test('Marques du magasin : U, U Bio, Prix Mini ; pas les autres marques', () =>
+  assertEqual(
+    [product({ brand: 'U' }), product({ brand: 'U Bio' }), product({ brand: 'Prix Mini' }), product({ brand: '', name: 'Riz Prix Mini 1 kg' }), product({ brand: 'Uncle Ben’s' }), product({ brand: 'Taureau Ailé' })].map(isStoreBrand),
+    [true, true, true, true, false, false],
+  ));
+const brands = [
+  product({ id: 'national', brand: 'Taureau Ailé', priceCents: 189 }),
+  product({ id: 'u', brand: 'U', priceCents: 215 }),
+  product({ id: 'mini', brand: 'Prix Mini', priceCents: 189 }),
+];
+test('Choix « marques U et Prix Mini » : la marque U passe devant une marque nationale', () =>
+  assertEqual(chooseProduct(need, brands.slice(0, 2), { ...choiceCtx, preference: 'store_brand' }).choice?.product.id, 'u'));
+test('À prix égal, la marque du magasin est choisie (même en « moins cher »)', () =>
+  assertEqual(chooseProduct(need, brands, choiceCtx).choice?.product.id, 'mini'));
 
 // --- Devis et comparaison ---
 /** @param {string} ingredientId @param {number} toBuy @returns {ShoppingLine} */

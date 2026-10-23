@@ -195,7 +195,17 @@ export function packagesNeeded(quantity, unit, p, ingredient) {
   return Math.max(1, Math.ceil(cleanNumber(quantity / size.value)));
 }
 
-/** @typedef {'cheapest' | 'quality' | 'promotions'} ProductPreference */
+/** @typedef {'cheapest' | 'quality' | 'promotions' | 'store_brand'} ProductPreference */
+
+/**
+ * Produit des marques du magasin U (U, U Bio, U Saveurs... et Prix Mini, premier prix).
+ * @param {DriveProduct} product
+ * @returns {boolean}
+ */
+export function isStoreBrand(product) {
+  const brand = product.brand.trim().toLowerCase();
+  return brand === 'u' || brand.startsWith('u ') || /prix mini/i.test(product.brand) || /prix mini/i.test(product.name);
+}
 
 /**
  * @typedef {Object} ProductChoice
@@ -210,7 +220,8 @@ export function packagesNeeded(quantity, unit, p, ingredient) {
  * - seuls les produits relies a l'ingredient, disponibles et de contenance compatible ;
  * - un produit choisi par le client (preferredId) passe en premier s'il convient ;
  * - "quality" : produits avec label d'abord ; "promotions" : promotions actives d'abord ;
- * - puis le moins cher pour la quantite reellement achetee.
+ *   "store_brand" : marques U et Prix Mini, ou produits en promotion, d'abord ;
+ * - puis le moins cher pour la quantite reellement achetee ; a prix egal, la marque U.
  * @param {{ ingredientId: string, quantity: number, unit: string }} need
  * @param {DriveProduct[]} products
  * @param {{ today: string, now: Date, hasLoyaltyCard: boolean, preference: ProductPreference, preferredId?: string | null, ingredient: Ingredient | null }} ctx
@@ -230,9 +241,16 @@ export function chooseProduct(need, products, ctx) {
     if (ctx.preferredId && o.product.id === ctx.preferredId) return 0;
     if (ctx.preference === 'quality' && o.product.quality.length > 0) return 1;
     if (ctx.preference === 'promotions' && o.cost.promoApplied) return 1;
+    if (ctx.preference === 'store_brand' && (isStoreBrand(o.product) || o.cost.promoApplied)) return 1;
     return 2;
   };
-  options.sort((a, b) => rank(a) - rank(b) || a.cost.cents - b.cost.cents || Number(b.fresh) - Number(a.fresh));
+  options.sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      a.cost.cents - b.cost.cents ||
+      Number(isStoreBrand(b.product)) - Number(isStoreBrand(a.product)) ||
+      Number(b.fresh) - Number(a.fresh),
+  );
   return { choice: options[0] ?? null, alternatives: options.slice(1) };
 }
 

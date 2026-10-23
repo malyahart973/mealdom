@@ -118,6 +118,7 @@ export async function renderDrive(el, params) {
         <select id="drive-pref" data-setting="preference">
           <option value="cheapest"${settings.preference === 'cheapest' ? ' selected' : ''}>Le moins cher pour la quantité achetée</option>
           <option value="promotions"${settings.preference === 'promotions' ? ' selected' : ''}>Les promotions d’abord</option>
+          <option value="store_brand"${settings.preference === 'store_brand' ? ' selected' : ''}>Marques U et Prix Mini, et promotions, d’abord</option>
           <option value="quality"${settings.preference === 'quality' ? ' selected' : ''}>La qualité d’abord (bio, Label Rouge, local)</option>
         </select>
       </div>
@@ -257,7 +258,7 @@ export async function renderDrive(el, params) {
   });
   el.querySelector('[data-setting="preference"]')?.addEventListener('change', async (event) => {
     const value = /** @type {HTMLSelectElement} */ (event.target).value;
-    await saveDriveSettings({ preference: value === 'quality' || value === 'promotions' ? value : 'cheapest' });
+    await saveDriveSettings({ preference: value === 'quality' || value === 'promotions' || value === 'store_brand' ? value : 'cheapest' });
     await renderDrive(el, params);
   });
   el.querySelector('[data-action="prepare"]')?.addEventListener('click', async () => {

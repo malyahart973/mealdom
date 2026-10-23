@@ -53,7 +53,7 @@ export async function getDriveSettings() {
   return {
     storeId: typeof storeId === 'string' ? storeId : null,
     hasLoyaltyCard: card === true,
-    preference: preference === 'quality' || preference === 'promotions' ? preference : 'cheapest',
+    preference: preference === 'quality' || preference === 'promotions' || preference === 'store_brand' ? preference : 'cheapest',
     preferredProducts: preferred && typeof preferred === 'object' ? /** @type {Record<string, string>} */ (preferred) : {},
   };
 }
