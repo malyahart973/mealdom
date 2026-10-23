@@ -11,7 +11,7 @@ import { addDays } from '../planning/dates.js';
 
 /**
  * Objectifs d'optimisation combinables.
- * @typedef {'promotions' | 'gourmand' | 'economy' | 'balance' | 'vegetables' | 'quick' | 'antiwaste' | 'light' | 'few_dishes' | 'quality'} Mode
+ * @typedef {'promotions' | 'gourmand' | 'economy' | 'balance' | 'vegetables' | 'quick' | 'antiwaste' | 'light' | 'few_dishes' | 'quality' | 'seasonal'} Mode
  */
 
 /** @type {{ id: Mode, label: string }[]} */
@@ -26,6 +26,7 @@ export const MODES = [
   { id: 'light', label: 'Léger (programme minceur)' },
   { id: 'few_dishes', label: 'Peu de vaisselle' },
   { id: 'quality', label: 'Meilleure qualité' },
+  { id: 'seasonal', label: 'Produits de saison et péyi' },
 ];
 
 /**
@@ -192,7 +193,8 @@ export function parseRequest(rawText, ctx) {
   if (has(text, /\breste|gaspill|ce que j'ai|frigo|placard|mon stock|deja achete/)) modes.add('antiwaste');
   if (has(text, /leger|minceur|regime|calorie|perdre du poids|maigrir|mon programme/)) modes.add('light');
   if (has(text, /vaisselle|une seule (casserole|poele|cocotte)|one pot/)) modes.add('few_dishes');
-  if (has(text, /meilleure qualite|qualite|\bbio\b|label rouge|produits? locaux|produits? pei|\bpeyi\b/)) modes.add('quality');
+  if (has(text, /meilleure qualite|qualite|\bbio\b|label rouge/)) modes.add('quality');
+  if (has(text, /de saison|produits? locaux|produits? du pays|produits? pei|\bpeyi\b|\blocal\b/)) modes.add('seasonal');
 
   const percent = /(\d+(?:[.,]\d+)?)\s*(?:%|pour ?cent)/.exec(text);
   let budgetPercent = null;

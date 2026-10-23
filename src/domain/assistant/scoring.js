@@ -38,6 +38,7 @@ import { substitutesFor } from './substitutes.js';
  * @property {Set<string>} promoIngredients                  Promotions actives et verifiees
  * @property {Set<string>} stockIngredients
  * @property {Set<string>} [expiringIngredients]           En stock et proches de leur date limite (non perimes)
+ * @property {Set<string>} [seasonalIngredients]           De saison, au plus bas ou peyi en ce moment
  * @property {Partial<Record<Slot, { kcal: number, proteinG: number }>> | null} programTargets
  * @property {import('../ingredients/territory.js').AvailabilityOf} [availability]
  *   Disponibilite locale (Guyane) : recettes impossibles exclues, ingredients rares penalises
@@ -270,6 +271,12 @@ export function scoreRecipe(recipe, weights, env, ctx) {
       score += Math.min(2, used.length) * (3 + 5 * w('antiwaste'));
       reasons.push(`utilise ${used.map((id) => ctx.ingredients.get(id)?.name ?? id).join(', ')} à consommer vite`);
     }
+  }
+  // Produits de saison et locaux : petit bonus permanent, fort quand la cliente le demande.
+  if (ctx.seasonalIngredients?.size) {
+    const local = allIngredientIds(recipe, ctx.preparations).filter((id) => ctx.seasonalIngredients?.has(id));
+    score += Math.min(3, local.length) * (1 + 4 * w('seasonal'));
+    if (local.length >= 2 && (w('seasonal') || local.length >= 3)) reasons.push('produits de saison ou péyi');
   }
   if (w('antiwaste')) {
     const ids = allIngredientIds(recipe, ctx.preparations).filter((id) => !ctx.ingredients.get(id)?.notPurchased);

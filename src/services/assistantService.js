@@ -39,6 +39,7 @@ import { programSummary } from './programService.js';
 import { isFeasibleLocally, recipeLocalIssues } from '../domain/ingredients/territory.js';
 import { substitutesFor } from '../domain/assistant/substitutes.js';
 import { loadAvailability, autoSubstituter } from './territoryService.js';
+import { seasonNow } from './seasonService.js';
 import { callClaude, responseText, LlmError, DEFAULT_MODEL } from './llmService.js';
 import { recipes, recipesById, ingredientsById, preparationsById, cuisineLabels, nutritionContext, nutritionByRecipe as recipeNutritionMap } from './catalog.js';
 import { INGREDIENTS } from '../data/ingredients.js';
@@ -107,7 +108,7 @@ async function loadEnvironment(monday) {
   const now = new Date();
   const today = toIsoDate(now);
   const days = weekDays(monday);
-  const [meals, household, budget, inventory, priceData, preferences, program, showBreakfast, showSnack, availability] = await Promise.all([
+  const [meals, household, budget, inventory, priceData, preferences, program, showBreakfast, showSnack, availability, season] = await Promise.all([
     getMeals(),
     getHousehold(),
     getBudget(),
@@ -118,6 +119,7 @@ async function loadEnvironment(monday) {
     getShowBreakfast(),
     getShowSnack(),
     loadAvailability(),
+    seasonNow(now),
   ]);
   const byIngredient = productsByIngredient(priceData.products);
   const promoIngredients = new Set(
@@ -138,6 +140,7 @@ async function loadEnvironment(monday) {
     expiringIngredients: new Set(itemsToUseFirst(inventory, today).filter((i) => expiryStatus(i, today).status !== 'expired').map((i) => i.ingredientId)),
     programTargets: program ? program.meals : null,
     availability,
+    seasonalIngredients: season.favoured,
   };
   /** @type {Slot[]} */
   const activeSlots = SLOTS.map((s) => s.id).filter((s) => (s !== 'breakfast' || showBreakfast) && (s !== 'snack' || showSnack));

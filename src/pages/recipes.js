@@ -6,6 +6,8 @@ import { recipes, cuisineLabels, filterContext, nutritionByRecipe, preparationsB
 import { CUISINES, REGIONS } from '../data/cuisines.js';
 import { getHousehold } from '../services/householdService.js';
 import { loadAvailability } from '../services/territoryService.js';
+import { seasonNow } from '../services/seasonService.js';
+import { seasonalIngredients, SEASONAL_MIN_INGREDIENTS } from '../domain/ingredients/seasons.js';
 import { recipeLocalIssues } from '../domain/ingredients/territory.js';
 import { substitutesFor } from '../domain/assistant/substitutes.js';
 
@@ -17,7 +19,7 @@ const PAGE_SIZE = 30;
 const cuisineRegion = new Map(CUISINES.map((c) => [c.id, c.region]));
 
 /** Filtres conserves pendant la navigation. */
-const state = { query: '', vesselOnly: false, householdOnly: true, quickOnly: false, localOnly: false, mealType: '', region: '', cuisine: '', tag: '', shown: PAGE_SIZE };
+const state = { query: '', vesselOnly: false, householdOnly: true, quickOnly: false, localOnly: false, seasonOnly: false, mealType: '', region: '', cuisine: '', tag: '', shown: PAGE_SIZE };
 
 /**
  * @param {Recipe[]} list
@@ -72,7 +74,9 @@ export async function renderRecipes(el, params = {}) {
     state.query = focus.name;
     state.shown = PAGE_SIZE;
   }
-  const [household, availability] = await Promise.all([getHousehold(), loadAvailability()]);
+  const [household, availability, season] = await Promise.all([getHousehold(), loadAvailability(), seasonNow()]);
+  /** Recettes qui utilisent au moins deux produits de saison ou peyi. */
+  const seasonal = new Set(recipes.filter((r) => seasonalIngredients(r, preparationsById, season.favoured).length >= SEASONAL_MIN_INGREDIENTS).map((r) => r.id));
   /** Recettes avec un ingredient rare ou introuvable (alternative possible ou non). */
   const hard = new Set(
     recipes.filter((r) => recipeLocalIssues(r, preparationsById, availability, substitutesFor).some((i) => i.level === 'rare' || i.level === 'missing')).map((r) => r.id),
@@ -101,6 +105,7 @@ export async function renderRecipes(el, params = {}) {
         <button type="button" class="chip" data-action="quick" aria-pressed="${state.quickOnly}">${QUICK_MINUTES} min maximum</button>
         <button type="button" class="chip" data-action="vessel" aria-pressed="${state.vesselOnly}">Un seul récipient</button>
         <button type="button" class="chip" data-action="local" aria-pressed="${state.localOnly}">Faciles à trouver en Guyane</button>
+        <button type="button" class="chip" data-action="season" aria-pressed="${state.seasonOnly}">De saison et péyi</button>
       </div>
       <p class="hint" id="recipe-count" aria-live="polite"></p>
       <div id="recipe-results"></div>
@@ -125,7 +130,8 @@ export async function renderRecipes(el, params = {}) {
         (!state.cuisine || r.cuisine === state.cuisine) &&
         (!state.tag || hasTag(r, /** @type {any} */ (state.tag))) &&
         (!state.quickOnly || totalMinutes(r) <= QUICK_MINUTES) &&
-        (!state.localOnly || !hard.has(r.id)),
+        (!state.localOnly || !hard.has(r.id)) &&
+        (!state.seasonOnly || seasonal.has(r.id)),
     );
     count.textContent = list.length === 1 ? '1 recette' : `${list.length} recettes`;
     results.innerHTML = listHtml(list.slice(0, state.shown), hard);
@@ -154,6 +160,7 @@ export async function renderRecipes(el, params = {}) {
     ['quick', 'quickOnly'],
     ['vessel', 'vesselOnly'],
     ['local', 'localOnly'],
+    ['season', 'seasonOnly'],
   ])) {
     const chip = /** @type {HTMLButtonElement} */ (el.querySelector(`[data-action="${action}"]`));
     chip.addEventListener('click', () => {

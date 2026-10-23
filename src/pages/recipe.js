@@ -21,6 +21,8 @@ import { loadAvailability, getAvailabilityOverrides, setAvailabilityOverride } f
 import { recipeLocalIssues } from '../domain/ingredients/territory.js';
 import { substitutesFor } from '../domain/assistant/substitutes.js';
 import { GUYANE_HINTS, WHERE_LABELS } from '../data/territory.js';
+import { seasonNow } from '../services/seasonService.js';
+import { seasonalIngredients } from '../domain/ingredients/seasons.js';
 import { getHousehold } from '../services/householdService.js';
 import { evaluateRecipeForHousehold } from '../domain/household/compatibility.js';
 import { DIETS } from '../domain/household/household.js';
@@ -120,7 +122,8 @@ export async function renderRecipe(el, params) {
     return;
   }
 
-  const [household, program, availability, overrides] = await Promise.all([getHousehold(), programSummary(), loadAvailability(), getAvailabilityOverrides()]);
+  const [household, program, availability, overrides, season] = await Promise.all([getHousehold(), programSummary(), loadAvailability(), getAvailabilityOverrides(), seasonNow()]);
+  const local = seasonalIngredients(recipe, preparationsById, season.favoured);
   const issues = recipeLocalIssues(recipe, preparationsById, availability, substitutesFor);
   /** @param {string} id */
   const nameOf = (id) => ingredientsById.get(id)?.name ?? id;
@@ -237,6 +240,7 @@ export async function renderRecipe(el, params) {
         <div><dt>Repas</dt><dd>${escapeHtml(types.map((t) => mealTypeLabels.get(t)).join(', '))}</dd></div>
       </dl>
       ${(recipe.tags ?? []).length ? `<p>${(recipe.tags ?? []).map((t) => `<span class="tag">${escapeHtml(tagLabels.get(t) ?? t)}</span>`).join(' ')}</p>` : ''}
+      ${local.length ? `<p class="hint">De saison ou péyi en ce moment : ${escapeHtml(local.map((id) => ingredientsById.get(id)?.name ?? id).join(', '))}. <a href="#/saison">Produits de saison</a></p>` : ''}
 
       ${fitHtml}
       <div class="allergens" role="note">

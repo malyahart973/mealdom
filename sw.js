@@ -135,6 +135,10 @@ const APP_FILES = [
   './src/services/priceHistoryService.js',
   './src/pages/priceChart.js',
   './src/pages/prices.js',
+  './src/data/seasons.js',
+  './src/domain/ingredients/seasons.js',
+  './src/services/seasonService.js',
+  './src/pages/seasons.js',
 ];
 
 self.addEventListener('install', (event) => {

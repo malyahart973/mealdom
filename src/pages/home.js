@@ -7,6 +7,8 @@ import { SLOTS, plannedEntries, slotKey, mealPortionsFor } from '../domain/plann
 import { toIsoDate } from '../domain/planning/dates.js';
 import { programSummary } from '../services/programService.js';
 import { nextTrip } from '../services/tripService.js';
+import { seasonNow } from '../services/seasonService.js';
+import { MONTH_LABELS } from '../data/seasons.js';
 import { getInventory } from '../services/shoppingService.js';
 import { itemsToUseFirst, expiryStatus } from '../domain/shopping/shopping.js';
 import { ingredientsById } from '../services/catalog.js';
@@ -18,7 +20,7 @@ import { getStores } from '../services/budgetService.js';
  */
 export async function renderHome(el) {
   const today = formatDayLong(new Date());
-  const [reminder, household, meals, program, trip, stores, inventory] = await Promise.all([isReminderDue(), getHousehold(), getMeals(), programSummary(), nextTrip(), getStores(), getInventory()]);
+  const [reminder, household, meals, program, trip, stores, inventory, season] = await Promise.all([isReminderDue(), getHousehold(), getMeals(), programSummary(), nextTrip(), getStores(), getInventory(), seasonNow()]);
   const storeNames = new Map(stores.map((s) => [s.id, s.name]));
   const todayIso = toIsoDate(new Date());
   const entries = plannedEntries(meals);
@@ -49,6 +51,15 @@ export async function renderHome(el) {
       }
       <p><a class="button button--secondary" href="#/assistant">Demander à l’assistant</a></p>
     </section>
+    ${(() => {
+      const highlight = [...season.lowPrice, ...season.season].filter((id, i, all) => all.indexOf(id) === i).slice(0, 6);
+      if (!highlight.length) return '';
+      return `<section class="notice" aria-labelledby="season-title">
+          <h2 id="season-title">De saison en ${escapeHtml(MONTH_LABELS[season.month - 1])}</h2>
+          <p>${highlight.map((id) => `<a href="#/recettes/avec/${encodeURIComponent(id)}">${escapeHtml(ingredientsById.get(id)?.name ?? id)}</a>`).join(', ')}</p>
+          <p><a href="#/saison">Produits de saison</a></p>
+        </section>`;
+    })()}
     ${(() => {
       const first = itemsToUseFirst(inventory, todayIso);
       if (!first.length) return '';

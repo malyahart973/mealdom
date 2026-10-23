@@ -21,6 +21,7 @@ import { renderProgram } from './pages/program.js';
 import { renderWeight } from './pages/weight.js';
 import { renderTrip } from './pages/trip.js';
 import { renderPriceOverview, renderPriceHistory } from './pages/prices.js';
+import { renderSeasons } from './pages/seasons.js';
 
 /**
  * @typedef {Object} Route
@@ -113,6 +114,7 @@ const routes = [
     render: renderDrive,
     parent: (p) => `/courses/semaine/${p.date}`,
   },
+  { pattern: /^\/saison$/, title: 'Produits de saison', tab: '/plus', render: renderSeasons, parent: () => '/plus' },
   { pattern: /^\/prix$/, title: 'Historique des prix', tab: '/plus', render: renderPriceOverview, parent: () => '/plus' },
   { pattern: /^\/prix\/(?<ingredientId>[^/]+)$/, title: 'Historique des prix', tab: '/plus', render: renderPriceHistory, parent: () => '/prix' },
   { pattern: /^\/programme$/, title: 'Programme minceur', tab: '/plus', render: renderProgram, parent: () => '/plus' },
