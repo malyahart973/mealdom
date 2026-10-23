@@ -162,3 +162,17 @@ test('Progression : 2 kg perdus sur 10 = 20 %', () => {
   const p = weightProgress({ startWeightKg: 71.4, goalWeightKg: 61.4 }, entries([['2026-10-01', 71.4], ['2026-10-22', 69.4]]), '2026-10-22');
   assertEqual([p.lostKg, p.remainingKg, p.percent], [2, 8, 20]);
 });
+
+test('Calories prévues du jour : portions personnelles, absences et restes du dîner', async () => {
+  const { plannedKcalForDay } = await import('../src/domain/nutrition/program.js');
+  /** @param {string} recipeId @param {string[]} attendees */
+  const meal = (recipeId, attendees) => ({ id: recipeId, date: '2026-10-23', slot: /** @type {'dinner'} */ ('dinner'), recipeId, recipeName: recipeId, attendees, guests: 0, nextLunch: null, locked: false });
+  const entries = new Map([
+    ['2026-10-23|lunch', { kind: /** @type {const} */ ('leftover'), meal: { ...meal('a', ['m1']), nextLunch: { attendees: ['m1'], guests: 0 } } }],
+    ['2026-10-23|dinner', { kind: /** @type {const} */ ('meal'), meal: meal('b', ['m1']) }],
+    ['2026-10-23|snack', { kind: /** @type {const} */ ('meal'), meal: meal('c', ['m2']) }],
+  ]);
+  const n = { kcal: 400, protein: 20, carbs: 40, fat: 10, fiber: 5 };
+  const r = plannedKcalForDay(entries, '2026-10-23', { memberId: 'm1', mealSplit: { breakfast: 25, lunch: 35, snack: 10, dinner: 30 } }, { breakfast: { kcal: 300 }, lunch: { kcal: 420 }, snack: { kcal: 120 }, dinner: { kcal: 360 } }, () => n);
+  assertEqual(r, { kcal: 420 + 360, meals: 2 });
+});

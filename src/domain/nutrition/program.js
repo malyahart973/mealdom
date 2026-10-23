@@ -275,3 +275,29 @@ export function programFitScore(perPortion, target) {
   const fiberPer100 = perPortion.kcal > 0 ? (perPortion.fiber * 100) / perPortion.kcal : 0;
   return Math.round((closeness * 40 + Math.min(proteinShare, 0.4) * 100 + Math.min(fiberPer100, 3) * 5) * 10) / 10;
 }
+
+/**
+ * Calories prevues un jour donne pour la personne suivie, avec ses portions personnelles.
+ * Les repas ou elle n'est pas a table ne comptent pas ; les restes du diner comptent au dejeuner.
+ * @param {Map<string, { kind: 'meal' | 'leftover', meal: import('../planning/planning.js').Meal }>} entries  Planning (plannedEntries)
+ * @param {string} day
+ * @param {{ memberId: string | null, mealSplit: Record<ProgramSlot, number> }} program
+ * @param {Record<ProgramSlot, { kcal: number }>} targets
+ * @param {(recipeId: string) => Nutrients | undefined} nutritionOf
+ * @returns {{ kcal: number, meals: number }}
+ */
+export function plannedKcalForDay(entries, day, program, targets, nutritionOf) {
+  let kcal = 0;
+  let meals = 0;
+  for (const slot of /** @type {ProgramSlot[]} */ (['breakfast', 'lunch', 'snack', 'dinner'])) {
+    const entry = entries.get(`${day}|${slot}`);
+    if (!entry) continue;
+    const attendees = entry.kind === 'leftover' ? entry.meal.nextLunch?.attendees ?? [] : entry.meal.attendees;
+    if (program.memberId && !attendees.includes(program.memberId)) continue;
+    const n = nutritionOf(entry.meal.recipeId);
+    if (!n) continue;
+    kcal += program.mealSplit[slot] > 0 ? personalPortion(n, targets[slot].kcal).kcal : Math.round(n.kcal);
+    meals++;
+  }
+  return { kcal, meals };
+}

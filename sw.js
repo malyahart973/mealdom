@@ -17,6 +17,8 @@ const APP_FILES = [
   './src/app.js',
   './src/router.js',
   './src/styles/main.css',
+  './src/styles/fonts/bricolage-grotesque.woff2',
+  './src/styles/fonts/dm-sans.woff2',
   './src/pages/home.js',
   './src/pages/more.js',
   './src/pages/settings.js',
@@ -139,6 +141,7 @@ const APP_FILES = [
   './src/domain/ingredients/seasons.js',
   './src/services/seasonService.js',
   './src/pages/seasons.js',
+  './src/pages/calorieRing.js',
 ];
 
 self.addEventListener('install', (event) => {

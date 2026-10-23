@@ -1,19 +1,39 @@
 /* =========================================================
    MealDom - feuille de style unique
-   Toutes les couleurs et tailles passent par les variables ci-dessous.
+   Charte « Roucou & Mangue » : rouge du roucou, orange de la mangue, bleu-vert du fleuve.
+   Toutes les couleurs et tailles passent par les variables ci-dessous
+   (les noms historiques --leaf et --maracuja designent la couleur principale et l'accent).
    ========================================================= */
 
+/* Polices integrees a l'application (fonctionnent hors ligne). Licence SIL OFL : fonts/OFL-*.txt */
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("fonts/bricolage-grotesque.woff2") format("woff2");
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DM Sans";
+  src: url("fonts/dm-sans.woff2") format("woff2");
+  font-weight: 100 1000;
+  font-display: swap;
+}
+
 :root {
-  /* Vert feuille de bananier, jaune maracuja */
-  --leaf: #1f5641;
-  --leaf-soft: #e3eee7;
-  --maracuja: #f2b33d;
-  --paper: #f5f8f3;
+  --leaf: #b4432e;        /* Roucou : actions principales, liens */
+  --leaf-soft: #faede8;   /* Roucou tres clair : fonds doux */
+  --maracuja: #f2a228;    /* Mangue : accent, mise en avant */
+  --fleuve: #1d6670;      /* Fleuve : informations, programme */
+  --fleuve-soft: #e1eff0;
+  --paper: #f8f3ec;
   --surface: #ffffff;
-  --ink: #172a21;
-  --muted: #56685e;
-  --line: #d6e1d9;
-  --danger: #a3302a;
+  --ink: #2a1a14;
+  --muted: #6b5a50;
+  --line: #eadccb;
+  --danger: #8e2440;
+  --tabbar-bg: #2a1a14;
+  --tabbar-ink: #e9ddd2;
   --chart-series: #2a78d6;
   --series-1: #2a78d6;
   --series-2: #eb6834;
@@ -27,25 +47,31 @@
   --space-8: 2rem;
 
   --radius-small: 8px;
-  --radius: 14px;
+  --radius: 16px;
+  --radius-button: 12px;
 
   --tabbar-height: 4rem;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Bricolage Grotesque", "DM Sans", system-ui, sans-serif;
 
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --leaf: #7cc4a0;
-    --leaf-soft: #1c2f26;
-    --maracuja: #f2b33d;
-    --paper: #0f1a15;
-    --surface: #16241d;
-    --ink: #e6efe9;
-    --muted: #9fb2a7;
-    --line: #2a3d33;
-    --danger: #ef8a83;
+    --leaf: #e58c70;
+    --leaf-soft: #3a2520;
+    --maracuja: #f2a228;
+    --fleuve: #5fb0b9;
+    --fleuve-soft: #1d3336;
+    --paper: #1a1210;
+    --surface: #261a16;
+    --ink: #f6ece3;
+    --muted: #cbb8aa;
+    --line: #43322a;
+    --danger: #f29a8e;
+    --tabbar-bg: #120c0a;
+    --tabbar-ink: #d8c8bb;
     --chart-series: #3987e5;
     --series-1: #3987e5;
     --series-2: #d95926;
@@ -77,6 +103,11 @@ h1,
 h2 {
   line-height: 1.2;
   margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+}
+
+h3 {
+  font-family: var(--font-display);
 }
 
 h2 {
@@ -133,7 +164,7 @@ a {
   padding: 0 var(--space-3) 0 var(--space-2);
   border: 0;
   border-radius: 999px;
-  background: rgb(255 255 255 / 0.14);
+  background: rgb(0 0 0 / 0.18);
   color: inherit;
   font: inherit;
   font-weight: 700;
@@ -151,6 +182,7 @@ a {
 }
 
 .brand {
+  font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.125rem;
   letter-spacing: -0.01em;
@@ -198,7 +230,12 @@ a {
   outline: none;
 }
 
+.page-title::first-letter {
+  text-transform: uppercase;
+}
+
 .page-title {
+  font-family: var(--font-display);
   font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -216,6 +253,7 @@ a {
 
 /* La date du jour : l'element fort de l'accueil */
 .today__date {
+  font-family: var(--font-display);
   font-size: clamp(2.25rem, 9vw, 3.25rem);
   font-weight: 800;
   letter-spacing: -0.03em;
@@ -265,7 +303,7 @@ a {
   min-height: 3rem;
   padding: 0 var(--space-6);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-button);
   background: var(--leaf);
   color: #fff;
   font: inherit;
@@ -357,7 +395,7 @@ a {
   min-height: 2.5rem;
   padding: 0 var(--space-4);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--surface);
   color: var(--ink);
   font: inherit;
@@ -1202,8 +1240,7 @@ h3 {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  background: var(--surface);
-  border-top: 1px solid var(--line);
+  background: var(--tabbar-bg);
 }
 
 .tabbar a {
@@ -1213,7 +1250,7 @@ h3 {
   justify-content: center;
   gap: 2px;
   min-height: var(--tabbar-height);
-  color: var(--muted);
+  color: var(--tabbar-ink);
   font-size: 0.75rem;
   font-weight: 600;
   text-decoration: none;
@@ -1235,11 +1272,8 @@ h3 {
 }
 
 .tabbar a[aria-current="page"] {
-  color: var(--leaf);
-}
-
-.tabbar a[aria-current="page"] span {
-  border-bottom: 3px solid var(--maracuja);
+  color: var(--maracuja);
+  font-weight: 800;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2054,4 +2088,187 @@ line.series-3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-1) var(--space-3);
+}
+
+/* ---------- Accueil « Roucou & Mangue » ---------- */
+
+.hero {
+  margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-4)) var(--space-4);
+  padding: var(--space-6) var(--space-4) var(--space-6);
+  border-radius: 0 0 28px 28px;
+  background: var(--leaf);
+  color: #fff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hero {
+    background: #7a2a1c;
+  }
+}
+
+.hero__date {
+  margin: 0 0 var(--space-2);
+  font-size: 0.9375rem;
+  opacity: 0.92;
+}
+
+.hero__date::first-letter {
+  text-transform: uppercase;
+}
+
+.hero__title {
+  margin: 0 0 var(--space-3);
+  font-size: clamp(1.75rem, 7.5vw, 2.25rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+.hero__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.hero__chip {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-small);
+  background: rgb(0 0 0 / 0.2);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.hero__chip--accent {
+  background: var(--maracuja);
+  color: #2a1a14;
+}
+
+.hero a:not(.button) {
+  color: inherit;
+}
+
+.button--light {
+  background: #fff;
+  color: #2a1a14;
+}
+
+.card {
+  display: block;
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.card .today__meals {
+  margin: 0;
+}
+
+.card .today__meals li:last-child {
+  border-bottom: 0;
+}
+
+.duo {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.duo .card {
+  margin: 0;
+}
+
+.ring-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.ring-card__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.weight-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-1);
+  background: var(--fleuve);
+  border-color: var(--fleuve);
+  color: #fff;
+}
+
+.weight-card .hint {
+  color: inherit;
+  opacity: 0.9;
+}
+
+@media (prefers-color-scheme: dark) {
+  .weight-card {
+    color: #0f1d1f;
+  }
+}
+
+.weight-card__value {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  line-height: 1.1;
+}
+
+.ring__track {
+  stroke: var(--fleuve-soft);
+}
+
+.ring__value {
+  stroke: var(--fleuve);
+}
+
+.ring__value--over {
+  stroke: var(--maracuja);
+}
+
+.ring__number {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  fill: var(--ink);
+}
+
+.ring__unit {
+  font-size: 10.5px;
+  font-weight: 600;
+  fill: var(--muted);
+}
+
+.assistant-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 3.25rem;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-button);
+  background: var(--tabbar-bg);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.assistant-link svg {
+  color: var(--maracuja);
+}
+
+.ring-card--row {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: var(--space-4);
+  text-align: left;
 }

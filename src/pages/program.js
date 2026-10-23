@@ -16,6 +16,11 @@ import {
 import { parseKg, sortEntries } from '../domain/nutrition/weight.js';
 import { getProgram, saveProgram, setProgramActive, getWeights, programSuggestions } from '../services/programService.js';
 import { getHousehold } from '../services/householdService.js';
+import { getMeals } from '../services/planningService.js';
+import { plannedEntries } from '../domain/planning/planning.js';
+import { plannedKcalForDay } from '../domain/nutrition/program.js';
+import { nutritionByRecipe } from '../services/catalog.js';
+import { calorieRingSvg } from './calorieRing.js';
 
 /** @typedef {import('../domain/nutrition/program.js').Program} Program */
 /** @typedef {import('../domain/nutrition/program.js').ProgramSlot} ProgramSlot */
@@ -43,7 +48,7 @@ const kgText = (kg) => `${formatNumber(kg)} kg`;
  */
 export async function renderProgram(el) {
   const today = toIsoDate(new Date());
-  const [program, entries, household] = await Promise.all([getProgram(), getWeights(), getHousehold()]);
+  const [program, entries, household, meals] = await Promise.all([getProgram(), getWeights(), getHousehold(), getMeals()]);
   const valid = validateProgram(program, today).length === 0;
   const sorted = sortEntries(entries);
   const currentKg = sorted.length ? sorted[sorted.length - 1].kg : program.startWeightKg;
@@ -51,6 +56,7 @@ export async function renderProgram(el) {
   const perMeal = targets ? mealTargets(targets, program.mealSplit) : null;
   const finish = targets ? goalDate(targets, today) : null;
   const currentBmi = valid ? bmi(currentKg, program.heightCm) : null;
+  const kcalToday = perMeal ? plannedKcalForDay(plannedEntries(meals), today, program, perMeal, (id) => nutritionByRecipe().get(id)) : null;
 
   /** @type {Record<string, string>} */
   const suggestionsHtml = {};
@@ -91,6 +97,12 @@ export async function renderProgram(el) {
               }</p>
               <button type="button" class="button ${program.active ? 'button--secondary' : ''}" data-action="toggle">${program.active ? 'Mettre en pause' : 'Activer le programme'}</button>
             </div>
+            ${
+              kcalToday && program.active
+                ? `<div class="card ring-card ring-card--row">${calorieRingSvg(kcalToday.kcal, targets.kcal)}
+                    <span class="ring-card__text"><strong>Prévues aujourd’hui</strong><span class="hint">${kcalToday.meals ? `${kcalToday.meals} repas du planning, avec vos portions` : 'Aucun repas planifié aujourd’hui'}</span></span></div>`
+                : ''
+            }
             <dl class="budget-card">
               <div><dt>IMC actuel</dt><dd>${escapeHtml(formatNumber(currentBmi))}</dd></div>
               <div><dt>Objectif par jour</dt><dd>${targets.kcal} kcal</dd></div>

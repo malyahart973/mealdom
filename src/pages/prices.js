@@ -78,11 +78,11 @@ export async function renderPriceHistory(el, params) {
               .join('')}</dl>
             <h2>Relevés</h2>
             <div class="table-scroll"><table class="table">
-              <thead><tr><th scope="col">Date</th><th scope="col">Magasin</th><th scope="col">Produit</th><th scope="col">Prix</th><th scope="col">${per ? escapeHtml(`Prix ${PER_LABELS[per]}`) : 'Prix ramené'}</th></tr></thead>
+              <thead><tr><th scope="col">Date</th><th scope="col">Magasin et produit</th><th scope="col">Prix</th><th scope="col">${per ? escapeHtml(PER_LABELS[per].replace(/^l[ea] /, 'Au ').replace('Au pièce', 'À la pièce')) : 'Ramené'}</th></tr></thead>
               <tbody>${points
                 .map(
-                  (p) => `<tr><td>${escapeHtml(formatIsoDayMonth(p.date))} ${escapeHtml(p.date.slice(0, 4))}</td><td>${escapeHtml(storeName(p.storeId))}</td>
-                    <td>${escapeHtml(p.label || '—')}<br /><span class="hint">${escapeHtml(formatQuantity(p.packageQuantity, p.packageUnit))}</span></td>
+                  (p) => `<tr><td>${escapeHtml(`${p.date.slice(8, 10)}/${p.date.slice(5, 7)}/${p.date.slice(2, 4)}`)}</td>
+                    <td>${escapeHtml(storeName(p.storeId))}<br /><span class="hint">${escapeHtml([p.label, formatQuantity(p.packageQuantity, p.packageUnit)].filter(Boolean).join(', '))}</span></td>
                     <td>${escapeHtml(formatCents(p.priceCents))}${p.promoCents !== null ? `<br /><span class="change change--down">promo ${escapeHtml(formatCents(p.promoCents))}</span>` : ''}</td>
                     <td>${p.unitCents === null ? '—' : escapeHtml(formatCents(p.unitCents))}</td></tr>`,
                 )

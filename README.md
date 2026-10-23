@@ -68,7 +68,8 @@ src/
     catalog/          Catalogue de recettes par famille (petit-déjeuner, goûter, Asie, monde, léger)
   db/                 Base locale et accès aux données
   utils/              Petits outils communs
-  styles/main.css     Style
+  styles/main.css     Style (charte Roucou & Mangue)
+  styles/fonts/       Polices intégrées (licence SIL OFL)
 tests/                Tests des règles métier (ouvrir tests/index.html)
 ```
 
@@ -87,6 +88,7 @@ tests/                Tests des règles métier (ouvrir tests/index.html)
 
 ## Historique
 
+- **0.13.0** — Nouvelle charte « Roucou & Mangue » (polices Bricolage Grotesque et DM Sans intégrées, thèmes clair et sombre), accueil redessiné avec l’anneau des calories prévues du jour. Partage de la liste de courses en un geste. Dates de péremption dans le stock (produits à consommer en priorité, priorité dans les propositions). Historique des prix (base v8) avec courbe par magasin, hausses et baisses. Produits de saison en Guyane (péyi, prix au plus bas, calendrier modifiable) et mode « de saison » de l’assistant.
 - **0.12.0** — Disponibilité des ingrédients en Guyane : indications par défaut (épicerie asiatique, marché, importé, souvent introuvable), corrections de la cliente, alternatives appliquées d’office aux ingrédients introuvables, recettes impossibles écartées des propositions, filtre « Faciles à trouver en Guyane », indications sur la liste de courses, remplacement d’ingrédient dans la fiche repas. Distance domicile ↔ magasin calculée (adresse via la Géoplateforme de l’IGN ou position GPS, itinéraire OSRM/OpenStreetMap, estimation signalée si le service ne répond pas).
 - **0.11.0** — « Ajuster au budget » avec les prix réels du Drive : produits moins chers d’abord, puis remplacement des repas les plus coûteux par des plats économiques (légumineuses, œufs), sans jamais compter sur un prix inconnu ; proposition avant/après à valider. Priorité aux marques U et Prix Mini. Photo d’un produit ou d’une étiquette pour remplir le formulaire (lecture par l’IA, à vérifier). Bouton micro pour dicter à l’assistant.
 - **0.10.0** — Organiser les courses : regroupement des achats sur 1 à 3 magasins (prix relevés + Drive), coût des trajets (distance, consommation, prix du carburant), objectif « limiter les trajets », sortie courses de la semaine avec ordre de passage et créneau de retrait Drive, repas prévus avant les courses, ajout à l'agenda du téléphone, rappel sur l'accueil. Modèle de fichier CSV pour l'import des prix Drive. Base v7.
