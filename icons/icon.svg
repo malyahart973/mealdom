@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="MealDom">
+  <rect width="100" height="100" rx="23" fill="#1D6670"/>
+  <circle cx="40" cy="42" r="10" fill="#B4432E"/>
+  <path d="M54 46c0-10 8-16 18-16-1 10-8 16-18 16z" fill="#F8F3EC"/>
+  <path d="M16 50h68c0 18-15 30-34 30S16 68 16 50z" fill="#F2A228"/>
+  <path d="M23 58l6 6 6-6 6 6 6-6 6 6 6-6 6 6 6-6" fill="none" stroke="#2A1A14" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+  <rect x="14" y="47" width="72" height="5" rx="2.5" fill="#2A1A14"/>
+</svg>
