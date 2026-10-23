@@ -5,8 +5,11 @@ import { SLOTS, mealPortionsFor } from '../domain/planning/planning.js';
 import { filterRecipes } from '../domain/recipes/recipeFiltering.js';
 import { totalMinutes, recipeMealTypes } from '../domain/recipes/recipes.js';
 import { personalPortion } from '../domain/nutrition/program.js';
-import { recipes, recipesById, filterContext, ingredientsById, nutritionByRecipe } from '../services/catalog.js';
+import { recipes, recipesById, filterContext, ingredientsById, preparationsById, nutritionByRecipe } from '../services/catalog.js';
 import { programSummary } from '../services/programService.js';
+import { loadAvailability, autoSubstituter } from '../services/territoryService.js';
+import { recipeLocalIssues } from '../domain/ingredients/territory.js';
+import { substitutesFor } from '../domain/assistant/substitutes.js';
 import { getHousehold } from '../services/householdService.js';
 import { getMeals, saveMeal, deleteMeal, newMealId } from '../services/planningService.js';
 
@@ -52,7 +55,8 @@ function readCount(input) {
  * @param {Record<string, string>} params
  */
 export async function renderMeal(el, params) {
-  const [meals, household, program] = await Promise.all([getMeals(), getHousehold(), programSummary()]);
+  const [meals, household, program, availability] = await Promise.all([getMeals(), getHousehold(), programSummary(), loadAvailability()]);
+  const autoSubs = autoSubstituter(availability);
   const existing = params.id ? meals.find((m) => m.id === params.id) : undefined;
 
   if (params.id && !existing) {
@@ -128,20 +132,7 @@ export async function renderMeal(el, params) {
           </div>
         </fieldset>
 
-        ${
-          meal.substitutions?.length
-            ? `<fieldset class="field checks"${disabled}>
-                <legend>Ingrédients remplacés</legend>
-                ${meal.substitutions
-                  .map(
-                    (sub) => `<label class="check"><input type="checkbox" name="substitution" value="${escapeHtml(sub.from)}" checked />
-                      <span>${escapeHtml(ingredientsById.get(sub.from)?.name ?? sub.from)} remplacé par ${escapeHtml(ingredientsById.get(sub.to)?.name ?? sub.to)}</span></label>`,
-                  )
-                  .join('')}
-                <p class="hint">Décochez pour revenir à l’ingrédient d’origine (la liste de courses suivra).</p>
-              </fieldset>`
-            : ''
-        }
+        <fieldset class="field" data-block="subs"${disabled}></fieldset>
 
         <p class="portions" data-output="portions" aria-live="polite"></p>
         <p class="hint" data-output="personal" aria-live="polite"></p>
@@ -166,6 +157,43 @@ export async function renderMeal(el, params) {
   const nextLunchGroup = /** @type {HTMLElement} */ (el.querySelector('[data-group="next-lunch"]'));
   const portionsOut = /** @type {HTMLElement} */ (el.querySelector('[data-output="portions"]'));
   const personalOut = /** @type {HTMLElement} */ (el.querySelector('[data-output="personal"]'));
+  const subsBlock = /** @type {HTMLElement} */ (el.querySelector('[data-block="subs"]'));
+  /** @param {string} id */
+  const nameOf = (id) => ingredientsById.get(id)?.name ?? id;
+  /** Ingredients remplaces du repas : ceux enregistres, ou les alternatives d'office pour une nouvelle recette. */
+  /** @type {import('../domain/planning/planning.js').Substitution[]} */
+  let subs = meal.substitutions ?? [];
+  if (!existing && recipesById.get(meal.recipeId)) subs = autoSubs(/** @type {import('../domain/recipes/recipes.js').Recipe} */ (recipesById.get(meal.recipeId)));
+
+  const renderSubs = () => {
+    const recipe = recipesById.get(selectedRecipeId);
+    if (!recipe) {
+      subsBlock.innerHTML = '';
+      return;
+    }
+    const replaced = new Set(subs.map((s) => s.from));
+    const pairs = [...new Set(recipe.ingredients.map((l) => l.ingredientId))]
+      .filter((id) => !replaced.has(id))
+      .flatMap((id) => substitutesFor(id).map((to) => ({ from: id, to })));
+    const issues = recipeLocalIssues(recipe, preparationsById, availability, substitutesFor);
+    subsBlock.innerHTML = `<legend>Ingrédients remplacés</legend>
+      ${subs.length ? `<ul class="local-list">${subs.map((s) => `<li><span>${escapeHtml(nameOf(s.from))} → <strong>${escapeHtml(nameOf(s.to))}</strong></span>
+          <button type="button" class="button button--small button--secondary" data-unsub="${escapeHtml(s.from)}"${disabled}>Revenir à l’original</button></li>`).join('')}</ul>` : '<p class="hint">Aucun.</p>'}
+      ${issues.length ? `<p class="hint">À trouver : ${issues.map((i) => `${escapeHtml(nameOf(i.ingredientId))} (${i.level === 'missing' ? 'introuvable pour vous' : i.level === 'rare' ? 'souvent introuvable en Guyane' : 'magasin spécialisé'})`).join(', ')}.</p>` : ''}
+      ${pairs.length ? `<div class="inline-form__row"><select data-sub-choice aria-label="Ingrédient à remplacer"${disabled}>${pairs.map((p) => `<option value="${escapeHtml(p.from)}|${escapeHtml(p.to)}">${escapeHtml(nameOf(p.from))} → ${escapeHtml(nameOf(p.to))}</option>`).join('')}</select>
+        <button type="button" class="button button--small button--secondary" data-add-sub${disabled}>Remplacer</button></div>` : ''}
+      <p class="hint">La liste de courses suit les remplacements. Le goût change un peu.</p>`;
+  };
+  subsBlock.addEventListener('click', (event) => {
+    const target = /** @type {HTMLElement} */ (event.target);
+    const from = target.getAttribute('data-unsub');
+    if (from) subs = subs.filter((s) => s.from !== from);
+    else if (target.hasAttribute('data-add-sub')) {
+      const [f, t] = (/** @type {HTMLSelectElement} */ (subsBlock.querySelector('[data-sub-choice]')).value || '|').split('|');
+      if (f && t) subs = [...subs.filter((s) => s.from !== f), { from: f, to: t }];
+    } else return;
+    renderSubs();
+  });
 
   /** @param {string} name */
   const field = (name) => /** @type {HTMLInputElement | null} */ (form.elements.namedItem(name));
@@ -188,7 +216,7 @@ export async function renderMeal(el, params) {
       guests: readCount(field('guests')),
       nextLunch: wantsLunch ? { attendees: checked('lunchAttendees'), guests: readCount(field('lunchGuests')) } : null,
       locked: Boolean(field('locked')?.checked),
-      ...(meal.substitutions ? { substitutions: meal.substitutions.filter((sub) => checked('substitution').includes(sub.from)) } : {}),
+      ...(subs.length || meal.substitutions ? { substitutions: subs } : {}),
     };
   };
 
@@ -234,7 +262,12 @@ export async function renderMeal(el, params) {
 
   list.addEventListener('change', (event) => {
     const input = /** @type {HTMLInputElement} */ (event.target);
-    if (input.name === 'recipe') selectedRecipeId = input.value;
+    if (input.name === 'recipe') {
+      selectedRecipeId = input.value;
+      const recipe = recipesById.get(selectedRecipeId);
+      subs = recipe ? (selectedRecipeId === meal.recipeId && existing ? meal.substitutions ?? [] : autoSubs(recipe)) : [];
+      renderSubs();
+    }
     refresh();
   });
   field('slot')?.addEventListener('change', renderRecipeChoices);
@@ -270,5 +303,6 @@ export async function renderMeal(el, params) {
   });
 
   renderRecipeChoices();
+  renderSubs();
   refresh();
 }

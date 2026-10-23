@@ -17,6 +17,10 @@ import { recipes, recipesById, preparationsById, ingredientsById, cuisineLabels,
 import { recipeNutrition, roundNutrients, portionLines } from '../domain/nutrition/nutrition.js';
 import { personalPortion } from '../domain/nutrition/program.js';
 import { programSummary } from '../services/programService.js';
+import { loadAvailability, getAvailabilityOverrides, setAvailabilityOverride } from '../services/territoryService.js';
+import { recipeLocalIssues } from '../domain/ingredients/territory.js';
+import { substitutesFor } from '../domain/assistant/substitutes.js';
+import { GUYANE_HINTS, WHERE_LABELS } from '../data/territory.js';
 import { getHousehold } from '../services/householdService.js';
 import { evaluateRecipeForHousehold } from '../domain/household/compatibility.js';
 import { DIETS } from '../domain/household/household.js';
@@ -116,7 +120,39 @@ export async function renderRecipe(el, params) {
     return;
   }
 
-  const [household, program] = await Promise.all([getHousehold(), programSummary()]);
+  const [household, program, availability, overrides] = await Promise.all([getHousehold(), programSummary(), loadAvailability(), getAvailabilityOverrides()]);
+  const issues = recipeLocalIssues(recipe, preparationsById, availability, substitutesFor);
+  /** @param {string} id */
+  const nameOf = (id) => ingredientsById.get(id)?.name ?? id;
+  const localHtml = issues.length
+    ? `<section class="local-box" aria-labelledby="local-title">
+        <h2 id="local-title">Trouver les ingrédients en Guyane</h2>
+        <ul class="local-list">${issues
+          .map((i) => {
+            const hint = GUYANE_HINTS[i.ingredientId];
+            const status =
+              i.level === 'missing'
+                ? 'introuvable pour vous'
+                : i.level === 'rare'
+                  ? 'souvent introuvable en Guyane'
+                  : hint?.where
+                    ? WHERE_LABELS[hint.where]
+                    : 'magasin spécialisé';
+            const own = overrides[i.ingredientId];
+            return `<li>
+              <p><strong>${escapeHtml(nameOf(i.ingredientId))}</strong> : ${escapeHtml(status)}${own ? ' (votre réponse)' : ''}.
+                ${i.substitute ? `Alternative : <strong>${escapeHtml(nameOf(i.substitute))}</strong>${i.inPreparation ? ' (dans une préparation de base : à remplacer vous-même)' : ''}.` : 'Pas d’alternative connue.'}</p>
+              <p class="row-actions">
+                ${own !== 'found' ? `<button type="button" class="button button--small button--secondary" data-local="${escapeHtml(i.ingredientId)}" data-value="found">Je le trouve</button>` : ''}
+                ${own !== 'missing' ? `<button type="button" class="button button--small button--secondary" data-local="${escapeHtml(i.ingredientId)}" data-value="missing">Introuvable pour moi</button>` : ''}
+                ${own ? `<button type="button" class="button button--small button--secondary" data-local="${escapeHtml(i.ingredientId)}" data-value="">Annuler ma réponse</button>` : ''}
+              </p>
+            </li>`;
+          })
+          .join('')}</ul>
+        <p class="hint">Indications générales, non vérifiées magasin par magasin : vos réponses priment. Un ingrédient « introuvable pour moi » est remplacé par son alternative dans les repas proposés par l’assistant et sur la liste de courses ; sans alternative, la recette n’est plus proposée.</p>
+      </section>`
+    : '';
   const nutrition = recipeNutrition(recipe, nutritionContext);
   const perPortion = roundNutrients(nutrition.perPortion);
   const types = recipeMealTypes(recipe);
@@ -209,6 +245,7 @@ export async function renderRecipe(el, params) {
       </div>
 
       ${personalHtml}
+      ${localHtml}
 
       <h2>Ingrédients pour ${recipe.servings} portions</h2>
       ${ingredientsHtml(recipe.ingredients)}
@@ -233,4 +270,13 @@ export async function renderRecipe(el, params) {
       <p class="hint source">Source : ${escapeHtml(recipe.source.license)}.</p>
     </article>
   `;
+
+  el.querySelectorAll('[data-local]').forEach((button) =>
+    button.addEventListener('click', async () => {
+      const value = button.getAttribute('data-value');
+      await setAvailabilityOverride(button.getAttribute('data-local') ?? '', value === 'found' || value === 'missing' ? value : null);
+      await renderRecipe(el, params);
+      el.querySelector('.local-box')?.scrollIntoView({ block: 'center' });
+    }),
+  );
 }

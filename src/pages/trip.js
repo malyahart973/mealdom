@@ -8,6 +8,71 @@ import { SLOTS } from '../domain/planning/planning.js';
 import { ingredientsById } from '../services/catalog.js';
 import { saveStore } from '../services/budgetService.js';
 import { getCarSettings, saveCarSettings, weekGrouping, getTrip, saveTrip, deleteTrip, mealsBefore, downloadTripCalendar } from '../services/tripService.js';
+import { getHome, saveHome, searchAddress, currentPlace, computeStoreDistances } from '../services/geoService.js';
+import { SOURCE_LABELS, isInGuyane } from '../domain/trips/geo.js';
+
+/** @typedef {import('../domain/trips/geo.js').GeoPlace} GeoPlace */
+
+/**
+ * Recherche d'adresse ou position GPS, pour le domicile ou un magasin.
+ * @param {string} key
+ * @param {string} placeholder
+ * @param {string} gpsLabel
+ * @returns {string}
+ */
+function placeSearchHtml(key, placeholder, gpsLabel) {
+  return `<div class="place-search" data-place="${key}">
+    <div class="inline-form__row">
+      <input type="text" autocomplete="street-address" placeholder="${escapeHtml(placeholder)}" data-place-query aria-label="Adresse" />
+      <button type="button" class="button button--small button--secondary" data-place-search>Chercher</button>
+    </div>
+    <ul class="place-results" hidden></ul>
+    <p><button type="button" class="button button--small button--secondary" data-place-gps>${escapeHtml(gpsLabel)}</button></p>
+    <p class="hint place-status" role="status"></p>
+  </div>`;
+}
+
+/**
+ * Branche une recherche d'adresse : le choix (adresse ou GPS) est transmis a onPick.
+ * @param {HTMLElement} root
+ * @param {string} key
+ * @param {(place: GeoPlace) => Promise<void>} onPick
+ */
+function mountPlaceSearch(root, key, onPick) {
+  const box = /** @type {HTMLElement} */ (root.querySelector(`[data-place="${key}"]`));
+  const query = /** @type {HTMLInputElement} */ (box.querySelector('[data-place-query]'));
+  const results = /** @type {HTMLElement} */ (box.querySelector('.place-results'));
+  const status = /** @type {HTMLElement} */ (box.querySelector('.place-status'));
+  /** @type {GeoPlace[]} */
+  let found = [];
+  const search = async () => {
+    status.textContent = 'Recherche…';
+    const { places, error } = await searchAddress(query.value);
+    found = places;
+    status.textContent = error ?? 'Choisissez l’adresse :';
+    results.hidden = places.length === 0;
+    results.innerHTML = places
+      .map((p, i) => `<li><button type="button" class="button button--small button--secondary" data-place-pick="${i}">${escapeHtml(p.label)}${isInGuyane(p) ? '' : ' (hors Guyane)'}</button></li>`)
+      .join('');
+  };
+  box.querySelector('[data-place-search]')?.addEventListener('click', search);
+  query.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      search();
+    }
+  });
+  results.addEventListener('click', async (event) => {
+    const index = /** @type {HTMLElement} */ (event.target).getAttribute('data-place-pick');
+    if (index !== null && found[Number(index)]) await onPick(found[Number(index)]);
+  });
+  box.querySelector('[data-place-gps]')?.addEventListener('click', async () => {
+    status.textContent = 'Localisation en cours…';
+    const { place, error } = await currentPlace(`Position GPS du ${new Date().toLocaleDateString('fr-FR')}`);
+    if (place) await onPick(place);
+    else status.textContent = error ?? '';
+  });
+}
 
 /** @typedef {import('../domain/trips/trips.js').GroupingPlan} GroupingPlan */
 /** @typedef {import('../domain/trips/trips.js').ShoppingTrip} ShoppingTrip */
@@ -29,7 +94,7 @@ const decimalInput = (v) => (v === null || v === undefined ? '' : String(v).repl
 export async function renderTrip(el, params) {
   const today = toIsoDate(new Date());
   const monday = weekStart(params.date && parseIsoDate(params.date) ? params.date : today);
-  const [{ mealCount, lines, grouping, stores, car, fewerTrips }, trip] = await Promise.all([weekGrouping(monday), getTrip(monday)]);
+  const [{ mealCount, lines, grouping, stores, car, fewerTrips }, trip, home] = await Promise.all([weekGrouping(monday), getTrip(monday), getHome()]);
   const storesById = new Map(stores.map((s) => [s.id, s]));
   const storeName = (/** @type {string} */ id) => storesById.get(id)?.name ?? 'Magasin supprimé';
   const lineName = new Map(lines.map((l) => [l.key, ingredientsById.get(l.ingredientId)?.name ?? l.ingredientId]));
@@ -160,6 +225,24 @@ export async function renderTrip(el, params) {
 
       <h2>Trajets</h2>
       <div class="alert" role="alert" data-alert="travel" hidden></div>
+      <h3>Mon domicile</h3>
+      <p>${home ? `<strong>${escapeHtml(home.label)}</strong> <button type="button" class="button button--small button--secondary" data-action="clear-home">Effacer</button>` : 'Non renseigné.'}</p>
+      ${placeSearchHtml('home', 'ex. 12 rue de la République, Cayenne', 'Je suis chez moi : utiliser ma position')}
+      ${
+        stores.length
+          ? `<h3>Position des magasins</h3>
+            <ul class="local-list">${stores
+              .map((s) => `<li><span><strong>${escapeHtml(s.name)}</strong> : ${s.location ? escapeHtml(s.location.label) : 'position inconnue'}</span></li>`)
+              .join('')}</ul>
+            <div class="field"><label for="store-pick">Magasin à positionner</label>
+              <select id="store-pick">${stores.map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('')}</select></div>
+            ${placeSearchHtml('store', 'Adresse du magasin, ex. ZI Collery, Cayenne', 'Je suis dans ce magasin : utiliser ma position')}
+            <p><button type="button" class="button" data-action="compute-distances"${home ? '' : ' disabled'}>Calculer les distances depuis chez moi</button></p>
+            <p class="hint" data-compute-status role="status"></p>`
+          : ''
+      }
+      <p class="hint">L’adresse tapée est envoyée au service d’adresses de l’IGN (Géoplateforme) ; pour l’itinéraire, seules les coordonnées sont envoyées au service OSRM. Votre position reste sur ce téléphone. Itinéraires : OSRM, données © contributeurs OpenStreetMap. Sans réponse de ces services, la distance est estimée à vol d’oiseau (× 1,3) et signalée comme telle.</p>
+      <h3>Voiture et distances</h3>
       <form class="stock-form" data-form="car" novalidate>
         <label class="check"><input type="checkbox" id="car-none"${car.consumptionL100 === 0 ? ' checked' : ''} /> <span>Je fais mes courses sans voiture (à pied, à vélo, en bus)</span></label>
         <div class="field when" data-block="car"${car.consumptionL100 === 0 ? ' hidden' : ''}>
@@ -173,7 +256,7 @@ export async function renderTrip(el, params) {
                 <thead><tr><th scope="col">Magasin</th><th scope="col">Distance (km, aller)</th><th scope="col">Temps (min, aller)</th></tr></thead>
                 <tbody>${stores
                   .map(
-                    (s) => `<tr><td>${escapeHtml(s.name)}</td>
+                    (s) => `<tr><td>${escapeHtml(s.name)}${s.distanceSource ? `<br /><span class="hint">${escapeHtml(SOURCE_LABELS[s.distanceSource])}</span>` : ''}</td>
                       <td><input type="text" inputmode="decimal" data-km="${escapeHtml(s.id)}" value="${escapeHtml(decimalInput(s.distanceKm))}" aria-label="Distance jusqu’à ${escapeHtml(s.name)}" /></td>
                       <td><input type="text" inputmode="numeric" data-min="${escapeHtml(s.id)}" value="${s.travelMinutes ?? ''}" aria-label="Temps jusqu’à ${escapeHtml(s.name)}" /></td></tr>`,
                   )
@@ -253,6 +336,42 @@ export async function renderTrip(el, params) {
     await downloadTripCalendar(trip, tripMinutes, details);
   });
 
+  mountPlaceSearch(el, 'home', async (place) => {
+    await saveHome(place);
+    await renderTrip(el, params);
+  });
+  el.querySelector('[data-action="clear-home"]')?.addEventListener('click', async () => {
+    await saveHome(null);
+    await renderTrip(el, params);
+  });
+  if (stores.length) {
+    mountPlaceSearch(el, 'store', async (place) => {
+      const id = /** @type {HTMLSelectElement} */ (el.querySelector('#store-pick')).value;
+      const store = storesById.get(id);
+      if (!store) return;
+      await saveStore({ ...store, location: place });
+      await renderTrip(el, params);
+    });
+  }
+  el.querySelector('[data-action="compute-distances"]')?.addEventListener('click', async (event) => {
+    const button = /** @type {HTMLButtonElement} */ (event.target);
+    const status = /** @type {HTMLElement} */ (el.querySelector('[data-compute-status]'));
+    button.disabled = true;
+    status.textContent = 'Calcul des itinéraires…';
+    const result = await computeStoreDistances();
+    if (result.error) {
+      status.textContent = result.error;
+      button.disabled = false;
+      return;
+    }
+    await renderTrip(el, params);
+    const parts = [`${result.updated} magasin(s) mis à jour.`];
+    if (result.estimated) parts.push(`${result.estimated} estimé(s) à vol d’oiseau : service d’itinéraire injoignable.`);
+    if (result.missing.length) parts.push(`Position inconnue : ${result.missing.join(', ')}.`);
+    const after = /** @type {HTMLElement | null} */ (el.querySelector('[data-compute-status]'));
+    if (after) after.textContent = parts.join(' ');
+  });
+
   el.querySelector('[data-form="car"]')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const consumptionText = val('#car-consumption');
@@ -273,7 +392,7 @@ export async function renderTrip(el, params) {
         travelMinutes: minText ? (/^\d+$/.test(minText) ? Number(minText) : Number.NaN) : null,
       };
       if (updated.distanceKm === store.distanceKm && updated.travelMinutes === store.travelMinutes) continue;
-      const storeErrors = await saveStore(updated);
+      const storeErrors = await saveStore({ ...updated, distanceSource: 'manual' });
       errors.push(...storeErrors.map((e) => `${store.name} : ${e}`));
     }
     if (errors.length) say('travel', errors);

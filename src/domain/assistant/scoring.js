@@ -9,6 +9,8 @@ import { allIngredientIds, totalMinutes, recipeMealTypes, hasTag } from '../reci
 import { evaluateRecipeForHousehold } from '../household/compatibility.js';
 import { gramsOf } from '../nutrition/nutrition.js';
 import { programFitScore } from '../nutrition/program.js';
+import { isFeasibleLocally, rareCount } from '../ingredients/territory.js';
+import { substitutesFor } from './substitutes.js';
 
 /** @typedef {import('../recipes/recipes.js').Recipe} Recipe */
 /** @typedef {import('../recipes/recipes.js').Preparation} Preparation */
@@ -36,6 +38,8 @@ import { programFitScore } from '../nutrition/program.js';
  * @property {Set<string>} promoIngredients                  Promotions actives et verifiees
  * @property {Set<string>} stockIngredients
  * @property {Partial<Record<Slot, { kcal: number, proteinG: number }>> | null} programTargets
+ * @property {import('../ingredients/territory.js').AvailabilityOf} [availability]
+ *   Disponibilite locale (Guyane) : recettes impossibles exclues, ingredients rares penalises
  */
 
 /**
@@ -198,6 +202,7 @@ export function isEligible(recipe, c, ctx) {
   if (c.avoid.some((t) => recipeContains(recipe, t, ctx))) return false;
   if (c.include.length && !c.include.some((t) => recipeContains(recipe, t, ctx))) return false;
   if (c.compatibleIds ? !c.compatibleIds.has(recipe.id) : evaluateRecipeForHousehold(recipe, ctx.household, ctx).status !== 'compatible') return false;
+  if (ctx.availability && !isFeasibleLocally(recipe, ctx.preparations, ctx.availability, substitutesFor)) return false;
   if (c.maxCostIndex !== null) {
     const cost = recipeCost(recipe, ctx);
     if (cost.index > c.maxCostIndex * 1.02) return false;
@@ -219,6 +224,9 @@ export function scoreRecipe(recipe, weights, env, ctx) {
   const reasons = [];
   /** @param {Mode} m */
   const w = (m) => weights[m] ?? 0;
+
+  // Ingredients souvent introuvables en Guyane : la recette passe apres les autres.
+  if (ctx.availability) score -= 5 * rareCount(recipe, ctx.preparations, ctx.availability);
 
   if (w('gourmand')) {
     const g = hasTag(recipe, 'gourmand') ? 1 : hasTag(recipe, 'convivial') ? 0.5 : 0;

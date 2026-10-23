@@ -1825,3 +1825,82 @@ h3 {
   color: var(--muted);
   font-size: 0.875rem;
 }
+
+/* ---------- Disponibilite des ingredients en Guyane ---------- */
+
+.local-box {
+  margin: var(--space-6) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--maracuja);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+}
+
+.local-box h2 {
+  margin-top: 0;
+}
+
+.local-list {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+}
+
+.local-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.local-list li p {
+  margin: 0;
+}
+
+.tag--warn {
+  background: color-mix(in srgb, var(--maracuja) 28%, var(--surface));
+  color: var(--ink);
+}
+
+.local-hint {
+  color: var(--ink);
+}
+
+/* ---------- Recherche d'adresse ---------- */
+
+.place-search {
+  margin-bottom: var(--space-4);
+}
+
+.place-search .inline-form__row input {
+  flex: 1;
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.place-results {
+  list-style: none;
+  margin: var(--space-2) 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.place-results[hidden] {
+  display: none;
+}
+
+.place-results .button {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}

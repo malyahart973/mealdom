@@ -190,6 +190,12 @@ test('Application : ajout sur un créneau déjà occupé refusé', () => {
   const r = applyOperations({ meals: week(), weeklyBudgetCents: null, preferredProducts: {} }, [{ type: 'add_meal', date: '2026-10-19', slot: 'dinner', recipeId: 'pad_thai_shrimp', guests: 0, reason: '' }], applyCtx);
   assertEqual(r.applied.length, 0);
 });
+
+test('Ingrédient introuvable pour la cliente : alternative appliquée d’office au repas proposé', () => {
+  const auto = (/** @type {import('../src/domain/recipes/recipes.js').Recipe} */ r) => (r.ingredients.some((l) => l.ingredientId === 'fish_sauce') ? [{ from: 'fish_sauce', to: 'soy_sauce' }] : []);
+  const r = applyOperations({ meals: [], weeklyBudgetCents: null, preferredProducts: {} }, [{ type: 'add_meal', date: '2026-10-21', slot: 'dinner', recipeId: 'pad_thai_shrimp', guests: 0, reason: '' }], { ...applyCtx, autoSubstitutions: auto });
+  assertEqual(r.state.meals[0]?.substitutions, [{ from: 'fish_sauce', to: 'soy_sauce' }]);
+});
 test('Application : les autres repas ne sont pas modifiés', () => {
   const meals = week();
   const r = applyOperations({ meals, weeklyBudgetCents: null, preferredProducts: {} }, [{ type: 'replace_recipe', mealId: meals[0].id, recipeId: 'pad_thai_shrimp', reason: '' }], applyCtx);

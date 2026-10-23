@@ -125,6 +125,11 @@ const APP_FILES = [
   './src/domain/drive/productPhoto.js',
   './src/services/photoService.js',
   './src/pages/photoField.js',
+  './src/data/territory.js',
+  './src/domain/ingredients/territory.js',
+  './src/services/territoryService.js',
+  './src/domain/trips/geo.js',
+  './src/services/geoService.js',
 ];
 
 self.addEventListener('install', (event) => {

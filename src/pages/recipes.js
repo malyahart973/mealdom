@@ -2,9 +2,12 @@ import { escapeHtml } from '../utils/html.js';
 import { formatMinutes } from '../utils/format.js';
 import { filterRecipes } from '../domain/recipes/recipeFiltering.js';
 import { totalMinutes, recipeMealTypes, hasTag, MEAL_TYPES, RECIPE_TAGS, QUICK_MINUTES, VESSEL_LABELS } from '../domain/recipes/recipes.js';
-import { recipes, cuisineLabels, filterContext, nutritionByRecipe } from '../services/catalog.js';
+import { recipes, cuisineLabels, filterContext, nutritionByRecipe, preparationsById } from '../services/catalog.js';
 import { CUISINES, REGIONS } from '../data/cuisines.js';
 import { getHousehold } from '../services/householdService.js';
+import { loadAvailability } from '../services/territoryService.js';
+import { recipeLocalIssues } from '../domain/ingredients/territory.js';
+import { substitutesFor } from '../domain/assistant/substitutes.js';
 
 /** @typedef {import('../domain/recipes/recipes.js').Recipe} Recipe */
 
@@ -14,13 +17,14 @@ const PAGE_SIZE = 30;
 const cuisineRegion = new Map(CUISINES.map((c) => [c.id, c.region]));
 
 /** Filtres conserves pendant la navigation. */
-const state = { query: '', vesselOnly: false, householdOnly: true, quickOnly: false, mealType: '', region: '', cuisine: '', tag: '', shown: PAGE_SIZE };
+const state = { query: '', vesselOnly: false, householdOnly: true, quickOnly: false, localOnly: false, mealType: '', region: '', cuisine: '', tag: '', shown: PAGE_SIZE };
 
 /**
  * @param {Recipe[]} list
+ * @param {Set<string>} hard   Recettes avec un ingredient difficile a trouver en Guyane
  * @returns {string}
  */
-function listHtml(list) {
+function listHtml(list, hard) {
   if (list.length === 0) {
     return '<p class="empty">Aucune recette ne correspond. Essayez un autre mot ou retirez un filtre.</p>';
   }
@@ -34,6 +38,7 @@ function listHtml(list) {
           <span class="recipe-list__meta">${escapeHtml(cuisineLabels.get(r.cuisine) ?? '')}, ${escapeHtml(formatMinutes(totalMinutes(r)))}, environ ${Math.round(kcal.get(r.id)?.kcal ?? 0)} kcal par portion</span>
           ${r.vessel ? `<span class="tag">${escapeHtml(VESSEL_LABELS[r.vessel])}</span>` : ''}
           ${(r.tags ?? []).includes('light') ? '<span class="tag">Léger</span>' : ''}
+          ${hard.has(r.id) ? '<span class="tag tag--warn">Ingrédient difficile à trouver</span>' : ''}
         </a>
       </li>`,
     )
@@ -60,7 +65,11 @@ function selectHtml(name, label, options, selected, all) {
  * @param {HTMLElement} el
  */
 export async function renderRecipes(el) {
-  const household = await getHousehold();
+  const [household, availability] = await Promise.all([getHousehold(), loadAvailability()]);
+  /** Recettes avec un ingredient rare ou introuvable (alternative possible ou non). */
+  const hard = new Set(
+    recipes.filter((r) => recipeLocalIssues(r, preparationsById, availability, substitutesFor).some((i) => i.level === 'rare' || i.level === 'missing')).map((r) => r.id),
+  );
   const cuisineOptions = () =>
     CUISINES.filter((c) => !state.region || c.region === state.region)
       .filter((c) => recipes.some((r) => r.cuisine === c.id))
@@ -84,6 +93,7 @@ export async function renderRecipes(el) {
         <button type="button" class="chip" data-action="household" aria-pressed="${state.householdOnly}">Adaptées à mon foyer</button>
         <button type="button" class="chip" data-action="quick" aria-pressed="${state.quickOnly}">${QUICK_MINUTES} min maximum</button>
         <button type="button" class="chip" data-action="vessel" aria-pressed="${state.vesselOnly}">Un seul récipient</button>
+        <button type="button" class="chip" data-action="local" aria-pressed="${state.localOnly}">Faciles à trouver en Guyane</button>
       </div>
       <p class="hint" id="recipe-count" aria-live="polite"></p>
       <div id="recipe-results"></div>
@@ -107,10 +117,11 @@ export async function renderRecipes(el) {
         (!state.region || cuisineRegion.get(r.cuisine) === state.region) &&
         (!state.cuisine || r.cuisine === state.cuisine) &&
         (!state.tag || hasTag(r, /** @type {any} */ (state.tag))) &&
-        (!state.quickOnly || totalMinutes(r) <= QUICK_MINUTES),
+        (!state.quickOnly || totalMinutes(r) <= QUICK_MINUTES) &&
+        (!state.localOnly || !hard.has(r.id)),
     );
     count.textContent = list.length === 1 ? '1 recette' : `${list.length} recettes`;
-    results.innerHTML = listHtml(list.slice(0, state.shown));
+    results.innerHTML = listHtml(list.slice(0, state.shown), hard);
     more.hidden = list.length <= state.shown;
     more.textContent = `Afficher plus (${Math.min(PAGE_SIZE, list.length - state.shown)} sur ${list.length - state.shown} restantes)`;
   };
@@ -135,6 +146,7 @@ export async function renderRecipes(el) {
     ['household', 'householdOnly'],
     ['quick', 'quickOnly'],
     ['vessel', 'vesselOnly'],
+    ['local', 'localOnly'],
   ])) {
     const chip = /** @type {HTMLButtonElement} */ (el.querySelector(`[data-action="${action}"]`));
     chip.addEventListener('click', () => {

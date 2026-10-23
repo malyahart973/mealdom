@@ -35,6 +35,9 @@ import { getHousehold } from './householdService.js';
 import { getBudget, saveBudget } from './budgetService.js';
 import { loadPriceData, quoteForMeals, weekQuoter, productsByIngredient, unitPrices, saveDriveSettings } from './driveService.js';
 import { programSummary } from './programService.js';
+import { isFeasibleLocally, recipeLocalIssues } from '../domain/ingredients/territory.js';
+import { substitutesFor } from '../domain/assistant/substitutes.js';
+import { loadAvailability, autoSubstituter } from './territoryService.js';
 import { callClaude, responseText, LlmError, DEFAULT_MODEL } from './llmService.js';
 import { recipes, recipesById, ingredientsById, preparationsById, cuisineLabels, nutritionContext, nutritionByRecipe as recipeNutritionMap } from './catalog.js';
 import { INGREDIENTS } from '../data/ingredients.js';
@@ -103,7 +106,7 @@ async function loadEnvironment(monday) {
   const now = new Date();
   const today = toIsoDate(now);
   const days = weekDays(monday);
-  const [meals, household, budget, inventory, priceData, preferences, program, showBreakfast, showSnack] = await Promise.all([
+  const [meals, household, budget, inventory, priceData, preferences, program, showBreakfast, showSnack, availability] = await Promise.all([
     getMeals(),
     getHousehold(),
     getBudget(),
@@ -113,6 +116,7 @@ async function loadEnvironment(monday) {
     programSummary(),
     getShowBreakfast(),
     getShowSnack(),
+    loadAvailability(),
   ]);
   const byIngredient = productsByIngredient(priceData.products);
   const promoIngredients = new Set(
@@ -131,6 +135,7 @@ async function loadEnvironment(monday) {
     promoIngredients,
     stockIngredients: new Set(inventory.filter((i) => i.quantity > 0).map((i) => i.ingredientId)),
     programTargets: program ? program.meals : null,
+    availability,
   };
   /** @type {Slot[]} */
   const activeSlots = SLOTS.map((s) => s.id).filter((s) => (s !== 'breakfast' || showBreakfast) && (s !== 'snack' || showSnack));
@@ -164,7 +169,7 @@ async function loadEnvironment(monday) {
       preferredCuisines: preferredCuisines(preferences, cuisineRegion),
     },
     /** @type {import('../domain/assistant/proposal.js').ApplyContext} */
-    apply: { household, recipes: recipesById, ingredients: ingredientsById, preparations: preparationsById, productsByIngredient: byIngredient, newId: newMealId },
+    apply: { household, recipes: recipesById, ingredients: ingredientsById, preparations: preparationsById, productsByIngredient: byIngredient, newId: newMealId, autoSubstitutions: autoSubstituter(availability) },
   };
 }
 
@@ -443,6 +448,7 @@ async function fitBudgetTurn(conv, env, budgetOverride) {
       ),
     recipesById,
     nameOf: (id) => ingredientsById.get(id)?.name ?? id,
+    autoSubstitutions: env.apply.autoSubstitutions,
   });
   /** @type {Operation[]} */
   const operations = budgetOverride !== null && budgetOverride !== env.budget.weeklyCents
@@ -690,7 +696,7 @@ function searchRecipes(args, env) {
         const text = normalizeText([r.name, cuisineLabels.get(r.cuisine) ?? '', ...ids.map((id) => ingredientsById.get(id)?.name ?? '')].join(' '));
         if (!words.every((w) => text.includes(w))) return false;
       }
-      return evaluateRecipeForHousehold(r, env.household, env.scoring).status === 'compatible';
+      return evaluateRecipeForHousehold(r, env.household, env.scoring).status === 'compatible' && isFeasibleLocally(r, preparationsById, env.scoring.availability ?? (() => 'common'), substitutesFor);
     })
     .map((r) => {
       const n = recipeNutritionMap().get(r.id);
@@ -712,6 +718,9 @@ function searchRecipes(args, env) {
       kcalPerPortion: n ? Math.round(n.kcal) : null,
       proteinPerPortion: n ? Math.round(n.protein) : null,
       costPerPortion: cost.real === null ? 'prix inconnus' : `${formatCents(cost.real)} (estimation d’après vos prix)`,
+      hardToFindInGuyane: recipeLocalIssues(r, preparationsById, env.scoring.availability ?? (() => 'common'), substitutesFor).map(
+        (i) => `${ingredientsById.get(i.ingredientId)?.name ?? i.ingredientId} (${i.level === 'missing' ? 'introuvable pour la cliente' : i.level === 'rare' ? 'souvent introuvable' : 'magasin spécialisé'}${i.substitute ? `, alternative : ${ingredientsById.get(i.substitute)?.name}` : ''})`,
+      ),
     };
   });
 }

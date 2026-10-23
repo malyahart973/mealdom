@@ -9,6 +9,10 @@ import { getHousehold } from '../services/householdService.js';
 import { saveShoppingList, newId } from '../services/shoppingService.js';
 import { weekShoppingEstimate, getStores } from '../services/budgetService.js';
 import { formatCents } from '../domain/budget/money.js';
+import { loadAvailability } from '../services/territoryService.js';
+import { usableSubstitute } from '../domain/ingredients/territory.js';
+import { substitutesFor } from '../domain/assistant/substitutes.js';
+import { GUYANE_HINTS, WHERE_LABELS } from '../data/territory.js';
 
 /** @typedef {import('../domain/shopping/shopping.js').ShoppingLine} ShoppingLine */
 
@@ -55,7 +59,16 @@ export async function renderShopping(el, params) {
     return;
   }
 
-  const [{ mealCount, lines, state, estimate }, stores] = await Promise.all([weekShoppingEstimate(monday), getStores()]);
+  const [{ mealCount, lines, state, estimate }, stores, availability] = await Promise.all([weekShoppingEstimate(monday), getStores(), loadAvailability()]);
+  /** @param {string} id */
+  const localText = (id) => {
+    const level = availability(id);
+    if (level === 'common') return '';
+    const alt = usableSubstitute(id, availability, substitutesFor);
+    const where = GUYANE_HINTS[id]?.where;
+    const status = level === 'missing' ? 'Introuvable pour vous' : level === 'rare' ? 'Souvent introuvable en Guyane' : where ? `À chercher ${WHERE_LABELS[where].replace(/^plutôt /, '')}` : 'Magasin spécialisé';
+    return `${status}${alt && level !== 'specialty' ? ` ; alternative : ${ingredientsById.get(alt)?.name ?? alt}` : ''}`;
+  };
   const storeNames = new Map(stores.map((st) => [st.id, st.name]));
   const bestByKey = new Map(estimate.lines.map((e) => [e.key, e.best]));
   /** @param {string} key */
@@ -79,6 +92,7 @@ export async function renderShopping(el, params) {
             <span><strong>${escapeHtml(name(l.ingredientId))}</strong>
               <span class="shop__qty">${escapeHtml(buyText(l))}</span>
               <span class="hint">${escapeHtml(detailText(l))}</span>
+              ${localText(l.ingredientId) ? `<span class="hint local-hint">${escapeHtml(localText(l.ingredientId))}</span>` : ''}
               ${priceText(l.key) ? `<span class="shop__price">${escapeHtml(priceText(l.key))}</span>` : ''}</span>
           </label>
           ${

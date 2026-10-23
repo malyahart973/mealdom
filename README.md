@@ -63,7 +63,7 @@ src/
     nutrition/        Valeurs nutritionnelles, programme minceur (besoins, portions), suivi du poids
     drive/            Produits Drive, promotions, chiffrage vérifié/estimé, contrôle de commande
     assistant/        Compréhension des demandes, moteur de propositions, opérations, préférences, outils de l'IA
-    trips/            Coût des trajets, regroupement des achats par magasin, sortie courses et agenda
+    trips/            Coût des trajets, regroupement des achats par magasin, sortie courses et agenda, positions et distances
   data/               Données de référence (ingrédients, valeurs nutritionnelles, cuisines, préparations, portions)
     catalog/          Catalogue de recettes par famille (petit-déjeuner, goûter, Asie, monde, léger)
   db/                 Base locale et accès aux données
@@ -87,6 +87,7 @@ tests/                Tests des règles métier (ouvrir tests/index.html)
 
 ## Historique
 
+- **0.12.0** — Disponibilité des ingrédients en Guyane : indications par défaut (épicerie asiatique, marché, importé, souvent introuvable), corrections de la cliente, alternatives appliquées d’office aux ingrédients introuvables, recettes impossibles écartées des propositions, filtre « Faciles à trouver en Guyane », indications sur la liste de courses, remplacement d’ingrédient dans la fiche repas. Distance domicile ↔ magasin calculée (adresse via la Géoplateforme de l’IGN ou position GPS, itinéraire OSRM/OpenStreetMap, estimation signalée si le service ne répond pas).
 - **0.11.0** — « Ajuster au budget » avec les prix réels du Drive : produits moins chers d’abord, puis remplacement des repas les plus coûteux par des plats économiques (légumineuses, œufs), sans jamais compter sur un prix inconnu ; proposition avant/après à valider. Priorité aux marques U et Prix Mini. Photo d’un produit ou d’une étiquette pour remplir le formulaire (lecture par l’IA, à vérifier). Bouton micro pour dicter à l’assistant.
 - **0.10.0** — Organiser les courses : regroupement des achats sur 1 à 3 magasins (prix relevés + Drive), coût des trajets (distance, consommation, prix du carburant), objectif « limiter les trajets », sortie courses de la semaine avec ordre de passage et créneau de retrait Drive, repas prévus avant les courses, ajout à l'agenda du téléphone, rappel sur l'accueil. Modèle de fichier CSV pour l'import des prix Drive. Base v7.
 - **0.9.0** — Assistant conversationnel (IA Claude facultative + moteur local hors ligne) : demandes libres, modes combinables (promotions, gourmand, économie, équilibre, rapidité, anti-gaspillage...), aperçu avant/après chiffré, Accepter/Modifier/Annuler, historique et annulation, préférences retenues. Catalogue de 602 recettes (petit-déjeuner, repas, goûter). Programme minceur (besoins, objectifs par repas, portions en grammes) et suivi du poids avec courbe. Drive Hyper U Cayenne (relevés, promotions, panier vérifié, commande validée explicitement). Goûter dans le planning. Base v6.

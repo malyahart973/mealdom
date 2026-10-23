@@ -50,6 +50,8 @@ export const OPERATION_TYPES = ['replace_recipe', 'add_meal', 'remove_meal', 'se
  * @property {Map<string, Preparation>} preparations
  * @property {Map<string, DriveProduct[]>} productsByIngredient
  * @property {() => string} newId
+ * @property {(recipe: Recipe) => import('../planning/planning.js').Substitution[]} [autoSubstitutions]
+ *   Alternatives appliquees d'office aux ingredients introuvables pour la cliente
  */
 
 /**
@@ -112,7 +114,7 @@ export function applyOperations(state, operations, ctx) {
         if (!meal) errors.push('Remplacement : repas introuvable.');
         else if (meal.locked) errors.push(`${label(meal)} est verrouillé : il n’est pas modifié.`);
         else if (!recipe) errors.push(`Recette inconnue : ${op.recipeId}.`);
-        else if (compatible(recipe, label(meal)) && commit({ ...meal, recipeId: recipe.id, recipeName: recipe.name, substitutions: [] }, label(meal))) applied.push(op);
+        else if (compatible(recipe, label(meal)) && commit({ ...meal, recipeId: recipe.id, recipeName: recipe.name, substitutions: ctx.autoSubstitutions?.(recipe) ?? [] }, label(meal))) applied.push(op);
         break;
       }
       case 'add_meal': {
@@ -132,6 +134,8 @@ export function applyOperations(state, operations, ctx) {
             nextLunch: null,
             locked: false,
           };
+          const subs = ctx.autoSubstitutions?.(recipe) ?? [];
+          if (subs.length) meal.substitutions = subs;
           if (commit(meal, `Nouveau repas du ${op.date}`)) applied.push(op);
         }
         break;

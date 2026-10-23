@@ -49,6 +49,8 @@ const CANDIDATES_PER_MEAL = 8;
  *   Recettes de remplacement possibles pour ce repas (foyer, type de repas...), les plus economiques d'abord
  * @property {Map<string, Recipe>} recipesById
  * @property {(ingredientId: string) => string} [nameOf]   Nom d'un ingredient, pour les explications
+ * @property {(recipe: Recipe) => import('../planning/planning.js').Substitution[]} [autoSubstitutions]
+ *   Alternatives appliquees aux ingredients introuvables (comme lors de l'application)
  */
 
 /**
@@ -64,10 +66,11 @@ const CANDIDATES_PER_MEAL = 8;
  * @param {Meal[]} meals
  * @param {string} mealId
  * @param {Recipe} recipe
+ * @param {FitInput['autoSubstitutions']} autoSubs
  * @returns {Meal[]}
  */
-function withRecipe(meals, mealId, recipe) {
-  return meals.map((m) => (m.id === mealId ? { ...m, recipeId: recipe.id, recipeName: recipe.name, substitutions: [] } : m));
+function withRecipe(meals, mealId, recipe, autoSubs) {
+  return meals.map((m) => (m.id === mealId ? { ...m, recipeId: recipe.id, recipeName: recipe.name, substitutions: autoSubs?.(recipe) ?? [] } : m));
 }
 
 /**
@@ -128,7 +131,7 @@ export function fitToBudget(input) {
     let best = null;
     for (const { meal } of marginal) {
       for (const recipe of input.candidates(meal, weekRecipeIds).slice(0, CANDIDATES_PER_MEAL)) {
-        const q = input.quote(withRecipe(meals, meal.id, recipe), preferred, input.preference);
+        const q = input.quote(withRecipe(meals, meal.id, recipe, input.autoSubstitutions), preferred, input.preference);
         // Aucun nouvel article sans prix : sinon la baisse viendrait d'un prix ignore.
         const unpriced = q.missing.filter((id) => !quote.missing.includes(id));
         if (unpriced.length) {
@@ -147,7 +150,7 @@ export function fitToBudget(input) {
       recipeId: best.recipe.id,
       reason: `${best.recipe.name} à la place de ${best.meal.recipeName}${thrifty ? ' (plat à base de légumineuses ou d’œufs)' : ''} : ${formatCents(saving)} de moins sur les courses.`,
     });
-    meals = withRecipe(meals, best.meal.id, best.recipe);
+    meals = withRecipe(meals, best.meal.id, best.recipe, input.autoSubstitutions);
     quote = best.quote;
     replaced.add(best.meal.id);
   }

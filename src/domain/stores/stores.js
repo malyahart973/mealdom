@@ -32,6 +32,8 @@ export const STORE_TYPES = [
  * @property {{ url: string, label: string } | null} [drive]  Commande en ligne (Drive) proposee par le magasin
  * @property {number | null} [distanceKm]     Distance depuis le domicile, aller simple
  * @property {number | null} [travelMinutes]  Temps de trajet, aller simple
+ * @property {import('../trips/geo.js').GeoPlace | null} [location]   Position du magasin
+ * @property {import('../trips/geo.js').DistanceSource} [distanceSource]  Origine de la distance
  */
 
 /** @typedef {'available' | 'unavailable' | 'unknown'} Availability */
@@ -82,6 +84,8 @@ export function validateStore(store) {
   const minutes = store.travelMinutes ?? null;
   if (km !== null && !(km >= 0 && km <= 300)) errors.push('Indiquez une distance en kilomètres (aller simple), par exemple 6,5.');
   if (minutes !== null && !(Number.isInteger(minutes) && minutes >= 0 && minutes <= 300)) errors.push('Indiquez un temps de trajet en minutes (aller simple), par exemple 15.');
+  const loc = store.location ?? null;
+  if (loc !== null && !(typeof loc.lat === 'number' && typeof loc.lon === 'number' && Math.abs(loc.lat) <= 90 && Math.abs(loc.lon) <= 180)) errors.push('Position du magasin invalide.');
   return errors;
 }
 
