@@ -21,6 +21,7 @@ import { getStores, getPrices, storeStore } from '../db/repositories/budgetRepos
 import { getInventory, getPackages } from '../db/repositories/shoppingRepository.js';
 import { getSetting, setSetting } from '../db/repositories/settingsRepository.js';
 import { getMeals } from './planningService.js';
+import { recordDriveProducts } from './priceHistoryService.js';
 import { getHousehold } from './householdService.js';
 import { ingredientsById, recipesById, preparationsById } from './catalog.js';
 import { INGREDIENTS } from '../data/ingredients.js';
@@ -105,7 +106,11 @@ export async function getStoreProducts() {
  */
 export async function saveDriveProduct(product) {
   const errors = validateDriveProduct(product, ingredientsById);
-  if (errors.length === 0) await driveProductStore.put({ ...product, key: driveProductKey(product), name: product.name.trim(), brand: product.brand.trim() });
+  if (errors.length === 0) {
+    const record = { ...product, key: driveProductKey(product), name: product.name.trim(), brand: product.brand.trim() };
+    await driveProductStore.put(record);
+    await recordDriveProducts([record]);
+  }
   return errors;
 }
 
@@ -132,6 +137,7 @@ export async function importDriveCsv(text) {
     ingredients: ingredientsById,
   });
   for (const p of products) await driveProductStore.put({ ...p, key: driveProductKey(p) });
+  await recordDriveProducts(products);
   return { imported: products.length, errors, unlinked };
 }
 

@@ -130,6 +130,11 @@ const APP_FILES = [
   './src/services/territoryService.js',
   './src/domain/trips/geo.js',
   './src/services/geoService.js',
+  './src/domain/stores/priceHistory.js',
+  './src/db/repositories/priceHistoryRepository.js',
+  './src/services/priceHistoryService.js',
+  './src/pages/priceChart.js',
+  './src/pages/prices.js',
 ];
 
 self.addEventListener('install', (event) => {

@@ -53,6 +53,7 @@ export async function renderStore(el, params) {
               <span class="shop__qty">${escapeHtml(formatCents(p.priceCents))} ${p.soldLoose ? 'pour' : 'le paquet de'} ${escapeHtml(formatQuantity(p.packageQuantity, p.packageUnit))}${p.soldLoose ? ', au détail' : ''}</span>
               <span class="hint">${escapeHtml(availabilityLabels.get(p.availability) ?? '')}, relevé le ${escapeHtml(formatIsoDate(`${p.date}T12:00:00`) ?? p.date)}</span></span></span>
             <span class="row-actions">
+              <a class="button button--small button--secondary" href="#/prix/${encodeURIComponent(p.ingredientId)}">Historique</a>
               <button type="button" class="button button--small button--secondary" data-edit="${escapeHtml(p.id)}">Modifier</button>
               <button type="button" class="icon-button" data-remove="${escapeHtml(p.id)}" aria-label="Supprimer ce prix">×</button>
             </span>

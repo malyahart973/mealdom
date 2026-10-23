@@ -102,6 +102,7 @@ export async function renderShopping(el, params) {
               : ''
           }
           <a class="shop__pkg" href="#/assistant/produit/${encodeURIComponent(l.ingredientId)}">Moins cher ?</a>
+          <a class="shop__pkg" href="#/prix/${encodeURIComponent(l.ingredientId)}">Prix</a>
         </li>`,
         )
         .join('')}</ul>`;

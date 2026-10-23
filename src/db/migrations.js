@@ -50,6 +50,10 @@ export const migrations = [
   (db) => {
     db.createObjectStore('shoppingTrips', { keyPath: 'week' });
   },
+  // v8 (0.13.0) : historique des prix releves
+  (db) => {
+    db.createObjectStore('priceHistory', { keyPath: 'id' }).createIndex('ingredientId', 'ingredientId');
+  },
 ];
 
 /** Version actuelle du schema de la base. */

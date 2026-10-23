@@ -6,7 +6,7 @@ import { test, assertEqual } from './runner.js';
 import { migrations } from '../src/db/migrations.js';
 
 const hasIndexedDb = typeof indexedDB !== 'undefined';
-const ALL_STORES = ['budget', 'changeHistory', 'conversations', 'driveOrders', 'driveProducts', 'expenses', 'household', 'inventory', 'meals', 'packages', 'preferences', 'prices', 'program', 'settings', 'shoppingLists', 'shoppingTrips', 'stores', 'weights'];
+const ALL_STORES = ['budget', 'changeHistory', 'conversations', 'driveOrders', 'driveProducts', 'expenses', 'household', 'inventory', 'meals', 'packages', 'preferences', 'priceHistory', 'prices', 'program', 'settings', 'shoppingLists', 'shoppingTrips', 'stores', 'weights'];
 const V5_STORES = ['budget', 'expenses', 'household', 'inventory', 'meals', 'packages', 'prices', 'settings', 'shoppingLists', 'stores'];
 
 /**
@@ -108,7 +108,7 @@ if (hasIndexedDb) {
     assertEqual(await done(v6.transaction('meals').objectStore('meals').get('m1')), { id: 'm1', date: '2026-10-19', slot: 'dinner' });
     const budget = /** @type {{ weeklyCents: number }} */ (await done(v6.transaction('budget').objectStore('budget').get('main')));
     assertEqual(budget.weeklyCents, 15000);
-    assertEqual([...v6.objectStoreNames].sort(), ALL_STORES.filter((s) => s !== 'shoppingTrips'));
+    assertEqual([...v6.objectStoreNames].sort(), ALL_STORES.filter((s) => s !== 'shoppingTrips' && s !== 'priceHistory'));
     v6.close();
     await done(indexedDB.deleteDatabase(name));
   });
@@ -123,8 +123,21 @@ if (hasIndexedDb) {
     const v7 = await openDatabaseWith(name, migrations.slice(0, 7));
     assertEqual(await done(v7.transaction('weights').objectStore('weights').get('2026-10-22')), { date: '2026-10-22', kg: 71.4, note: '' });
     assertEqual(await done(v7.transaction('stores').objectStore('stores').get('s1')), { id: 's1', name: 'Hyper U Cayenne', type: 'hypermarket', commune: 'Cayenne' });
-    assertEqual([...v7.objectStoreNames].sort(), ALL_STORES);
+    assertEqual([...v7.objectStoreNames].sort(), ALL_STORES.filter((s) => s !== 'priceHistory'));
     v7.close();
+    await done(indexedDB.deleteDatabase(name));
+  });
+
+  test('Migration v7 -> v8 : prix conservés, historique des prix ajouté', async () => {
+    const name = `mealdom-test-v7-${Date.now()}`;
+    const v7 = await openDatabaseWith(name, migrations.slice(0, 7));
+    await write(v7, 'prices', { id: 's1|rice_white', storeId: 's1', ingredientId: 'rice_white', priceCents: 189 });
+    v7.close();
+
+    const v8 = await openDatabaseWith(name, migrations.slice(0, 8));
+    assertEqual(await done(v8.transaction('prices').objectStore('prices').get('s1|rice_white')), { id: 's1|rice_white', storeId: 's1', ingredientId: 'rice_white', priceCents: 189 });
+    assertEqual([...v8.objectStoreNames].sort(), ALL_STORES);
+    v8.close();
     await done(indexedDB.deleteDatabase(name));
   });
 

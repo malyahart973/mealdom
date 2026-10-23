@@ -15,6 +15,7 @@ import {
 } from '../db/repositories/budgetRepository.js';
 import { ingredientsById } from './catalog.js';
 import { weekShoppingList } from './shoppingService.js';
+import { recordPrice } from './priceHistoryService.js';
 
 /** @typedef {import('../domain/stores/stores.js').Store} Store */
 /** @typedef {import('../domain/stores/stores.js').Price} Price */
@@ -64,7 +65,10 @@ export async function deleteStore(storeId) {
 export async function savePrice(price) {
   const record = { ...price, id: priceId(price.storeId, price.ingredientId), label: price.label.trim() };
   const errors = validatePrice(record, ingredientsById);
-  if (errors.length === 0) await priceStore.put(record);
+  if (errors.length === 0) {
+    await priceStore.put(record);
+    await recordPrice(record);
+  }
   return errors;
 }
 

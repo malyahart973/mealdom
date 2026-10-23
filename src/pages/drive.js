@@ -59,6 +59,7 @@ function productHtml(p, now) {
       <span class="badge badge--${isFresh(p, now) ? 'ok' : 'estimated'}">${isFresh(p, now) ? 'Prix vérifié' : 'À revérifier'} · relevé le ${escapeHtml(new Date(p.checkedAt).toLocaleString('fr-FR'))}</span></span></span>
     <span class="row-actions">
       <button type="button" class="button button--small button--secondary" data-recheck="${escapeHtml(p.id)}">Prix vérifié aujourd’hui</button>
+      ${p.ingredientId ? `<a class="button button--small button--secondary" href="#/prix/${encodeURIComponent(p.ingredientId)}">Historique</a>` : ''}
       <button type="button" class="button button--small button--secondary" data-edit="${escapeHtml(p.id)}">Modifier</button>
       <button type="button" class="icon-button" data-remove="${escapeHtml(p.id)}" aria-label="Supprimer ${escapeHtml(p.name)}">×</button>
     </span>
