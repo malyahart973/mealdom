@@ -1,5 +1,5 @@
 import { test, assertEqual } from './runner.js';
-import { parseRequest, mergeRequests, makeIngredientFinder } from '../src/domain/assistant/intent.js';
+import { parseRequest, mergeRequests, makeIngredientFinder, describeRequest } from '../src/domain/assistant/intent.js';
 import { buildNameIndex } from '../src/domain/ingredients/ingredients.js';
 import { INGREDIENTS } from '../src/data/ingredients.js';
 
@@ -68,3 +68,7 @@ test('Annuler la dernière modification', () => assertEqual(parse('Annule la der
 test('Retenir une préférence', () => assertEqual(parse('Retiens que je veux toujours des recettes rapides').remember, true));
 test('Phrase hors sujet : non comprise', () => assertEqual(parse('Quel temps fait-il ?').understood, false));
 test('« Fais-moi le planning de la semaine » : génération demandée', () => assertEqual(parse('Fais-moi le planning de la semaine').generate, true));
+test('« Fais-moi un planning pour la semaine » : demande comprise et résumée', () => {
+  const r = parse('Fais-moi un planning pour la semaine');
+  assertEqual([r.generate, describeRequest(r, (d) => d, new Map())], [true, 'J’ai compris : composer le planning.']);
+});

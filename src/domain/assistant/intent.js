@@ -391,6 +391,8 @@ export function describeRequest(r, dayLabel, slotLabels, placeLabels) {
   /** @type {string[]} */
   const parts = [];
   const modeLabels = new Map(MODES.map((m) => [m.id, m.label.toLowerCase()]));
+  if (r.generate) parts.push('composer le planning');
+  else if (r.redo) parts.push('refaire les repas');
   if (r.modes.length) parts.push(`objectifs : ${r.modes.map((m) => modeLabels.get(m)).join(', ')}`);
   if (r.budgetPercent !== null) parts.push(`budget ${r.budgetPercent > 0 ? '+' : ''}${r.budgetPercent} %`);
   if (r.budgetCents !== null) parts.push(`budget de ${(r.budgetCents / 100).toFixed(2).replace('.', ',')} €`);

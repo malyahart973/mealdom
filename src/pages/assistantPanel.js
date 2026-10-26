@@ -146,8 +146,8 @@ function reviewHtml(proposal, monday) {
       ${
         proposal.status === 'pending'
           ? `<div class="proposal__actions">
-              ${review.bigChange ? '<label class="check"><input type="checkbox" data-confirm-big /> <span>Changement important : je confirme l’avoir vérifié.</span></label>' : ''}
-              <button type="button" class="button" data-accept="${escapeHtml(proposal.id)}"${review.bigChange ? ' disabled' : ''}>Accepter</button>
+              ${review.bigChange ? '<p class="hint">Changement important : une confirmation vous sera demandée. Vous pourrez l’annuler ensuite.</p>' : ''}
+              <button type="button" class="button" data-accept="${escapeHtml(proposal.id)}"${review.bigChange ? ` data-big="${review.diff.meals.length}"` : ''}>Accepter</button>
               <button type="button" class="button button--secondary" data-modify>Modifier</button>
               <button type="button" class="button button--danger" data-reject="${escapeHtml(proposal.id)}">Annuler</button>
             </div>
@@ -313,15 +313,13 @@ export async function mountAssistant(root, opts) {
       input.focus();
     }),
   );
-  root.querySelector('[data-confirm-big]')?.addEventListener('change', (event) => {
-    const accept = root.querySelector('.proposal [data-accept]');
-    if (accept) /** @type {HTMLButtonElement} */ (accept).disabled = !(/** @type {HTMLInputElement} */ (event.target).checked);
-  });
   root.querySelectorAll('[data-accept]').forEach((b) =>
     b.addEventListener('click', async () => {
-      const big = /** @type {HTMLInputElement | null} */ (root.querySelector('[data-confirm-big]'));
+      // Changement important : seconde confirmation explicite (jamais un bouton grise sans explication).
+      const big = b.getAttribute('data-big');
+      if (big !== null && !window.confirm(`Changement important : ${big} repas modifié(s). Appliquer au planning ? Vous pourrez l’annuler ensuite.`)) return;
       setBusy('Application des changements et recalcul du budget et du panier…');
-      const result = await acceptProposal(monday, b.getAttribute('data-accept') ?? '', { confirmedBigChange: Boolean(big?.checked) });
+      const result = await acceptProposal(monday, b.getAttribute('data-accept') ?? '', { confirmedBigChange: big !== null });
       if (!result.ok) showError(result.message);
       opts.onPlanChange?.();
       await refresh();
