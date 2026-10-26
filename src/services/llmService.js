@@ -131,6 +131,43 @@ export async function readImage({ apiKey, model, system, schema, imageBase64, me
 }
 
 /**
+ * Lecture d'une recette sur une page web : l'IA ouvre la page avec l'outil web_fetch
+ * (execute chez Anthropic, l'application n'appelle pas le site) et renvoie le JSON demande.
+ * @param {{ apiKey: string, model: string, system: string, schema: Record<string, unknown>, url: string, signal?: AbortSignal }} params
+ * @returns {Promise<unknown>}
+ */
+export async function readRecipeFromUrl({ apiKey, model, system, schema, url, signal }) {
+  /** @type {ApiMessage[]} */
+  const messages = [{ role: 'user', content: `Ouvre cette page avec l’outil web_fetch et recopie la recette qu’elle contient : ${url}` }];
+  // Le serveur peut suspendre un long travail d'outil (pause_turn) : on renvoie la reponse pour qu'il reprenne.
+  for (let round = 0; round < 4; round++) {
+    const data = await post(
+      apiKey,
+      {
+        model,
+        max_tokens: 8000,
+        system,
+        tools: [{ type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 3 }],
+        output_config: { effort: 'low', format: { type: 'json_schema', schema } },
+        messages,
+      },
+      signal,
+    );
+    if (data.stop_reason === 'pause_turn') {
+      messages.push({ role: 'assistant', content: data.content });
+      continue;
+    }
+    if (data.stop_reason === 'max_tokens') throw new LlmError('unknown', 'La recette est trop longue pour être lue en une fois. Collez plutôt son texte.');
+    try {
+      return JSON.parse(responseText(data.content));
+    } catch {
+      throw new LlmError('unknown', 'La réponse du service IA est illisible. Réessayez ou collez le texte de la recette.');
+    }
+  }
+  throw new LlmError('unknown', 'La lecture de la page prend trop de temps. Réessayez ou collez le texte de la recette.');
+}
+
+/**
  * Texte de la reponse (blocs « text » uniquement).
  * @param {ContentBlock[]} content
  * @returns {string}

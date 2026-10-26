@@ -5,6 +5,7 @@
 import { startRouter } from './router.js';
 import { requestPersistentStorage } from './services/storage.js';
 import { registerServiceWorker, applyUpdate } from './services/serviceWorker.js';
+import { loadUserRecipes } from './services/userRecipeService.js';
 
 /**
  * Recupere un element obligatoire de la page.
@@ -27,8 +28,14 @@ function watchConnection() {
   update();
 }
 
-function start() {
+async function start() {
   watchConnection();
+  // Les recettes personnelles rejoignent le catalogue avant le premier ecran.
+  try {
+    await loadUserRecipes();
+  } catch (error) {
+    console.error('Recettes personnelles non chargées', error);
+  }
   startRouter(requireElement('view'), requireElement('tabbar'), /** @type {HTMLButtonElement} */ (requireElement('back-button')));
   requestPersistentStorage();
 

@@ -96,6 +96,7 @@ export async function renderRecipes(el, params = {}) {
   el.innerHTML = `
     <section>
       <h1 class="page-title">Recettes</h1>
+      <p class="actions"><a class="button" href="#/recettes/nouvelle">+ Ajouter une recette</a></p>
       <div class="search">
         <label for="recipe-search">Rechercher une recette, une cuisine ou un ingrédient</label>
         <input id="recipe-search" type="search" autocomplete="off" placeholder="ex. quiche, poulet, coco" value="${escapeHtml(state.query)}" />
@@ -147,20 +148,23 @@ export async function renderRecipes(el, params = {}) {
     // Accueil : une tuile par famille, chaque plat dans une seule famille.
     if (!state.family && !state.query.trim()) {
       count.textContent = all.length === 1 ? '1 recette' : `${all.length} recettes, rangées en ${FAMILIES.length} familles`;
-      results.innerHTML = `<div class="family-grid">${FAMILIES.map((f) => {
+      const mine = all.filter((r) => r.source.type === 'personal').length;
+      results.innerHTML = `<div class="family-grid">
+        <button type="button" class="family-tile family-tile--mine" data-open-family="mine"><strong>Mes recettes</strong><span>${mine ? `${mine} recette${mine > 1 ? 's' : ''}` : 'Ajoutez les vôtres'}</span></button>${FAMILIES.map((f) => {
         const n = all.filter((r) => familyOf.get(r.id) === f.id).length;
         return `<button type="button" class="family-tile" data-open-family="${f.id}"${n ? '' : ' disabled'}><strong>${escapeHtml(f.label)}</strong><span>${n} recette${n > 1 ? 's' : ''}</span></button>`;
       }).join('')}</div>`;
       more.hidden = true;
     } else {
-      const list = state.family ? all.filter((r) => familyOf.get(r.id) === state.family) : all;
+      const list = state.family === 'mine' ? all.filter((r) => r.source.type === 'personal') : state.family ? all.filter((r) => familyOf.get(r.id) === state.family) : all;
       count.textContent = list.length === 1 ? '1 recette' : `${list.length} recettes`;
       results.innerHTML = `${
         state.family
           ? `<div class="family-head"><button type="button" class="button button--small button--secondary" data-open-family="">‹ Toutes les familles</button>
-              <h2 class="family__title">${escapeHtml(familyLabel(state.family))}</h2></div>`
+              <h2 class="family__title">${escapeHtml(state.family === 'mine' ? 'Mes recettes' : familyLabel(state.family))}</h2>
+              ${state.family === 'mine' && !list.length ? '<p>Aucune recette personnelle pour l’instant. Saisissez-en une, ou importez-la depuis un texte, un lien ou une photo.</p><p><a class="button" href="#/recettes/nouvelle">+ Ajouter une recette</a></p>' : ''}</div>`
           : ''
-      }${listHtml(list.slice(0, state.shown), hard, !state.family)}`;
+      }${list.length || state.family !== 'mine' ? listHtml(list.slice(0, state.shown), hard, !state.family) : ''}`;
       more.hidden = list.length <= state.shown;
       more.textContent = `Afficher plus (${Math.min(PAGE_SIZE, list.length - state.shown)} sur ${list.length - state.shown} restantes)`;
     }

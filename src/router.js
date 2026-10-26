@@ -3,6 +3,7 @@ import { renderMore } from './pages/more.js';
 import { renderSettings } from './pages/settings.js';
 import { renderRecipes } from './pages/recipes.js';
 import { renderRecipe } from './pages/recipe.js';
+import { renderRecipeEditor } from './pages/recipeEditor.js';
 import { renderHousehold } from './pages/household.js';
 import { renderMember } from './pages/member.js';
 import { renderPlanning } from './pages/planning.js';
@@ -58,6 +59,14 @@ const routes = [
   },
   { pattern: /^\/recettes$/, title: 'Recettes', tab: '/recettes', render: renderRecipes },
   { pattern: /^\/recettes\/avec\/(?<ingredientId>[^/]+)$/, title: 'Recettes', tab: '/recettes', render: renderRecipes, parent: () => '/stock' },
+  { pattern: /^\/recettes\/nouvelle$/, title: 'Nouvelle recette', tab: '/recettes', render: renderRecipeEditor, parent: () => '/recettes' },
+  {
+    pattern: /^\/recettes\/modifier\/(?<id>[^/]+)$/,
+    title: 'Modifier ma recette',
+    tab: '/recettes',
+    render: renderRecipeEditor,
+    parent: (p) => `/recettes/${p.id}`,
+  },
   { pattern: /^\/recettes\/(?<id>[^/]+)$/, title: 'Recette', tab: '/recettes', render: renderRecipe, parent: () => '/recettes' },
   { pattern: /^\/courses$/, title: 'Courses', tab: '/courses', render: renderShopping },
   { pattern: /^\/courses\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/, title: 'Courses', tab: '/courses', render: renderShopping },

@@ -20,7 +20,7 @@ const MAX_SIDE = 1568;
  * @param {File} file
  * @returns {Promise<{ base64: string, mediaType: string }>}
  */
-async function prepareImage(file) {
+export async function prepareImage(file) {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas');

@@ -26,6 +26,7 @@ import { seasonalIngredients } from '../domain/ingredients/seasons.js';
 import { getHousehold } from '../services/householdService.js';
 import { evaluateRecipeForHousehold } from '../domain/household/compatibility.js';
 import { DIETS } from '../domain/household/household.js';
+import { archiveUserRecipe } from '../services/userRecipeService.js';
 
 /** @typedef {import('../domain/recipes/recipes.js').IngredientLine} IngredientLine */
 /** @typedef {import('../domain/recipes/recipes.js').CookingMethod} CookingMethod */
@@ -229,7 +230,15 @@ export async function renderRecipe(el, params) {
   el.innerHTML = `
     <article class="recipe">
       <h1 class="page-title">${escapeHtml(recipe.name)}</h1>
-      <p>${escapeHtml(recipe.description)}</p>
+      ${recipe.status === 'archived' ? '<p class="notice-inline">Recette supprimée : elle reste visible pour les repas déjà planifiés, mais n’est plus proposée.</p>' : ''}
+      ${
+        recipe.source.type === 'personal' && recipe.status !== 'archived'
+          ? `<p class="form-actions"><span class="badge">Ma recette</span>
+              <a class="button button--small button--secondary" href="#/recettes/modifier/${encodeURIComponent(recipe.id)}">Modifier</a>
+              <button type="button" class="button button--small button--danger" data-delete-recipe>Supprimer</button></p>`
+          : ''
+      }
+      ${recipe.description ? `<p>${escapeHtml(recipe.description)}</p>` : ''}
       <dl class="recipe__facts">
         <div><dt>Cuisine</dt><dd>${escapeHtml(cuisineLabels.get(recipe.cuisine) ?? '')}</dd></div>
         <div><dt>Portions</dt><dd>${recipe.servings} adultes</dd></div>
@@ -275,6 +284,11 @@ export async function renderRecipe(el, params) {
     </article>
   `;
 
+  el.querySelector('[data-delete-recipe]')?.addEventListener('click', async () => {
+    if (!window.confirm(`Supprimer « ${recipe.name} » ? Les repas déjà planifiés la gardent, mais elle ne sera plus proposée.`)) return;
+    await archiveUserRecipe(recipe.id);
+    window.location.hash = '#/recettes';
+  });
   el.querySelectorAll('[data-local]').forEach((button) =>
     button.addEventListener('click', async () => {
       const value = button.getAttribute('data-value');
