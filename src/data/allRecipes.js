@@ -12,6 +12,7 @@ import { WORLD_EUROPE_RECIPES } from './catalog/worldEurope.js';
 import { WORLD_TROPICS_RECIPES } from './catalog/worldTropics.js';
 import { WORLD_AMERICAS_RECIPES } from './catalog/worldAmericas.js';
 import { LIGHT_RECIPES } from './catalog/light.js';
+import { EVERYDAY_RECIPES } from './catalog/everyday.js';
 
 /** @type {import('../domain/recipes/recipes.js').Recipe[]} */
-export const ALL_RECIPES = [...RECIPES, ...BREAKFAST_RECIPES, ...SNACK_RECIPES, ...ASIA_EAST_RECIPES, ...ASIA_SOUTHEAST_RECIPES, ...ASIA_SOUTH_RECIPES, ...WORLD_EUROPE_RECIPES, ...WORLD_TROPICS_RECIPES, ...WORLD_AMERICAS_RECIPES, ...LIGHT_RECIPES];
+export const ALL_RECIPES = [...RECIPES, ...BREAKFAST_RECIPES, ...SNACK_RECIPES, ...ASIA_EAST_RECIPES, ...ASIA_SOUTHEAST_RECIPES, ...ASIA_SOUTH_RECIPES, ...WORLD_EUROPE_RECIPES, ...WORLD_TROPICS_RECIPES, ...WORLD_AMERICAS_RECIPES, ...LIGHT_RECIPES, ...EVERYDAY_RECIPES];

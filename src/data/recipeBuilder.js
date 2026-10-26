@@ -85,7 +85,12 @@ function parsePreparations(text) {
  * @property {string} [equip]       Equipements separes par des espaces ('' = aucun)
  * @property {string} [label]       Nom de la methode
  * @property {string[]} [tips]
+ * @property {string} [family]      Famille de plat imposee (voir families.js)
+ * @property {string[]} [tm]        Etapes au robot cuiseur (type Thermomix) : deuxieme methode
  */
+
+/** Libelle de la methode au robot cuiseur. */
+const ROBOT_LABEL = 'Au robot cuiseur (type Thermomix)';
 
 /**
  * Construit une recette validee du catalogue.
@@ -118,7 +123,10 @@ export function r(id, name, description, cuisine, meals, servings, prepMinutes, 
     vessel: opts.vessel ?? null,
     ingredients: parseIngredients(ingredients),
     preparations: opts.preps ? parsePreparations(opts.preps) : [],
-    methods: [{ id: equipment[0] ?? 'no_cook', label: opts.label ?? METHOD_LABELS[key] ?? 'Préparation', equipment, steps }],
+    methods: [
+      { id: equipment[0] ?? 'no_cook', label: opts.label ?? METHOD_LABELS[key] ?? 'Préparation', equipment, steps },
+      ...(opts.tm ? [{ id: 'food_processor', label: ROBOT_LABEL, equipment: equipment.includes('oven') ? ['food_processor', 'oven'] : ['food_processor'], steps: opts.tm }] : []),
+    ],
     tips: opts.tips ?? [],
     source: SOURCE,
     status: 'validated',
@@ -128,5 +136,6 @@ export function r(id, name, description, cuisine, meals, servings, prepMinutes, 
       return type;
     }),
     tags: /** @type {RecipeTag[]} */ ((opts.tags ?? '').split(/\s+/).filter(Boolean)),
+    ...(opts.family ? { family: opts.family } : {}),
   };
 }

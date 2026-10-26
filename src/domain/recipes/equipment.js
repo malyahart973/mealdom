@@ -8,7 +8,7 @@ export const EQUIPMENT = [
   { id: 'oven', label: 'Four' },
   { id: 'microwave', label: 'Micro-ondes' },
   { id: 'air_fryer', label: 'Air fryer' },
-  { id: 'food_processor', label: 'Robot cuiseur' },
+  { id: 'food_processor', label: 'Robot cuiseur (type Thermomix)' },
   { id: 'blender', label: 'Mixeur' },
   { id: 'barbecue', label: 'Barbecue' },
   { id: 'pressure_cooker', label: 'Autocuiseur ou multicuiseur' },

@@ -20,7 +20,7 @@ const PAGE_SIZE = 30;
 const cuisineRegion = new Map(CUISINES.map((c) => [c.id, c.region]));
 
 /** Filtres conserves pendant la navigation. */
-const state = { query: '', family: '', vesselOnly: false, householdOnly: true, quickOnly: false, localOnly: false, seasonOnly: false, mealType: '', region: '', cuisine: '', tag: '', shown: PAGE_SIZE };
+const state = { query: '', family: '', robotOnly: false, vesselOnly: false, householdOnly: true, quickOnly: false, localOnly: false, seasonOnly: false, mealType: '', region: '', cuisine: '', tag: '', shown: PAGE_SIZE };
 
 
 
@@ -91,7 +91,7 @@ export async function renderRecipes(el, params = {}) {
       .map((c) => ({ id: c.id, label: c.label }))
       .sort((a, b) => a.label.localeCompare(b.label));
 
-  const moreFilters = [state.mealType, state.region, state.cuisine, state.tag].filter(Boolean).length + [state.quickOnly, state.vesselOnly, state.localOnly, state.seasonOnly].filter(Boolean).length;
+  const moreFilters = [state.mealType, state.region, state.cuisine, state.tag].filter(Boolean).length + [state.quickOnly, state.robotOnly, state.vesselOnly, state.localOnly, state.seasonOnly].filter(Boolean).length;
 
   el.innerHTML = `
     <section>
@@ -110,6 +110,7 @@ export async function renderRecipes(el, params = {}) {
         </div>
         <div class="chips">
           <button type="button" class="chip" data-action="quick" aria-pressed="${state.quickOnly}">${QUICK_MINUTES} min maximum</button>
+          <button type="button" class="chip" data-action="robot" aria-pressed="${state.robotOnly}">Au robot cuiseur (Thermomix)</button>
           <button type="button" class="chip" data-action="vessel" aria-pressed="${state.vesselOnly}">Un seul récipient</button>
           <button type="button" class="chip" data-action="local" aria-pressed="${state.localOnly}">Faciles à trouver en Guyane</button>
           <button type="button" class="chip" data-action="season" aria-pressed="${state.seasonOnly}">De saison et péyi</button>
@@ -136,6 +137,7 @@ export async function renderRecipes(el, params = {}) {
         (!state.cuisine || r.cuisine === state.cuisine) &&
         (!state.tag || hasTag(r, /** @type {any} */ (state.tag))) &&
         (!state.quickOnly || totalMinutes(r) <= QUICK_MINUTES) &&
+        (!state.robotOnly || r.methods.some((m) => m.equipment.includes('food_processor'))) &&
         (!state.localOnly || !hard.has(r.id)) &&
         (!state.seasonOnly || seasonal.has(r.id)),
     );
@@ -196,6 +198,7 @@ export async function renderRecipes(el, params = {}) {
   });
   for (const [action, key] of /** @type {const} */ ([
     ['quick', 'quickOnly'],
+    ['robot', 'robotOnly'],
     ['vessel', 'vesselOnly'],
     ['local', 'localOnly'],
     ['season', 'seasonOnly'],

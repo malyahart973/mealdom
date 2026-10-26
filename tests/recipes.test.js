@@ -152,3 +152,8 @@ test('Familles : exemples', () => {
 });
 test('Famille explicite d’une recette ajoutée : elle l’emporte', () =>
   assertEqual(recipeFamily({ .../** @type {import('../src/domain/recipes/recipes.js').Recipe} */ (ALL_RECIPES[0]), family: 'tarts' }, ingredientsMap), 'tarts'));
+test('Recettes du quotidien : au moins 15 quiches, tartes ou pizzas et 10 recettes au robot cuiseur', () => {
+  const tarts = ALL_RECIPES.filter((r) => recipeFamily(r, ingredientsMap) === 'tarts').length;
+  const robot = ALL_RECIPES.filter((r) => r.methods.some((m) => m.equipment.includes('food_processor'))).length;
+  assertEqual([tarts >= 15, robot >= 10], [true, true]);
+});

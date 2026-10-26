@@ -52,6 +52,7 @@ const APP_FILES = [
   './src/data/catalog/worldTropics.js',
   './src/data/catalog/worldAmericas.js',
   './src/data/catalog/light.js',
+  './src/data/catalog/everyday.js',
   './src/domain/nutrition/nutrition.js',
   './src/domain/nutrition/program.js',
   './src/domain/nutrition/weight.js',
