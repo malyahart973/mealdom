@@ -2,7 +2,8 @@ import { escapeHtml } from '../utils/html.js';
 import { formatMinutes } from '../utils/format.js';
 import { filterRecipes } from '../domain/recipes/recipeFiltering.js';
 import { totalMinutes, recipeMealTypes, hasTag, MEAL_TYPES, RECIPE_TAGS, QUICK_MINUTES, VESSEL_LABELS } from '../domain/recipes/recipes.js';
-import { recipes, cuisineLabels, filterContext, nutritionByRecipe, preparationsById, ingredientsById } from '../services/catalog.js';
+import { recipes, cuisineLabels, familyOf, filterContext, nutritionByRecipe, preparationsById, ingredientsById } from '../services/catalog.js';
+import { FAMILIES, familyLabel } from '../domain/recipes/families.js';
 import { CUISINES, REGIONS } from '../data/cuisines.js';
 import { getHousehold } from '../services/householdService.js';
 import { loadAvailability } from '../services/territoryService.js';
@@ -19,14 +20,17 @@ const PAGE_SIZE = 30;
 const cuisineRegion = new Map(CUISINES.map((c) => [c.id, c.region]));
 
 /** Filtres conserves pendant la navigation. */
-const state = { query: '', vesselOnly: false, householdOnly: true, quickOnly: false, localOnly: false, seasonOnly: false, mealType: '', region: '', cuisine: '', tag: '', shown: PAGE_SIZE };
+const state = { query: '', family: '', vesselOnly: false, householdOnly: true, quickOnly: false, localOnly: false, seasonOnly: false, mealType: '', region: '', cuisine: '', tag: '', shown: PAGE_SIZE };
+
+
 
 /**
  * @param {Recipe[]} list
  * @param {Set<string>} hard   Recettes avec un ingredient difficile a trouver en Guyane
+ * @param {boolean} [showFamily]  Afficher la famille (resultats de recherche toutes familles)
  * @returns {string}
  */
-function listHtml(list, hard) {
+function listHtml(list, hard, showFamily = false) {
   if (list.length === 0) {
     return '<p class="empty">Aucune recette ne correspond. Essayez un autre mot ou retirez un filtre.</p>';
   }
@@ -37,7 +41,7 @@ function listHtml(list, hard) {
       <li>
         <a href="#/recettes/${encodeURIComponent(r.id)}">
           <span class="recipe-list__name">${escapeHtml(r.name)}</span>
-          <span class="recipe-list__meta">${escapeHtml(cuisineLabels.get(r.cuisine) ?? '')}, ${escapeHtml(formatMinutes(totalMinutes(r)))}, environ ${Math.round(kcal.get(r.id)?.kcal ?? 0)} kcal par portion</span>
+          <span class="recipe-list__meta">${showFamily ? `${escapeHtml(familyLabel(familyOf.get(r.id) ?? ''))} · ` : ''}${escapeHtml(cuisineLabels.get(r.cuisine) ?? '')}, ${escapeHtml(formatMinutes(totalMinutes(r)))}, environ ${Math.round(kcal.get(r.id)?.kcal ?? 0)} kcal par portion</span>
           ${r.vessel ? `<span class="tag">${escapeHtml(VESSEL_LABELS[r.vessel])}</span>` : ''}
           ${(r.tags ?? []).includes('light') ? '<span class="tag">Léger</span>' : ''}
           ${hard.has(r.id) ? '<span class="tag tag--warn">Ingrédient difficile à trouver</span>' : ''}
@@ -87,26 +91,31 @@ export async function renderRecipes(el, params = {}) {
       .map((c) => ({ id: c.id, label: c.label }))
       .sort((a, b) => a.label.localeCompare(b.label));
 
+  const moreFilters = [state.mealType, state.region, state.cuisine, state.tag].filter(Boolean).length + [state.quickOnly, state.vesselOnly, state.localOnly, state.seasonOnly].filter(Boolean).length;
+
   el.innerHTML = `
     <section>
       <h1 class="page-title">Recettes</h1>
       <div class="search">
         <label for="recipe-search">Rechercher une recette, une cuisine ou un ingrédient</label>
-        <input id="recipe-search" type="search" autocomplete="off" placeholder="ex. poulet, japonaise, coco" value="${escapeHtml(state.query)}" />
+        <input id="recipe-search" type="search" autocomplete="off" placeholder="ex. quiche, poulet, coco" value="${escapeHtml(state.query)}" />
       </div>
-      <div class="filters">
-        ${selectHtml('mealType', 'Repas', MEAL_TYPES, state.mealType, 'Tous les repas')}
-        ${selectHtml('region', 'Région', REGIONS, state.region, 'Toutes les régions')}
-        <div data-cuisine-field>${selectHtml('cuisine', 'Cuisine', cuisineOptions(), state.cuisine, 'Toutes les cuisines')}</div>
-        ${selectHtml('tag', 'Style', RECIPE_TAGS, state.tag, 'Tous les styles')}
-      </div>
-      <div class="chips">
-        <button type="button" class="chip" data-action="household" aria-pressed="${state.householdOnly}">Adaptées à mon foyer</button>
-        <button type="button" class="chip" data-action="quick" aria-pressed="${state.quickOnly}">${QUICK_MINUTES} min maximum</button>
-        <button type="button" class="chip" data-action="vessel" aria-pressed="${state.vesselOnly}">Un seul récipient</button>
-        <button type="button" class="chip" data-action="local" aria-pressed="${state.localOnly}">Faciles à trouver en Guyane</button>
-        <button type="button" class="chip" data-action="season" aria-pressed="${state.seasonOnly}">De saison et péyi</button>
-      </div>
+      <details class="more-filters"${moreFilters ? ' open' : ''}>
+        <summary>Plus de filtres${moreFilters ? ` (${moreFilters})` : ''}</summary>
+        <div class="filters">
+          ${selectHtml('mealType', 'Moment du repas', MEAL_TYPES, state.mealType, 'Tous les moments')}
+          ${selectHtml('region', 'Région', REGIONS, state.region, 'Toutes les régions')}
+          <div data-cuisine-field>${selectHtml('cuisine', 'Cuisine', cuisineOptions(), state.cuisine, 'Toutes les cuisines')}</div>
+          ${selectHtml('tag', 'Style', RECIPE_TAGS, state.tag, 'Tous les styles')}
+        </div>
+        <div class="chips">
+          <button type="button" class="chip" data-action="quick" aria-pressed="${state.quickOnly}">${QUICK_MINUTES} min maximum</button>
+          <button type="button" class="chip" data-action="vessel" aria-pressed="${state.vesselOnly}">Un seul récipient</button>
+          <button type="button" class="chip" data-action="local" aria-pressed="${state.localOnly}">Faciles à trouver en Guyane</button>
+          <button type="button" class="chip" data-action="season" aria-pressed="${state.seasonOnly}">De saison et péyi</button>
+        </div>
+      </details>
+      <label class="check"><input type="checkbox" data-action="household"${state.householdOnly ? ' checked' : ''} /> <span>Seulement les recettes adaptées à mon foyer</span></label>
       <p class="hint" id="recipe-count" aria-live="polite"></p>
       <div id="recipe-results"></div>
       <button type="button" class="button button--secondary" data-action="more" hidden>Afficher plus</button>
@@ -118,12 +127,9 @@ export async function renderRecipes(el, params = {}) {
   const count = /** @type {HTMLElement} */ (el.querySelector('#recipe-count'));
   const more = /** @type {HTMLButtonElement} */ (el.querySelector('[data-action="more"]'));
 
-  const refresh = () => {
-    const list = filterRecipes(
-      recipes,
-      { query: state.query, vesselOnly: state.vesselOnly, household: state.householdOnly ? household : null },
-      filterContext,
-    ).filter(
+  /** Recettes qui passent la recherche et les filtres (hors famille). */
+  const filtered = () =>
+    filterRecipes(recipes, { query: state.query, vesselOnly: state.vesselOnly, household: state.householdOnly ? household : null }, filterContext).filter(
       (r) =>
         (!state.mealType || recipeMealTypes(r).includes(/** @type {any} */ (state.mealType))) &&
         (!state.region || cuisineRegion.get(r.cuisine) === state.region) &&
@@ -133,10 +139,38 @@ export async function renderRecipes(el, params = {}) {
         (!state.localOnly || !hard.has(r.id)) &&
         (!state.seasonOnly || seasonal.has(r.id)),
     );
-    count.textContent = list.length === 1 ? '1 recette' : `${list.length} recettes`;
-    results.innerHTML = listHtml(list.slice(0, state.shown), hard);
-    more.hidden = list.length <= state.shown;
-    more.textContent = `Afficher plus (${Math.min(PAGE_SIZE, list.length - state.shown)} sur ${list.length - state.shown} restantes)`;
+
+  const refresh = () => {
+    const all = filtered();
+    // Accueil : une tuile par famille, chaque plat dans une seule famille.
+    if (!state.family && !state.query.trim()) {
+      count.textContent = all.length === 1 ? '1 recette' : `${all.length} recettes, rangées en ${FAMILIES.length} familles`;
+      results.innerHTML = `<div class="family-grid">${FAMILIES.map((f) => {
+        const n = all.filter((r) => familyOf.get(r.id) === f.id).length;
+        return `<button type="button" class="family-tile" data-open-family="${f.id}"${n ? '' : ' disabled'}><strong>${escapeHtml(f.label)}</strong><span>${n} recette${n > 1 ? 's' : ''}</span></button>`;
+      }).join('')}</div>`;
+      more.hidden = true;
+    } else {
+      const list = state.family ? all.filter((r) => familyOf.get(r.id) === state.family) : all;
+      count.textContent = list.length === 1 ? '1 recette' : `${list.length} recettes`;
+      results.innerHTML = `${
+        state.family
+          ? `<div class="family-head"><button type="button" class="button button--small button--secondary" data-open-family="">‹ Toutes les familles</button>
+              <h2 class="family__title">${escapeHtml(familyLabel(state.family))}</h2></div>`
+          : ''
+      }${listHtml(list.slice(0, state.shown), hard, !state.family)}`;
+      more.hidden = list.length <= state.shown;
+      more.textContent = `Afficher plus (${Math.min(PAGE_SIZE, list.length - state.shown)} sur ${list.length - state.shown} restantes)`;
+    }
+    results.querySelectorAll('[data-open-family]').forEach((b) => b.addEventListener('click', () => selectFamily(b.getAttribute('data-open-family') ?? '')));
+  };
+
+  /** @param {string} family */
+  const selectFamily = (family) => {
+    state.family = family;
+    state.shown = PAGE_SIZE;
+    refresh();
+    count.scrollIntoView({ block: 'start' });
   };
 
   input.addEventListener('input', () => {
@@ -155,8 +189,12 @@ export async function renderRecipes(el, params = {}) {
     state.shown = PAGE_SIZE;
     refresh();
   });
+  el.querySelector('[data-action="household"]')?.addEventListener('change', (event) => {
+    state.householdOnly = /** @type {HTMLInputElement} */ (event.target).checked;
+    state.shown = PAGE_SIZE;
+    refresh();
+  });
   for (const [action, key] of /** @type {const} */ ([
-    ['household', 'householdOnly'],
     ['quick', 'quickOnly'],
     ['vessel', 'vesselOnly'],
     ['local', 'localOnly'],

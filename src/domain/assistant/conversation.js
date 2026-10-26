@@ -34,7 +34,8 @@
  */
 
 /**
- * @typedef {Proposal & { review: ProposalReview | null }} StoredProposal
+ * @typedef {Proposal & { review: ProposalReview | null, request?: Request | null, seen?: Record<string, string[]> }} StoredProposal
+ *   seen : recettes deja montrees par creneau (« date|creneau »), pour que « Changer » propose toujours autre chose
  */
 
 /**

@@ -188,6 +188,9 @@ export function vegetableShare(recipe, ctx) {
   return total > 0 ? veg / total : 0;
 }
 
+/** Calories visees par portion en mode « léger » quand aucun programme n'est actif. */
+const LIGHT_KCAL = { breakfast: 350, lunch: 500, snack: 150, dinner: 450 };
+
 /**
  * La recette respecte-t-elle les criteres stricts ?
  * @param {Recipe} recipe
@@ -292,8 +295,10 @@ export function scoreRecipe(recipe, weights, env, ctx) {
       score += 10 * w('light') * Math.max(0, fit) / 80;
       if (fit > 40) reasons.push('adaptée à votre programme (portions et protéines)');
     } else if (n) {
-      score += 10 * w('light') * Math.max(0, 1 - n.kcal / 900);
-      if (n.kcal < 500) reasons.push(`environ ${Math.round(n.kcal)} kcal la portion`);
+      // Sans programme : une portion raisonnable pour le repas, ni trop riche ni trop maigre.
+      const aim = LIGHT_KCAL[/** @type {'breakfast' | 'lunch' | 'snack' | 'dinner'} */ (env.slot ?? 'lunch')];
+      score += 10 * w('light') * Math.max(0, 1 - Math.abs(n.kcal - aim) / aim);
+      if (Math.abs(n.kcal - aim) <= aim * 0.25) reasons.push(`environ ${Math.round(n.kcal)} kcal la portion`);
     }
     if (hasTag(recipe, 'light')) score += 3 * w('light');
   }

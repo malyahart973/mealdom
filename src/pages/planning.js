@@ -62,7 +62,10 @@ export async function renderPlanning(el, params) {
     <div class="planning-layout${assistantOpen ? ' planning-layout--assistant' : ''}">
     <section class="planning-layout__main">
       <h1 class="page-title">Planning</h1>
-      <p class="actions"><button type="button" class="button" data-action="assistant" aria-expanded="${assistantOpen}">${assistantOpen ? 'Fermer l’assistant' : 'Parler à l’assistant'}</button></p>
+      <p class="actions form-actions">
+        <a class="button" href="#/assistant/planifier/${monday}">Planifier ma semaine</a>
+        <button type="button" class="button button--secondary" data-action="assistant" aria-expanded="${assistantOpen}">${assistantOpen ? 'Fermer l’assistant' : 'Parler à l’assistant'}</button>
+      </p>
       <nav class="week-nav" aria-label="Changer de semaine">
         <a href="#/planning/semaine/${addDays(monday, -7)}" aria-label="Semaine précédente">‹</a>
         <span>Semaine du ${escapeHtml(formatIsoDayMonth(monday))}</span>

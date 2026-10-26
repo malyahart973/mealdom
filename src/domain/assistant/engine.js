@@ -40,6 +40,7 @@ import { freeSlots } from './proposal.js';
  * @property {Map<string, DriveProduct[]>} productsByIngredient
  * @property {Map<string, string>} cuisineRegion
  * @property {Set<string>} [preferredCuisines]   Cuisines retenues dans les preferences (bonus leger)
+ * @property {Map<string, string>} [familyOf]       Famille de chaque recette (variete : pas cinq salades dans la semaine)
  */
 
 /**
@@ -95,11 +96,43 @@ function targetMeals(req, ctx) {
 }
 
 /**
+ * @typedef {{ chosen: string[], cuisines: string[], families: string[], ingredients: Set<string>, preferCuisine?: string | null, preferTag?: import('../recipes/recipes.js').RecipeTag | null, medianCostIndex: number, maxMinutes: number | null }} WeekEnv
+ */
+
+/**
+ * Variete de la semaine : chaque famille de plat (salade, soupe...) et chaque region
+ * deja tres presente coute un peu plus cher, pour une semaine equilibree.
+ * @param {Recipe} recipe
+ * @param {WeekEnv} env
+ * @param {EngineContext} ctx
+ * @returns {number}
+ */
+function varietyPenalty(recipe, env, ctx) {
+  const family = ctx.familyOf?.get(recipe.id);
+  const sameFamily = family ? env.families.filter((f) => f === family).length : 0;
+  const region = ctx.cuisineRegion.get(recipe.cuisine);
+  const sameRegion = region ? env.cuisines.filter((c) => ctx.cuisineRegion.get(c) === region).length : 0;
+  return 2.5 * sameFamily + Math.max(0, sameRegion - 2);
+}
+
+/**
+ * Retient un plat choisi pour la suite de la semaine.
+ * @param {WeekEnv} env
+ * @param {Recipe} recipe
+ * @param {EngineContext} ctx
+ */
+function remember(env, recipe, ctx) {
+  env.chosen.push(recipe.id);
+  env.cuisines.push(recipe.cuisine);
+  env.families.push(ctx.familyOf?.get(recipe.id) ?? '');
+}
+
+/**
  * Meilleure recette pour un creneau.
  * @param {{ date: string, slot: Slot }} where
  * @param {Constraints} constraints
  * @param {Weights} weights
- * @param {{ chosen: string[], cuisines: string[], ingredients: Set<string>, preferCuisine?: string | null, preferTag?: import('../recipes/recipes.js').RecipeTag | null, medianCostIndex: number, maxMinutes: number | null }} env
+ * @param {WeekEnv} env
  * @param {EngineContext} ctx
  * @returns {{ recipe: Recipe, score: number, reasons: string[] } | null}
  */
@@ -114,7 +147,7 @@ function bestRecipe(where, constraints, weights, env, ctx) {
       { slot: where.slot, medianCostIndex: env.medianCostIndex, maxMinutes: env.maxMinutes, weekCuisines: env.cuisines, weekRecipeIds: env.chosen, weekIngredients: env.ingredients },
       ctx.scoring,
     );
-    let score = s.score + tieBreak(`${recipe.id}|${where.date}|${where.slot}`);
+    let score = s.score + tieBreak(`${recipe.id}|${where.date}|${where.slot}`) - varietyPenalty(recipe, env, ctx);
     if (env.preferCuisine && recipe.cuisine === env.preferCuisine) score += 3;
     if (ctx.preferredCuisines?.has(recipe.cuisine)) score += 2;
     if (env.preferTag && hasTag(recipe, env.preferTag)) score += 6;
@@ -124,16 +157,11 @@ function bestRecipe(where, constraints, weights, env, ctx) {
 }
 
 /**
- * Proposition a partir d'une demande comprise.
+ * Objectifs, criteres stricts et variete de la semaine, communs a toutes les recherches.
  * @param {Request} req
  * @param {EngineContext} ctx
- * @returns {EngineResult}
  */
-export function proposeChanges(req, ctx) {
-  /** @type {Operation[]} */
-  const operations = [];
-  /** @type {string[]} */
-  const notes = [];
+function prepare(req, ctx) {
   const weights = weightsFor(req, ctx.learnedWeights);
   const weekMeals = ctx.meals.filter((m) => ctx.days.includes(m.date));
   const compatibleIds = new Set(ctx.recipes.filter((r) => evaluateRecipeForHousehold(r, ctx.scoring.household, ctx.scoring).status === 'compatible').map((r) => r.id));
@@ -156,12 +184,57 @@ export function proposeChanges(req, ctx) {
   const env = {
     chosen: weekMeals.map((m) => m.recipeId),
     cuisines: weekMeals.map((m) => ctx.recipesById.get(m.recipeId)?.cuisine ?? ''),
+    families: weekMeals.map((m) => ctx.familyOf?.get(m.recipeId) ?? ''),
     ingredients: new Set(weekMeals.flatMap((m) => ctx.recipesById.get(m.recipeId)?.ingredients.map((l) => l.ingredientId) ?? [])),
     medianCostIndex,
     maxMinutes: req.maxMinutes,
     /** @type {string | null} */ preferCuisine: null,
     /** @type {import('../recipes/recipes.js').RecipeTag | null} */ preferTag: null,
   };
+  return { weights, weekMeals, medianCostIndex, base, env };
+}
+
+/**
+ * Autres recettes possibles pour un creneau, de la mieux notee a la moins bien notee
+ * (bouton « Changer » de l'apercu de la semaine).
+ * @param {Request} req              Demande d'origine : objectifs et criteres
+ * @param {{ date: string, slot: Slot }} where
+ * @param {EngineContext} ctx        ctx.meals : la semaine telle que proposee
+ * @param {Set<string>} exclude      Recettes deja montrees pour ce creneau
+ * @param {number} [limit]
+ * @returns {{ recipe: Recipe, score: number, reasons: string[] }[]}
+ */
+export function suggestRecipes(req, where, ctx, exclude, limit = 3) {
+  const { weights, base, env } = prepare(req, { ...ctx, meals: ctx.meals.filter((m) => !(m.date === where.date && m.slot === where.slot)) });
+  /** @type {{ recipe: Recipe, score: number, reasons: string[] }[]} */
+  const ranked = [];
+  for (const recipe of ctx.recipes) {
+    if (!isEligible(recipe, { ...base, slot: where.slot, excludeRecipeIds: exclude }, ctx.scoring)) continue;
+    const s = scoreRecipe(
+      recipe,
+      weights,
+      { slot: where.slot, medianCostIndex: env.medianCostIndex, maxMinutes: env.maxMinutes, weekCuisines: env.cuisines, weekRecipeIds: env.chosen, weekIngredients: env.ingredients },
+      ctx.scoring,
+    );
+    let score = s.score + tieBreak(`${recipe.id}|${where.date}|${where.slot}`) - varietyPenalty(recipe, env, ctx);
+    if (ctx.preferredCuisines?.has(recipe.cuisine)) score += 2;
+    ranked.push({ recipe, score, reasons: s.reasons });
+  }
+  return ranked.sort((a, b) => b.score - a.score).slice(0, limit);
+}
+
+/**
+ * Proposition a partir d'une demande comprise.
+ * @param {Request} req
+ * @param {EngineContext} ctx
+ * @returns {EngineResult}
+ */
+export function proposeChanges(req, ctx) {
+  /** @type {Operation[]} */
+  const operations = [];
+  /** @type {string[]} */
+  const notes = [];
+  const { weights, weekMeals, medianCostIndex, base, env } = prepare(req, ctx);
 
   // --- Limites et conflits a signaler ---
   if (req.modes.includes('gourmand') && (req.modes.includes('economy') || req.budgetCap)) {
@@ -263,7 +336,7 @@ export function proposeChanges(req, ctx) {
       }
       const pick = bestRecipe(meal, { ...base, include: [to], avoid: [...base.avoid, from] }, weights, { ...env, preferCuisine: recipe.cuisine }, ctx);
       if (pick) {
-        env.chosen.push(pick.recipe.id);
+        remember(env, pick.recipe, ctx);
         operations.push({ type: 'replace_recipe', mealId: meal.id, recipeId: pick.recipe.id, reason: `Avec ${to.label} à la place de ${from.label}${pick.reasons.length ? ` ; ${pick.reasons.join(', ')}` : ''}.` });
       } else notes.push(`Aucune recette compatible avec ${to.label} pour ${mealLabel(meal)}.`);
     }
@@ -294,7 +367,7 @@ export function proposeChanges(req, ctx) {
       if (!free.length) continue;
       const pick = bestRecipe({ date, slot }, base, { ...weights, gourmand: Math.max(weights.gourmand ?? 0, 0.6) }, { ...env, preferTag: 'convivial' }, ctx);
       if (pick) {
-        env.chosen.push(pick.recipe.id);
+        remember(env, pick.recipe, ctx);
         const guests = req.guests.mode === 'add' ? req.guests.count : Math.max(0, req.guests.count - ctx.scoring.household.members.length);
         operations.push({ type: 'add_meal', date, slot, recipeId: pick.recipe.id, guests, reason: `Repas à partager avec vos invités${pick.reasons.length ? ` ; ${pick.reasons.join(', ')}` : ''}.` });
       }
@@ -326,7 +399,7 @@ export function proposeChanges(req, ctx) {
           ctx,
         );
         if (pick) {
-          env.chosen.push(pick.recipe.id);
+          remember(env, pick.recipe, ctx);
           operations.push({ type: 'replace_recipe', mealId: target.id, recipeId: pick.recipe.id, reason: `Réutilise les ingrédients déjà ouverts pour ${before.recipeName}.` });
         }
       }
@@ -345,7 +418,7 @@ export function proposeChanges(req, ctx) {
           notes.push(`Aucune recette compatible trouvée pour le ${date}.`);
           continue;
         }
-        env.chosen.push(pick.recipe.id);
+        remember(env, pick.recipe, ctx);
         const why = `${req.convivial ? 'Repas convivial' : 'Repas ajouté'}${pick.reasons.length ? ` ; ${pick.reasons.join(', ')}` : ''}.`;
         if (!existing) operations.push({ type: 'add_meal', date, slot, recipeId: pick.recipe.id, guests: 0, reason: why });
         else if (existing.locked) notes.push(`${mealLabel(existing)} est verrouillé.`);
@@ -399,8 +472,7 @@ export function proposeChanges(req, ctx) {
         ? scoreRecipe(current, weights, { slot: meal.slot, medianCostIndex, maxMinutes: req.maxMinutes, weekCuisines: env.cuisines, weekRecipeIds: [], weekIngredients: env.ingredients }, ctx.scoring).score
         : -100;
       if (!req.redo && pick.score - currentScore < IMPROVEMENT) continue;
-      env.chosen.push(pick.recipe.id);
-      env.cuisines.push(pick.recipe.cuisine);
+      remember(env, pick.recipe, ctx);
       saved += (currentCost - recipeCost(pick.recipe, ctx.scoring).index) * mealPortionsFor(meal, ctx.scoring.household).total;
       operations.push({ type: 'replace_recipe', mealId: meal.id, recipeId: pick.recipe.id, reason: pick.reasons.length ? `${pick.reasons.join(', ')}.` : 'Correspond mieux à votre demande.' });
     }
@@ -413,8 +485,7 @@ export function proposeChanges(req, ctx) {
       for (const free of freeSlots(ctx.meals, days, slots)) {
         const pick = bestRecipe(free, base, weights, env, ctx);
         if (!pick) continue;
-        env.chosen.push(pick.recipe.id);
-        env.cuisines.push(pick.recipe.cuisine);
+        remember(env, pick.recipe, ctx);
         operations.push({ type: 'add_meal', date: free.date, slot: free.slot, recipeId: pick.recipe.id, guests: 0, reason: pick.reasons.length ? `${pick.reasons.join(', ')}.` : 'Complète le planning.' });
       }
     }

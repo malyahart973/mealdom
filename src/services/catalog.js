@@ -8,12 +8,16 @@ import { ALL_RECIPES } from '../data/allRecipes.js';
 import { CUISINES } from '../data/cuisines.js';
 import { NUTRITION } from '../data/nutrition.js';
 import { buildNutritionIndex, recipeNutrition } from '../domain/nutrition/nutrition.js';
+import { recipeFamily } from '../domain/recipes/families.js';
 
 export const ingredientsById = new Map(INGREDIENTS.map((i) => [i.id, i]));
 export const preparationsById = new Map(PREPARATIONS.map((p) => [p.id, p]));
 export const recipesById = new Map(ALL_RECIPES.map((r) => [r.id, r]));
 export const cuisineLabels = new Map(CUISINES.map((c) => [c.id, c.label]));
 export const recipes = ALL_RECIPES;
+
+/** Famille de chaque recette (une seule par plat). */
+export const familyOf = new Map(ALL_RECIPES.map((r) => [r.id, recipeFamily(r, ingredientsById)]));
 
 /** Contexte utilise par le filtrage des recettes. */
 export const filterContext = { ingredients: ingredientsById, preparations: preparationsById, cuisineLabels };

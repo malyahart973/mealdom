@@ -92,7 +92,13 @@ function reviewHtml(proposal, monday) {
         ${status}
       </header>
 
-      <h4>Modifications</h4>
+      ${
+        review.diff.meals.length >= 5 && proposal.status === 'pending'
+          ? `<p><a class="button button--small" href="#/assistant/apercu/${monday}/${escapeHtml(proposal.id)}">Voir la semaine en cartes</a></p>`
+          : ''
+      }
+      <details class="proposal__list"${review.diff.meals.length > 6 ? '' : ' open'}>
+      <summary><h4>Modifications (${review.diff.meals.length + proposal.operations.filter((o) => o.type === 'set_weekly_budget' || o.type === 'choose_product').length})</h4></summary>
       <ul class="proposal__changes">
         ${review.diff.meals
           .map(
@@ -115,10 +121,14 @@ function reviewHtml(proposal, monday) {
           )
           .join('')}
       </ul>
+      </details>
       ${reasons.length ? `<h4>Pourquoi</h4><ul class="proposal__reasons">${reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join('')}</ul>` : ''}
 
       <h4>Courses de la semaine</h4>
-      <dl class="budget-card proposal__cost">
+      ${
+        c.beforeCents === 0 && c.afterCents === 0
+          ? `<p>Aucun prix enregistré pour ces articles : le coût ne peut pas être calculé. <a href="#/magasins">Ajouter des prix</a></p>`
+          : `<dl class="budget-card proposal__cost">
         <div><dt>Avant</dt><dd>${escapeHtml(formatCents(c.beforeCents))}</dd></div>
         <div><dt>Après</dt><dd>${escapeHtml(formatCents(c.afterCents))}</dd></div>
         <div class="${c.comparison.deltaCents !== null && c.comparison.deltaCents > 0 ? 'over' : ''}"><dt>Écart</dt><dd>${c.comparison.deltaCents === null ? '—' : escapeHtml(signed(c.comparison.deltaCents))}</dd></div>
@@ -126,7 +136,8 @@ function reviewHtml(proposal, monday) {
       </dl>
       <p><span class="badge badge--${c.comparison.level}">${escapeHtml(reliabilityLabels[c.comparison.level])}</span> ${escapeHtml(c.comparison.explanation)}</p>
       ${c.savingCents > 0 ? `<p>Dont promotions appliquées : ${escapeHtml(formatCents(c.savingCents))}.</p>` : ''}
-      ${c.missingAfter > 0 ? `<p class="hint">${c.missingAfter} article(s) sans prix connu : ils ne sont pas comptés.</p>` : ''}
+      ${c.missingAfter > 0 ? `<p class="hint">${c.missingAfter} article(s) sans prix connu : ils ne sont pas comptés.</p>` : ''}`
+      }
 
       <h4>Quantités</h4>
       <p>Portions cuisinées dans la semaine : ${escapeHtml(formatNumber(review.diff.portions.before))} → ${escapeHtml(formatNumber(review.diff.portions.after))}.

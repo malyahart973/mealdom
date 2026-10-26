@@ -15,6 +15,7 @@ import { renderStores } from './pages/stores.js';
 import { renderStore } from './pages/store.js';
 import { renderBudget } from './pages/budget.js';
 import { renderAssistant } from './pages/assistant.js';
+import { renderPlanWeek, renderWeekPreview } from './pages/assistantGuided.js';
 import { renderAssistantPreferences } from './pages/assistantPreferences.js';
 import { renderDrive } from './pages/drive.js';
 import { renderProgram } from './pages/program.js';
@@ -104,6 +105,21 @@ const routes = [
     tab: '/courses',
     render: renderAssistant,
     parent: () => '/courses',
+  },
+  { pattern: /^\/assistant\/planifier$/, title: 'Planifier ma semaine', tab: '/planning', render: renderPlanWeek, parent: () => '/planning' },
+  {
+    pattern: /^\/assistant\/planifier\/(?<date>\d{4}-\d{2}-\d{2})$/,
+    title: 'Planifier ma semaine',
+    tab: '/planning',
+    render: renderPlanWeek,
+    parent: (p) => `/planning/semaine/${p.date}`,
+  },
+  {
+    pattern: /^\/assistant\/apercu\/(?<date>\d{4}-\d{2}-\d{2})\/(?<proposalId>[^/]+)$/,
+    title: 'Votre semaine',
+    tab: '/planning',
+    render: renderWeekPreview,
+    parent: (p) => `/assistant/planifier/${p.date}`,
   },
   { pattern: /^\/assistant\/preferences$/, title: 'Préférences de l’assistant', tab: '/plus', render: renderAssistantPreferences, parent: () => '/plus' },
   { pattern: /^\/drive$/, title: 'Drive', tab: '/courses', render: renderDrive, parent: () => '/courses' },

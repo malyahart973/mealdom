@@ -89,6 +89,7 @@ export const QUICK_MINUTES = 30;
  * @property {RecipeStatus} status
  * @property {MealType[]} [mealTypes]      Repas ou la recette a sa place (defaut : dejeuner et diner)
  * @property {RecipeTag[]} [tags]
+ * @property {string} [family]            Famille de plat imposee (sinon deduite, voir families.js)
  */
 
 /** @type {Record<Vessel, string>} */

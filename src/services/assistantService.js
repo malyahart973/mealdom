@@ -9,7 +9,8 @@
  * - aucune commande Drive n'est passee ici.
  */
 import { parseRequest, mergeRequests, describeRequest, makeIngredientFinder } from '../domain/assistant/intent.js';
-import { proposeChanges, learnedWeights, preferredCuisines } from '../domain/assistant/engine.js';
+import { proposeChanges, suggestRecipes, learnedWeights, preferredCuisines } from '../domain/assistant/engine.js';
+import { guidedRequest, describeChoices, operationIndexFor } from '../domain/assistant/guided.js';
 import { applyOperations, parseOperations, planDiff, freeSlots } from '../domain/assistant/proposal.js';
 import { learnFromRequest, applyPreferences, describePreferences, upsertPreference } from '../domain/assistant/preferences.js';
 import { createConversation, isBigChange } from '../domain/assistant/conversation.js';
@@ -41,7 +42,7 @@ import { substitutesFor } from '../domain/assistant/substitutes.js';
 import { loadAvailability, autoSubstituter } from './territoryService.js';
 import { seasonNow } from './seasonService.js';
 import { callClaude, responseText, LlmError, DEFAULT_MODEL } from './llmService.js';
-import { recipes, recipesById, ingredientsById, preparationsById, cuisineLabels, nutritionContext, nutritionByRecipe as recipeNutritionMap } from './catalog.js';
+import { recipes, recipesById, ingredientsById, preparationsById, cuisineLabels, familyOf, nutritionContext, nutritionByRecipe as recipeNutritionMap } from './catalog.js';
 import { INGREDIENTS } from '../data/ingredients.js';
 import { CUISINES, REGIONS } from '../data/cuisines.js';
 import { formatIsoDay } from '../utils/format.js';
@@ -172,6 +173,7 @@ async function loadEnvironment(monday) {
       productsByIngredient: byIngredient,
       cuisineRegion,
       preferredCuisines: preferredCuisines(preferences, cuisineRegion),
+      familyOf,
     },
     /** @type {import('../domain/assistant/proposal.js').ApplyContext} */
     apply: { household, recipes: recipesById, ingredients: ingredientsById, preparations: preparationsById, productsByIngredient: byIngredient, newId: newMealId, autoSubstitutions: autoSubstituter(availability) },
@@ -413,6 +415,187 @@ export async function sendMessage(monday, text, opts = {}) {
   if (merged.understood && !merged.undo) conv.context = merged;
   await saveConversation(conv);
   return conv;
+}
+
+// ---------------------------------------------------------------------------
+// Parcours guide « Planifier ma semaine »
+// ---------------------------------------------------------------------------
+
+const regionLabels = new Map(REGIONS.map((r) => [r.id, r.label]));
+
+/**
+ * Valeurs de depart du parcours guide : derniers choix, sinon repas affiches,
+ * « leger » si un programme minceur est actif et preference de temps retenue.
+ * @returns {Promise<{ choices: import('../domain/assistant/guided.js').GuidedChoices, weeklyBudgetCents: number | null, programActive: boolean }>}
+ */
+export async function guidedDefaults() {
+  const [stored, budget, program, showBreakfast, showSnack, preferences] = await Promise.all([
+    getSetting('guidedChoices'),
+    getBudget(),
+    programSummary(),
+    getShowBreakfast(),
+    getShowSnack(),
+    getPreferences(),
+  ]);
+  const maxPref = preferences.find((p) => p.active && p.kind === 'max_minutes');
+  /** @type {import('../domain/assistant/guided.js').GuidedChoices} */
+  const fallback = {
+    slots: SLOTS.map((s) => s.id).filter((s) => (s !== 'breakfast' || showBreakfast) && (s !== 'snack' || showSnack)),
+    keepExisting: true,
+    budgetCents: null,
+    maxMinutes: maxPref ? Number(maxPref.value) : 45,
+    wishes: program ? ['light'] : [],
+    region: null,
+  };
+  const last = /** @type {Partial<import('../domain/assistant/guided.js').GuidedChoices> | null} */ (stored && typeof stored === 'object' ? stored : null);
+  return {
+    choices: last ? { ...fallback, ...last, budgetCents: null } : fallback,
+    weeklyBudgetCents: budget.weeklyCents,
+    programActive: program !== null,
+  };
+}
+
+/**
+ * Compose la semaine a partir des choix du parcours guide. La proposition
+ * rejoint la conversation de la semaine (historique et annulation communs).
+ * @param {string} monday
+ * @param {import('../domain/assistant/guided.js').GuidedChoices} choices
+ * @returns {Promise<{ proposalId: string | null, notes: string[] }>}
+ */
+export async function planWeek(monday, choices) {
+  const conv = await getConversation(monday);
+  const env = await loadEnvironment(monday);
+  await setSetting('guidedChoices', { ...choices, budgetCents: null });
+  const req = applyPreferences(guidedRequest(choices), env.preferences);
+  const result = proposeChanges(req, env.engine);
+  // « Garder les repas deja prevus » : on ne fait que remplir les cases vides.
+  const operations = choices.keepExisting ? result.operations.filter((o) => o.type !== 'replace_recipe') : result.operations;
+  const summary = describeChoices(choices, slotLabels, regionLabels);
+  conv.messages.push(message('user', summary, null, null));
+  const proposal = operations.length ? await createProposal(conv, operations, 'Planifier ma semaine', result.notes, 'engine', req, env) : null;
+  const pending = proposal?.status === 'pending' ? proposal : null;
+  const notes = pending ? result.notes : [...result.notes, 'Aucun repas à ajouter : la semaine est déjà remplie ou aucune recette ne correspond à vos choix.'];
+  conv.messages.push(message('assistant', pending ? `Voici une semaine de ${pending.operations.filter((o) => o.type === 'add_meal' || o.type === 'replace_recipe').length} repas. Changez ce qui ne vous plaît pas, puis validez.` : notes.join('\n'), 'engine', pending?.id ?? null));
+  conv.pendingEvents.push(`Le client a utilisé le parcours guidé : « ${summary} ».`);
+  await saveConversation(conv);
+  return { proposalId: pending?.id ?? null, notes };
+}
+
+/**
+ * @param {string} monday
+ * @param {string} proposalId
+ */
+async function pendingProposal(monday, proposalId) {
+  const conv = await getConversation(monday);
+  const proposal = /** @type {StoredProposal | undefined} */ (conv.proposals.find((p) => p.id === proposalId && p.status === 'pending'));
+  return { conv, proposal };
+}
+
+/**
+ * Apercu de la semaine telle que proposee : un jour par carte, repas par repas.
+ * @param {string} monday
+ * @param {string} proposalId
+ */
+export async function previewProposal(monday, proposalId) {
+  const conv = await getConversation(monday);
+  const proposal = /** @type {StoredProposal | undefined} */ (conv.proposals.find((p) => p.id === proposalId));
+  if (!proposal) return null;
+  const env = await loadEnvironment(monday);
+  const { review, state } = proposal.status === 'pending' ? await reviewOperations(proposal.operations, env) : { review: proposal.review, state: { meals: env.meals } };
+  const wanted = new Set(proposal.request?.slots?.length ? proposal.request.slots : env.activeSlots);
+  const changed = new Set((review?.diff.meals ?? []).map((d) => `${d.date}|${d.slot}`));
+  /** Raison de chaque plat propose, par creneau. */
+  /** @type {Map<string, string>} */
+  const reasons = new Map();
+  for (const o of proposal.operations) {
+    if (o.type === 'add_meal') reasons.set(`${o.date}|${o.slot}`, o.reason);
+    if (o.type === 'replace_recipe') {
+      const m = env.meals.find((x) => x.id === o.mealId);
+      if (m) reasons.set(`${m.date}|${m.slot}`, o.reason);
+    }
+  }
+  const nutrition = recipeNutritionMap();
+  const days = env.days
+    .filter((date) => date >= env.today)
+    .map((date) => ({
+      date,
+      meals: SLOTS.filter((s) => wanted.has(s.id) || state.meals.some((m) => m.date === date && m.slot === s.id)).map((s) => {
+        const meal = state.meals.find((m) => m.date === date && m.slot === s.id) ?? null;
+        const recipe = meal ? recipesById.get(meal.recipeId) : undefined;
+        const kcal = recipe ? nutrition.get(recipe.id)?.kcal : undefined;
+        return {
+          slot: s.id,
+          slotLabel: s.label,
+          mealId: meal?.id ?? null,
+          recipeId: recipe?.id ?? null,
+          recipeName: meal?.recipeName ?? null,
+          minutes: recipe ? totalMinutes(recipe) : null,
+          kcal: kcal === undefined ? null : Math.round(kcal),
+          changed: changed.has(`${date}|${s.id}`),
+          reason: reasons.get(`${date}|${s.id}`) ?? null,
+          locked: meal?.locked ?? false,
+        };
+      }),
+    }));
+  return { proposal, review, days, programActive: env.program !== null };
+}
+
+/**
+ * « Changer » : remplace le plat propose a un creneau par la meilleure autre idee.
+ * @param {string} monday
+ * @param {string} proposalId
+ * @param {string} date
+ * @param {Slot} slot
+ * @returns {Promise<{ ok: boolean, message: string }>}
+ */
+export async function swapProposalMeal(monday, proposalId, date, slot) {
+  const { conv, proposal } = await pendingProposal(monday, proposalId);
+  if (!proposal) return { ok: false, message: 'Cette proposition n’est plus valable.' };
+  const env = await loadEnvironment(monday);
+  const { state } = await reviewOperations(proposal.operations, env);
+  const key = `${date}|${slot}`;
+  const current = state.meals.find((m) => m.date === date && m.slot === slot);
+  const existing = env.meals.find((m) => m.date === date && m.slot === slot) ?? null;
+  if (existing?.locked) return { ok: false, message: 'Ce repas est verrouillé dans le planning.' };
+  const seen = proposal.seen?.[key] ?? [];
+  const exclude = new Set([...seen, ...(current ? [current.recipeId] : [])]);
+  const request = proposal.request ?? guidedRequest({ slots: [slot], keepExisting: true, budgetCents: null, maxMinutes: null, wishes: [], region: null });
+  const [pick] = suggestRecipes(request, { date, slot }, { ...env.engine, meals: state.meals }, exclude, 1);
+  if (!pick) return { ok: false, message: 'Je n’ai plus d’autre idée pour ce repas avec vos critères.' };
+  const reason = pick.reasons.length ? `${pick.reasons.join(', ')}.` : 'Autre idée demandée.';
+  const index = operationIndexFor(proposal.operations, { date, slot }, existing?.id ?? null);
+  /** @type {Operation} */
+  const operation = existing
+    ? { type: 'replace_recipe', mealId: existing.id, recipeId: pick.recipe.id, reason }
+    : { type: 'add_meal', date, slot, recipeId: pick.recipe.id, guests: index >= 0 && proposal.operations[index].type === 'add_meal' ? /** @type {{ guests: number }} */ (proposal.operations[index]).guests : 0, reason };
+  if (index >= 0) proposal.operations[index] = operation;
+  else proposal.operations.push(operation);
+  proposal.seen = { ...(proposal.seen ?? {}), [key]: [...exclude] };
+  proposal.review = (await reviewOperations(proposal.operations, env)).review;
+  await saveConversation(conv);
+  return { ok: true, message: `${pick.recipe.name} à la place.` };
+}
+
+/**
+ * « Retirer » : le creneau garde son repas d'origine (ou reste vide).
+ * @param {string} monday
+ * @param {string} proposalId
+ * @param {string} date
+ * @param {Slot} slot
+ * @returns {Promise<{ ok: boolean, message: string }>}
+ */
+export async function dropProposalMeal(monday, proposalId, date, slot) {
+  const { conv, proposal } = await pendingProposal(monday, proposalId);
+  if (!proposal) return { ok: false, message: 'Cette proposition n’est plus valable.' };
+  const env = await loadEnvironment(monday);
+  const existing = env.meals.find((m) => m.date === date && m.slot === slot) ?? null;
+  const index = operationIndexFor(proposal.operations, { date, slot }, existing?.id ?? null);
+  if (index < 0) return { ok: false, message: 'Ce repas ne fait pas partie de la proposition.' };
+  proposal.operations.splice(index, 1);
+  if (!proposal.operations.length) proposal.status = 'rejected';
+  else proposal.review = (await reviewOperations(proposal.operations, env)).review;
+  await saveConversation(conv);
+  return { ok: true, message: existing ? 'Le repas prévu est conservé.' : 'Ce repas reste libre.' };
 }
 
 // ---------------------------------------------------------------------------

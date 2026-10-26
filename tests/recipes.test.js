@@ -14,6 +14,10 @@ import { RECIPES } from '../src/data/recipes.js';
 import { PREPARATIONS } from '../src/data/preparations.js';
 import { INGREDIENTS } from '../src/data/ingredients.js';
 import { CUISINES } from '../src/data/cuisines.js';
+import { ALL_RECIPES } from '../src/data/allRecipes.js';
+import { FAMILIES, recipeFamily } from '../src/domain/recipes/families.js';
+
+const ingredientsMap = new Map(INGREDIENTS.map((i) => [i.id, i]));
 
 /** @typedef {import('../src/domain/recipes/recipes.js').Recipe} Recipe */
 
@@ -133,3 +137,18 @@ test('Recette non validée jamais proposée', () => {
   const draft = variant({ id: 'brouillon', status: 'draft' });
   assertEqual(filterRecipes([draft], {}, ctx).length, 0);
 });
+
+// --- Familles de plats : une seule par recette ---
+test('Chaque recette du catalogue a une et une seule famille connue', () => {
+  const known = new Set(FAMILIES.map((f) => f.id));
+  assertEqual(ALL_RECIPES.filter((r) => !known.has(recipeFamily(r, ingredientsMap))).map((r) => r.id), []);
+});
+test('Familles : exemples', () => {
+  const byName = (/** @type {string} */ name) => recipeFamily(/** @type {import('../src/domain/recipes/recipes.js').Recipe} */ (ALL_RECIPES.find((r) => r.name === name)), ingredientsMap);
+  assertEqual(
+    ['Quiche lorraine et salade', 'Pâtés créoles', 'Gratin dauphinois', 'Soupe à l’oignon gratinée', 'Burger maison et frites au four', 'Salade niçoise', 'Omelette aux fines herbes', 'Spaghetti bolognaise', 'Colombo de poulet', 'Bœuf bourguignon', 'Blaff de poisson', 'Ratatouille', 'Porridge pomme-cannelle', 'Cake marbré'].map(byName),
+    ['tarts', 'tarts', 'oven', 'soups', 'street', 'salads', 'eggs', 'starches', 'poultry', 'meat', 'fish', 'veggie', 'breakfast', 'sweets'],
+  );
+});
+test('Famille explicite d’une recette ajoutée : elle l’emporte', () =>
+  assertEqual(recipeFamily({ .../** @type {import('../src/domain/recipes/recipes.js').Recipe} */ (ALL_RECIPES[0]), family: 'tarts' }, ingredientsMap), 'tarts'));

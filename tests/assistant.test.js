@@ -1,5 +1,6 @@
 import { test, assertEqual } from './runner.js';
-import { proposeChanges, learnedWeights } from '../src/domain/assistant/engine.js';
+import { proposeChanges, suggestRecipes, learnedWeights } from '../src/domain/assistant/engine.js';
+import { guidedRequest, describeChoices, operationIndexFor } from '../src/domain/assistant/guided.js';
 import { applyOperations, planDiff, parseOperations } from '../src/domain/assistant/proposal.js';
 import { parseRequest, makeIngredientFinder, mergeRequests } from '../src/domain/assistant/intent.js';
 import { learnFromRequest, applyPreferences, LEARN_THRESHOLD } from '../src/domain/assistant/preferences.js';
@@ -240,4 +241,53 @@ test('Anti-gaspillage : une recette qui utilise un produit à consommer vite pas
   const plain = scoreRecipe(recipe, {}, env, base);
   const boosted = scoreRecipe(recipe, {}, env, { ...base, expiringIngredients: new Set(['ground_beef']) });
   assertEqual([boosted.score > plain.score, boosted.reasons.some((r) => r.includes('à consommer vite'))], [true, true]);
+});
+
+// --- Parcours guide « Planifier ma semaine » ---
+
+/** @type {import('../src/domain/assistant/guided.js').GuidedChoices} */
+const guided = { slots: ['lunch', 'dinner'], keepExisting: true, budgetCents: null, maxMinutes: 30, wishes: ['light', 'economy'], region: null };
+
+test('Parcours guidé : demande de génération, équilibre toujours recherché', () => {
+  const r = guidedRequest(guided);
+  assertEqual([r.generate, r.redo, r.modes.sort(), r.maxMinutes, r.slots, r.understood], [true, false, ['balance', 'economy', 'light'], 30, ['lunch', 'dinner'], true]);
+});
+test('Parcours guidé : « tout refaire » refait les repas non verrouillés', () => {
+  const r = proposeChanges(guidedRequest({ ...guided, keepExisting: false, maxMinutes: null, wishes: [] }), engineCtx(week()));
+  const replaced = r.operations.filter((o) => o.type === 'replace_recipe').map((o) => /** @type {{ mealId: string }} */ (o).mealId);
+  const locked = week().find((m) => m.locked);
+  assertEqual([replaced.length >= 4, r.operations.some((o) => o.type === 'add_meal')], [true, true]);
+  assertEqual(replaced.includes(/** @type {Meal} */ (locked).id), false);
+});
+test('Parcours guidé : chaque case vide reçoit un plat qui respecte le temps maximal', () => {
+  const r = proposeChanges(guidedRequest(guided), engineCtx([]));
+  const adds = /** @type {{ recipeId: string, slot: string }[]} */ (r.operations.filter((o) => o.type === 'add_meal'));
+  assertEqual(adds.length, 14);
+  assertEqual(adds.every((o) => totalMinutes(/** @type {import('../src/domain/recipes/recipes.js').Recipe} */ (recipesById.get(o.recipeId))) <= 30), true);
+  assertEqual(new Set(adds.map((o) => o.recipeId)).size, 14);
+});
+test('« Changer » : autres idées, jamais une recette déjà montrée ni déjà dans la semaine', () => {
+  const meals = [meal('2026-10-20', 'lunch', 'red_lentil_dal'), meal('2026-10-21', 'dinner', 'ratatouille')];
+  const exclude = new Set(['red_lentil_dal', 'chili_con_carne']);
+  const picks = suggestRecipes(guidedRequest(guided), { date: '2026-10-20', slot: 'lunch' }, engineCtx(meals), exclude, 5);
+  assertEqual(picks.length, 5);
+  assertEqual(picks.some((p) => exclude.has(p.recipe.id)), false);
+  assertEqual(picks.every((p) => recipeMealTypes(p.recipe).includes('lunch') && totalMinutes(p.recipe) <= 30), true);
+  assertEqual(picks[0].score >= picks[4].score, true);
+});
+test('Résumé des choix du parcours guidé', () =>
+  assertEqual(
+    describeChoices({ ...guided, region: 'caribbean', budgetCents: 8000 }, new Map([['lunch', 'Déjeuner'], ['dinner', 'Dîner']]), new Map([['caribbean', 'Antilles et Guyane']])),
+    'Planifier ma semaine : déjeuner, dîner ; en gardant les repas déjà prévus ; 30 min maximum ; léger, économique ; cuisine : Antilles et Guyane ; budget 80,00 €.',
+  ));
+test('Opération d’un créneau : ajout ou remplacement du repas existant', () => {
+  /** @type {import('../src/domain/assistant/proposal.js').Operation[]} */
+  const ops = [
+    { type: 'add_meal', date: '2026-10-20', slot: 'dinner', recipeId: 'x', guests: 0, reason: '' },
+    { type: 'replace_recipe', mealId: 'm9', recipeId: 'y', reason: '' },
+  ];
+  assertEqual(
+    [operationIndexFor(ops, { date: '2026-10-20', slot: 'dinner' }, null), operationIndexFor(ops, { date: '2026-10-21', slot: 'lunch' }, 'm9'), operationIndexFor(ops, { date: '2026-10-22', slot: 'lunch' }, null)],
+    [0, 1, -1],
+  );
 });
