@@ -40,6 +40,7 @@ export async function renderStore(el, params) {
   el.innerHTML = `
     <section>
       <h1 class="page-title">${escapeHtml(store.name)}</h1>
+      <p class="actions"><a class="button" href="#/prix/ajouter/magasin/${encodeURIComponent(store.id)}">Scanner ou ajouter un prix</a></p>
       <div class="alert" role="alert" hidden></div>
 
       <h2>Prix relevés</h2>

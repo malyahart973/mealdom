@@ -340,7 +340,7 @@ function why(reason) {
  */
 function costHtml(afterCents, missing, budgetCents) {
   if (afterCents === 0) {
-    return `<p class="notice-inline">Aucun prix enregistré pour ces courses : je ne peux pas les chiffrer. <a href="#/magasins">Ajouter des prix</a></p>`;
+    return `<p class="notice-inline">Aucun prix enregistré pour ces courses : je ne peux pas les chiffrer. <a href="#/prix/ajouter">Ajouter un prix ou scanner</a></p>`;
   }
   const over = budgetCents !== null && afterCents > budgetCents;
   return `<p class="${over ? 'notice-inline' : ''}">Courses estimées : <strong>${escapeHtml(formatCents(afterCents))}</strong>${

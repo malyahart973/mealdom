@@ -30,10 +30,11 @@ export async function renderPriceOverview(el) {
   el.innerHTML = `
     <section>
       <h1 class="page-title">Historique des prix</h1>
+      <p class="actions"><a class="button" href="#/prix/ajouter">Ajouter un prix ou scanner</a></p>
       <p class="hint">Chaque prix relevé (magasins, Drive, import) est conservé ici, ramené au kilo, au litre ou à la pièce pour comparer les formats. ${count} relevé(s) sur ${tracked.size} produit(s).</p>
       ${
         count === 0
-          ? '<p class="empty">Aucun prix relevé pour l’instant. Ajoutez des prix dans <a href="#/magasins">Magasins</a> ou dans le <a href="#/drive">Drive</a>.</p>'
+          ? '<p class="empty">Aucun prix relevé pour l’instant. <a href="#/prix/ajouter">Ajoutez un prix</a> (scan du code-barres ou saisie) ou importez ceux du <a href="#/drive">Drive</a>.</p>'
           : `<h2>Plus fortes hausses</h2>
             ${ups.length ? `<ul class="recipe-list">${ups.map(line).join('')}</ul>` : '<p class="empty">Aucune hausse relevée.</p>'}
             <h2>Plus fortes baisses</h2>
@@ -61,9 +62,10 @@ export async function renderPriceHistory(el, params) {
   el.innerHTML = `
     <section>
       <h1 class="page-title">${escapeHtml(nameOf(ingredientId))}</h1>
+      ${points.length ? `<p class="actions"><a class="button button--secondary" href="#/prix/ajouter/${encodeURIComponent(ingredientId)}">Relever un nouveau prix</a></p>` : ''}
       ${
         points.length === 0
-          ? `<p class="empty">Aucun prix relevé pour ce produit.</p><p><a class="button button--secondary" href="#/magasins">Relever un prix</a></p>`
+          ? `<p class="empty">Aucun prix relevé pour ce produit.</p><p><a class="button button--secondary" href="#/prix/ajouter/${encodeURIComponent(ingredientId)}">Relever un prix</a></p>`
           : `${per ? `<p class="hint">Prix ${escapeHtml(PER_LABELS[per])}, promotion du moment comprise.</p>` : ''}
             ${charted.some(([, s]) => s.length >= 2) ? '<div class="chart" data-chart></div>' : '<p class="hint">La courbe apparaît à partir de deux relevés dans un même magasin.</p>'}
             ${ordered.length > MAX_SERIES ? `<p class="hint">La courbe montre les ${MAX_SERIES} magasins les plus suivis ; tous les relevés sont dans le tableau.</p>` : ''}

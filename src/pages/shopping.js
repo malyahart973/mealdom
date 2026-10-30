@@ -133,7 +133,8 @@ export async function renderShopping(el, params) {
         mealCount > 0 || state.extras.length
           ? `<p class="share-row"><button type="button" class="button" data-action="share">
               <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
-              Partager la liste</button></p>
+              Partager la liste</button>
+              <a class="button button--secondary" href="#/prix/ajouter">Ajouter un prix ou scanner</a></p>
             <div class="alert alert--ok" role="status" data-alert="share" hidden></div>`
           : ''
       }
@@ -149,7 +150,7 @@ export async function renderShopping(el, params) {
                   ? ''
                   : estimate.complete
                     ? `Coût estimé : environ ${escapeHtml(formatCents(estimate.totalCents))}.`
-                    : `Coût estimé : au moins ${escapeHtml(formatCents(estimate.totalCents))} (prix inconnu pour ${estimate.missing.length} article${estimate.missing.length > 1 ? 's' : ''}). <a href="#/magasins">Ajouter des prix</a>`
+                    : `Coût estimé : au moins ${escapeHtml(formatCents(estimate.totalCents))} (prix inconnu pour ${estimate.missing.length} article${estimate.missing.length > 1 ? 's' : ''}). <a href="#/prix/ajouter">Ajouter un prix ou scanner</a>`
               }</p>
               <p><a class="button button--secondary" href="#/courses/organisation/semaine/${monday}">Organiser les courses (magasins, trajets, jour)</a></p>
               <p><a href="#/drive/semaine/${monday}">Préparer le panier Drive</a> · <a href="#/assistant/semaine/${monday}">Réduire le coût avec l’assistant</a> · <a href="#/budget">Enregistrer le montant payé</a></p></div>`

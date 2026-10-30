@@ -127,7 +127,7 @@ function reviewHtml(proposal, monday) {
       <h4>Courses de la semaine</h4>
       ${
         c.beforeCents === 0 && c.afterCents === 0
-          ? `<p>Aucun prix enregistré pour ces articles : le coût ne peut pas être calculé. <a href="#/magasins">Ajouter des prix</a></p>`
+          ? `<p>Aucun prix enregistré pour ces articles : le coût ne peut pas être calculé. <a href="#/prix/ajouter">Ajouter un prix ou scanner</a></p>`
           : `<dl class="budget-card proposal__cost">
         <div><dt>Avant</dt><dd>${escapeHtml(formatCents(c.beforeCents))}</dd></div>
         <div><dt>Après</dt><dd>${escapeHtml(formatCents(c.afterCents))}</dd></div>

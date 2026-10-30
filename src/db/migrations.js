@@ -54,9 +54,10 @@ export const migrations = [
   (db) => {
     db.createObjectStore('priceHistory', { keyPath: 'id' }).createIndex('ingredientId', 'ingredientId');
   },
-  // v9 (0.14.0) : recettes personnelles
+  // v9 (0.14.0) : recettes personnelles et codes-barres reconnus
   (db) => {
     db.createObjectStore('userRecipes', { keyPath: 'id' });
+    db.createObjectStore('barcodes', { keyPath: 'code' });
   },
 ];
 

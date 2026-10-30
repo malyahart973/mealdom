@@ -91,7 +91,7 @@ export async function renderBudget(el, params) {
           ? `<p>Budget de la semaine : ${escapeHtml(formatCents(thisWeek.budgetCents))}, déjà dépensé ${escapeHtml(formatCents(thisWeek.spentCents))}, reste ${escapeHtml(formatCents(/** @type {number} */ (thisWeek.remainingCents)))}.</p>`
           : ''
       }
-      <p><a href="#/magasins">Saisir des prix dans mes magasins</a></p>`
+      <p><a href="#/prix/ajouter">Ajouter un prix (scanner ou saisir)</a></p>`
           : ''
       }
 

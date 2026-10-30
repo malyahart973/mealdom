@@ -10,6 +10,7 @@ export function renderMore(el) {
         <li><a href="#/assistant">Assistant<span>Modifier le planning en le demandant simplement</span></a></li>
         <li><a href="#/programme">Programme minceur<span>Vos besoins, vos portions en grammes, des idées de repas</span></a></li>
         <li><a href="#/poids">Suivi du poids<span>Pesées, courbe et progression</span></a></li>
+        <li><a href="#/prix/ajouter">Ajouter un prix<span>Scanner un code-barres, photographier l’étiquette ou saisir</span></a></li>
         <li><a href="#/drive">Drive Hyper U Cayenne<span>Prix relevés, promotions, panier et commande</span></a></li>
         <li><a href="#/foyer">Mon foyer<span>Personnes, allergies, régimes, équipement</span></a></li>
         <li><a href="#/stock">Stock<span>Ce que vous avez déjà à la maison</span></a></li>
