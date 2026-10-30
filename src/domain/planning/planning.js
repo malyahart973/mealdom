@@ -7,11 +7,12 @@ import { mealPortions } from '../portions/portions.js';
 
 /** @typedef {import('../household/household.js').Household} Household */
 
-/** @typedef {'breakfast' | 'lunch' | 'snack' | 'dinner'} Slot */
+/** @typedef {'breakfast' | 'morning_snack' | 'lunch' | 'snack' | 'dinner'} Slot */
 
 /** @type {{ id: Slot, label: string }[]} */
 export const SLOTS = [
   { id: 'breakfast', label: 'Petit-déjeuner' },
+  { id: 'morning_snack', label: 'Collation du matin' },
   { id: 'lunch', label: 'Déjeuner' },
   { id: 'snack', label: 'Goûter' },
   { id: 'dinner', label: 'Dîner' },

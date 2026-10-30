@@ -32,7 +32,7 @@ Méthode :
 - Pour une demande précise, cherche les recettes avec search_recipes et propose des opérations ciblées.
 - Après la proposition, résume : ce qui change, pourquoi, le coût avant/après tel que calculé (et sa fiabilité), l'impact sur le budget et les quantités, les compromis éventuels. Termine en invitant à accepter, modifier ou annuler.`;
 
-const slotEnum = ['breakfast', 'lunch', 'snack', 'dinner'];
+const slotEnum = ['breakfast', 'morning_snack', 'lunch', 'snack', 'dinner'];
 
 /** Definitions des outils (format de l'API Messages). */
 export const TOOL_DEFINITIONS = [

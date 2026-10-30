@@ -335,7 +335,7 @@ export function validateTrip(trip) {
 }
 
 /** Heure habituelle de chaque repas, pour savoir s'il a lieu avant les courses. */
-const SLOT_TIMES = { breakfast: '08:00', lunch: '12:00', snack: '16:00', dinner: '19:00' };
+const SLOT_TIMES = { breakfast: '08:00', morning_snack: '10:00', lunch: '12:00', snack: '16:00', dinner: '19:00' };
 
 /**
  * Repas de la semaine prevus avant le retour des courses : leurs ingredients doivent deja etre a la maison.

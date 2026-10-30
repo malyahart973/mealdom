@@ -8,7 +8,7 @@
 import { addDays } from '../planning/dates.js';
 import { SLOTS, mealPortionsFor } from '../planning/planning.js';
 import { evaluateRecipeForHousehold } from '../household/compatibility.js';
-import { applySubstitutions, hasTag, recipeMealTypes } from '../recipes/recipes.js';
+import { applySubstitutions, hasTag, fitsSlot } from '../recipes/recipes.js';
 import { activePromotions } from '../drive/drive.js';
 import { isEligible, scoreRecipe, recipeCost, recipeContains, matchesTarget, tieBreak } from './scoring.js';
 import { substitutesFor } from './substitutes.js';
@@ -383,7 +383,7 @@ export function proposeChanges(req, ctx) {
       const order = new Map(SLOTS.map((s, i) => [s.id, i]));
       const before = ctx.meals
         .filter((m) => m.date < target.date || (m.date === target.date && (order.get(m.slot) ?? 0) < (order.get(target.slot) ?? 0)))
-        .filter((m) => m.slot !== 'snack' && m.slot !== 'breakfast')
+        .filter((m) => m.slot !== 'snack' && m.slot !== 'morning_snack' && m.slot !== 'breakfast')
         .sort((a, b) => b.date.localeCompare(a.date) || (order.get(b.slot) ?? 0) - (order.get(a.slot) ?? 0))[0];
       if (!before) notes.push('Aucun repas précédent dans le planning.');
       else if (before.slot === 'dinner' && target.slot === 'lunch' && addDays(before.date, 1) === target.date && !before.locked && !target.locked) {
@@ -467,7 +467,7 @@ export function proposeChanges(req, ctx) {
       const constraints = { ...base, excludeRecipeIds: new Set([current.id]), maxCostIndex: req.budgetCap || savingGoal !== null ? currentCost : null };
       const pick = bestRecipe(meal, constraints, weights, env, ctx);
       if (!pick) continue;
-      const currentEligible = isEligible(current, { ...base, slot: meal.slot }, ctx.scoring) && recipeMealTypes(current).includes(meal.slot);
+      const currentEligible = isEligible(current, { ...base, slot: meal.slot }, ctx.scoring) && fitsSlot(current, meal.slot);
       const currentScore = currentEligible
         ? scoreRecipe(current, weights, { slot: meal.slot, medianCostIndex, maxMinutes: req.maxMinutes, weekCuisines: env.cuisines, weekRecipeIds: [], weekIngredients: env.ingredients }, ctx.scoring).score
         : -100;

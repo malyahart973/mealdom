@@ -2686,3 +2686,134 @@ line.series-3 {
   font-weight: 700;
   cursor: pointer;
 }
+
+/* ---------- Programme minceur : methode, rythme, sport, trame ---------- */
+
+.check--block {
+  align-items: flex-start;
+  padding: var(--space-2) 0;
+}
+
+.check--block input {
+  margin-top: 0.2rem;
+}
+
+.check--block > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.check--block .hint {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.pace-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.pace-table th {
+  padding: var(--space-1) var(--space-1);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.pace-table td {
+  padding: var(--space-1);
+  border-top: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.pace-table .check {
+  min-height: 2.5rem;
+  gap: var(--space-2);
+}
+
+.pace-table__off {
+  color: var(--muted);
+}
+
+.sport-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sport-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 2.75rem;
+  gap: var(--space-2);
+  align-items: center;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.sport-row select,
+.sport-row input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.sport-row [data-sp="kind"] {
+  grid-column: 2 / 4;
+}
+
+.sport-row__min {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.trame {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.trame__meal {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+}
+
+.trame__meal ul {
+  margin: var(--space-1) 0 0;
+  padding-left: 1.25rem;
+}
+
+.plate-icon {
+  flex: none;
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  background: conic-gradient(var(--fleuve) 0 50%, var(--maracuja) 50% 75%, var(--leaf) 75% 100%);
+  box-shadow: inset 0 0 0 6px var(--surface);
+  border: 2px solid var(--line);
+}
+
+.program-form textarea {
+  width: 100%;
+  min-height: 4.5rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}

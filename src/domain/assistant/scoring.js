@@ -5,7 +5,7 @@
  */
 import { getUnit, convertUniversal } from '../units/units.js';
 import { convertUnit } from '../ingredients/conversion.js';
-import { allIngredientIds, totalMinutes, recipeMealTypes, hasTag } from '../recipes/recipes.js';
+import { allIngredientIds, totalMinutes, hasTag, fitsSlot } from '../recipes/recipes.js';
 import { evaluateRecipeForHousehold } from '../household/compatibility.js';
 import { gramsOf } from '../nutrition/nutrition.js';
 import { programFitScore } from '../nutrition/program.js';
@@ -189,7 +189,7 @@ export function vegetableShare(recipe, ctx) {
 }
 
 /** Calories visees par portion en mode « léger » quand aucun programme n'est actif. */
-const LIGHT_KCAL = { breakfast: 350, lunch: 500, snack: 150, dinner: 450 };
+const LIGHT_KCAL = { breakfast: 350, morning_snack: 150, lunch: 500, snack: 150, dinner: 450 };
 
 /**
  * La recette respecte-t-elle les criteres stricts ?
@@ -200,7 +200,7 @@ const LIGHT_KCAL = { breakfast: 350, lunch: 500, snack: 150, dinner: 450 };
  */
 export function isEligible(recipe, c, ctx) {
   if (recipe.status !== 'validated' || c.excludeRecipeIds.has(recipe.id)) return false;
-  if (c.slot && !recipeMealTypes(recipe).includes(c.slot)) return false;
+  if (c.slot && !fitsSlot(recipe, c.slot)) return false;
   if (c.maxMinutes !== null && totalMinutes(recipe) > c.maxMinutes) return false;
   if (c.cuisine && recipe.cuisine !== c.cuisine) return false;
   if (c.cuisines && !c.cuisines.has(recipe.cuisine)) return false;
@@ -289,18 +289,24 @@ export function scoreRecipe(recipe, weights, env, ctx) {
   }
   if (w('light')) {
     const n = ctx.nutritionByRecipe.get(recipe.id);
-    const target = env.slot ? ctx.programTargets?.[/** @type {'breakfast' | 'lunch' | 'snack' | 'dinner'} */ (env.slot)] : undefined;
+    const target = env.slot ? ctx.programTargets?.[env.slot] : undefined;
     if (n && target) {
       const fit = programFitScore(n, target);
       score += 10 * w('light') * Math.max(0, fit) / 80;
       if (fit > 40) reasons.push('adaptée à votre programme (portions et protéines)');
     } else if (n) {
       // Sans programme : une portion raisonnable pour le repas, ni trop riche ni trop maigre.
-      const aim = LIGHT_KCAL[/** @type {'breakfast' | 'lunch' | 'snack' | 'dinner'} */ (env.slot ?? 'lunch')];
+      const aim = LIGHT_KCAL[/** @type {Slot} */ (env.slot ?? 'lunch')];
       score += 10 * w('light') * Math.max(0, 1 - Math.abs(n.kcal - aim) / aim);
       if (Math.abs(n.kcal - aim) <= aim * 0.25) reasons.push(`environ ${Math.round(n.kcal)} kcal la portion`);
     }
     if (hasTag(recipe, 'light')) score += 3 * w('light');
+  }
+  if (w('protein')) {
+    const n = ctx.nutritionByRecipe.get(recipe.id);
+    const share = n && n.kcal > 0 ? (n.protein * 4) / n.kcal : 0;
+    score += 10 * w('protein') * Math.min(share, 0.35) / 0.35;
+    if (share >= 0.25) reasons.push('riche en protéines');
   }
   if (w('few_dishes') && recipe.vessel) {
     score += 8 * w('few_dishes');

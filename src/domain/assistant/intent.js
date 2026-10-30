@@ -11,7 +11,7 @@ import { addDays } from '../planning/dates.js';
 
 /**
  * Objectifs d'optimisation combinables.
- * @typedef {'promotions' | 'gourmand' | 'economy' | 'balance' | 'vegetables' | 'quick' | 'antiwaste' | 'light' | 'few_dishes' | 'quality' | 'seasonal'} Mode
+ * @typedef {'promotions' | 'gourmand' | 'economy' | 'balance' | 'vegetables' | 'quick' | 'antiwaste' | 'light' | 'few_dishes' | 'quality' | 'seasonal' | 'protein'} Mode
  */
 
 /** @type {{ id: Mode, label: string }[]} */
@@ -27,6 +27,7 @@ export const MODES = [
   { id: 'few_dishes', label: 'Peu de vaisselle' },
   { id: 'quality', label: 'Meilleure qualité' },
   { id: 'seasonal', label: 'Produits de saison et péyi' },
+  { id: 'protein', label: 'Riche en protéines' },
 ];
 
 /**
@@ -169,7 +170,8 @@ function datesAndSlots(text, ctx) {
   if (/\bce soir\b|\bsoir\b|\bdiner\b|\bdiners\b/.test(text)) slots.add('dinner');
   if (/\bce midi\b|\bmidi\b|\bdejeuner\b|\bdejeuners\b/.test(text)) slots.add('lunch');
   if (/petit[- ]?dej|\bmatin\b/.test(text)) slots.add('breakfast');
-  if (/\bgouter\b|\bgouters\b|\b4 heures\b|\bquatre heures\b|\ben-cas\b/.test(text)) slots.add('snack');
+  if (/\bcollation du matin\b|\ben-cas du matin\b|\b10 heures\b|\bdix heures\b/.test(text)) slots.add('morning_snack');
+  else if (/\bgouter\b|\bgouters\b|\b4 heures\b|\bquatre heures\b|\ben-cas\b|\bcollation\b/.test(text)) slots.add('snack');
   return { days: [...days].sort(), slots: [...slots] };
 }
 
@@ -195,6 +197,7 @@ export function parseRequest(rawText, ctx) {
   if (has(text, /vaisselle|une seule (casserole|poele|cocotte)|one pot/)) modes.add('few_dishes');
   if (has(text, /meilleure qualite|qualite|\bbio\b|label rouge/)) modes.add('quality');
   if (has(text, /de saison|produits? locaux|produits? du pays|produits? pei|\bpeyi\b|\blocal\b/)) modes.add('seasonal');
+  if (has(text, /proteine/)) modes.add('protein');
 
   const percent = /(\d+(?:[.,]\d+)?)\s*(?:%|pour ?cent)/.exec(text);
   let budgetPercent = null;

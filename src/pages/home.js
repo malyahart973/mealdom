@@ -6,7 +6,7 @@ import { getMeals } from '../services/planningService.js';
 import { SLOTS, plannedEntries, slotKey, mealPortionsFor } from '../domain/planning/planning.js';
 import { toIsoDate } from '../domain/planning/dates.js';
 import { programSummary } from '../services/programService.js';
-import { plannedKcalForDay } from '../domain/nutrition/program.js';
+import { plannedKcalForDay, hourText } from '../domain/nutrition/program.js';
 import { calorieRingSvg } from './calorieRing.js';
 import { totalMinutes } from '../domain/recipes/recipes.js';
 import { nextTrip } from '../services/tripService.js';
@@ -30,14 +30,14 @@ export async function renderHome(el) {
   const todayMeals = SLOTS.map((s) => ({ slot: s, entry: entries.get(slotKey(todayIso, s.id)) })).filter((x) => x.entry);
   // Le repas mis en avant : le prochain de la journee selon l'heure, sinon le dernier.
   const hour = new Date().getHours();
-  const currentSlot = hour < 10 ? 0 : hour < 14 ? 1 : hour < 17 ? 2 : 3;
+  const currentSlot = hour < 9 ? 0 : hour < 11 ? 1 : hour < 14 ? 2 : hour < 17 ? 3 : 4;
   const featured = todayMeals.find((x) => SLOTS.findIndex((s) => s.id === x.slot.id) >= currentSlot) ?? todayMeals[todayMeals.length - 1];
   const featuredRecipe = featured?.entry ? recipesById.get(featured.entry.meal.recipeId) : undefined;
   /** @type {Record<string, string>} */
-  const momentLabels = { breakfast: 'Ce matin', lunch: 'À midi', snack: 'Au goûter', dinner: 'Ce soir' };
+  const momentLabels = { breakfast: 'Ce matin', morning_snack: 'À 10 heures', lunch: 'À midi', snack: 'Au goûter', dinner: 'Ce soir' };
   const others = todayMeals.filter((x) => x !== featured);
   const kcalToday = program
-    ? plannedKcalForDay(entries, todayIso, program.program, program.meals, (id) => nutritionByRecipe().get(id))
+    ? plannedKcalForDay(entries, todayIso, program.program, program.todayMeals, (id) => nutritionByRecipe().get(id))
     : null;
   /** @param {{ slot: { id: string, label: string }, entry: ReturnType<typeof entries.get> }} x */
   const detailOf = (x) => {
@@ -81,9 +81,17 @@ export async function renderHome(el) {
       program && kcalToday
         ? `<section class="duo" aria-label="Programme minceur">
             <a class="card ring-card" href="#/programme">
-              ${calorieRingSvg(kcalToday.kcal, program.targets.kcal)}
-              <span class="ring-card__text"><strong>Prévues aujourd’hui</strong>
-                <span class="hint">${kcalToday.meals ? `${kcalToday.meals} repas, avec vos portions` : 'Aucun repas planifié'}</span></span>
+              ${
+                program.program.method === 'count'
+                  ? `${calorieRingSvg(kcalToday.kcal, program.today.kcal)}
+                    <span class="ring-card__text"><strong>Prévues aujourd’hui</strong>
+                      <span class="hint">${kcalToday.meals ? `${kcalToday.meals} repas, avec vos portions` : 'Aucun repas planifié'}</span>`
+                  : `<span class="plate-icon" aria-hidden="true"></span>
+                    <span class="ring-card__text"><strong>Assiette équilibrée</strong>
+                      <span class="hint">½ légumes, ¼ protéines, ¼ féculents</span>`
+              }
+                ${program.window ? `<span class="hint">Repas : ${hourText(program.window.start)} – ${hourText(program.window.end)}</span>` : ''}
+                ${program.today.sessions.length ? `<span class="hint">Jour de sport</span>` : ''}</span>
             </a>
             <a class="card weight-card" href="#/poids">
               <span class="hint">Poids</span>

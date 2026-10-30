@@ -1,4 +1,6 @@
 import { objectStore } from './storeHelpers.js';
+import { normalizeProgram } from '../../domain/nutrition/program.js';
+import { toIsoDate } from '../../domain/planning/dates.js';
 
 /** @typedef {import('../../domain/nutrition/program.js').Program} Program */
 /** @typedef {import('../../domain/nutrition/weight.js').WeightEntry} WeightEntry */
@@ -6,9 +8,13 @@ import { objectStore } from './storeHelpers.js';
 export const programStore = objectStore('program');
 export const weightStore = objectStore('weights');
 
-/** @returns {Promise<Program | null>} */
+/**
+ * Programme enregistre, complete des champs ajoutes depuis (collation du matin, methode, sport...).
+ * @returns {Promise<Program | null>}
+ */
 export async function getProgramRecord() {
-  return (await programStore.get('main')) ?? null;
+  const stored = await programStore.get('main');
+  return stored ? normalizeProgram(stored, toIsoDate(new Date())) : null;
 }
 
 /** @returns {Promise<WeightEntry[]>} */

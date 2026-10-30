@@ -160,8 +160,8 @@ export async function renderRecipe(el, params) {
   const nutrition = recipeNutrition(recipe, nutritionContext);
   const perPortion = roundNutrients(nutrition.perPortion);
   const types = recipeMealTypes(recipe);
-  /** @type {{ slot: 'breakfast' | 'lunch' | 'snack' | 'dinner', label: string, kcal: number, portion: ReturnType<typeof personalPortion> }[]} */
-  const personal = program
+  /** @type {{ slot: import('../domain/recipes/recipes.js').MealType, label: string, kcal: number, portion: ReturnType<typeof personalPortion> }[]} */
+  const personal = program && program.program.method === 'count'
     ? MEAL_TYPES.filter((t) => types.includes(t.id) && program.program.mealSplit[t.id] > 0).map((t) => ({
         slot: t.id,
         label: t.label,

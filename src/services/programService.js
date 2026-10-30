@@ -1,8 +1,8 @@
 /**
  * Programme minceur et suivi du poids : relie les ecrans, les regles et la base.
  */
-import { createDefaultProgram, validateProgram, dailyTargets, mealTargets, goalDate, programFitScore, personalPortion } from '../domain/nutrition/program.js';
-import { recipeMealTypes } from '../domain/recipes/recipes.js';
+import { createDefaultProgram, validateProgram, dailyTargets, dayTargets, mealTargets, goalDate, programFitScore, personalPortion, programTrame, eatingWindow } from '../domain/nutrition/program.js';
+import { fitsSlot } from '../domain/recipes/recipes.js';
 import { evaluateRecipeForHousehold } from '../domain/household/compatibility.js';
 import { recipes, filterContext, nutritionByRecipe } from './catalog.js';
 import { getHousehold } from './householdService.js';
@@ -58,22 +58,31 @@ export function deleteWeight(date) {
 }
 
 /**
- * Programme actif avec ses objectifs du jour, ou null.
- * @returns {Promise<{ program: Program, targets: ReturnType<typeof dailyTargets>, meals: ReturnType<typeof mealTargets>, progress: ReturnType<typeof weightProgress>, goalDate: string | null, entries: WeightEntry[] } | null>}
+ * Programme actif avec ses objectifs, ou null.
+ * - targets / meals : journee type (sans sport), utilisee pour choisir les recettes ;
+ * - today / todayMeals : aujourd'hui, seances de sport comprises ;
+ * - trame : reperes ou trame personnelle de chaque repas ; window : fenetre du jeune.
+ * @returns {Promise<{ program: Program, targets: ReturnType<typeof dailyTargets>, meals: ReturnType<typeof mealTargets>, today: ReturnType<typeof dayTargets>, todayMeals: ReturnType<typeof mealTargets>, trame: ReturnType<typeof programTrame>, window: { start: number, end: number } | null, progress: ReturnType<typeof weightProgress>, goalDate: string | null, entries: WeightEntry[] } | null>}
  */
 export async function programSummary() {
   const [program, entries] = await Promise.all([getProgramRecord(), getWeights()]);
   if (!program || !program.active) return null;
-  const today = toIsoDate(new Date());
+  const todayIso = toIsoDate(new Date());
   const sorted = sortEntries(entries);
   const current = sorted.length ? sorted[sorted.length - 1].kg : program.startWeightKg;
-  const targets = dailyTargets(program, current, today);
+  const targets = dailyTargets(program, current, todayIso);
+  const meals = mealTargets(targets, program.mealSplit);
+  const today = dayTargets(program, targets, current, todayIso);
   return {
     program,
     targets,
-    meals: mealTargets(targets, program.mealSplit),
-    progress: weightProgress(program, entries, today),
-    goalDate: goalDate(targets, today),
+    meals,
+    today,
+    todayMeals: mealTargets(today, program.mealSplit),
+    trame: programTrame(program, meals),
+    window: program.fasting ? eatingWindow(program.fasting) : null,
+    progress: weightProgress(program, entries, todayIso),
+    goalDate: goalDate(targets, todayIso),
     entries: sorted,
   };
 }
@@ -103,7 +112,7 @@ export async function programSuggestions(slot, target, memberId, limit, offset) 
   const person = { ...household, members };
   const values = nutritionByRecipe();
   return recipes
-    .filter((r) => recipeMealTypes(r).includes(slot))
+    .filter((r) => fitsSlot(r, slot))
     .filter((r) => evaluateRecipeForHousehold(r, person, filterContext).status === 'compatible')
     .map((r) => {
       const n = values.get(r.id) ?? { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };

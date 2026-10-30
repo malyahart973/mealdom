@@ -6,7 +6,7 @@ import { toIsoDate, weekStart, addDays, parseIsoDate } from '../domain/planning/
 import { WISHES, TIME_CHOICES } from '../domain/assistant/guided.js';
 import { REGIONS } from '../data/cuisines.js';
 import { getHousehold } from '../services/householdService.js';
-import { setShowBreakfast, setShowSnack } from '../services/planningService.js';
+import { setShowBreakfast, setShowSnack, setShowMorningSnack } from '../services/planningService.js';
 import {
   guidedDefaults,
   planWeek,
@@ -282,6 +282,7 @@ export async function renderWeekPreview(el, params) {
         const slots = proposal.request?.slots ?? [];
         if (slots.includes('breakfast')) await setShowBreakfast(true);
         if (slots.includes('snack')) await setShowSnack(true);
+        if (slots.includes('morning_snack')) await setShowMorningSnack(true);
       }
       await rerender();
       if (!result.ok) /** @type {HTMLElement} */ (el.querySelector('.status')).textContent = result.message;

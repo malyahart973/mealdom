@@ -136,6 +136,17 @@ export function recipeMealTypes(recipe) {
 }
 
 /**
+ * La recette a-t-elle sa place a ce creneau du planning ?
+ * La collation du matin reprend les recettes de gouter.
+ * @param {Recipe} recipe
+ * @param {string} slot
+ * @returns {boolean}
+ */
+export function fitsSlot(recipe, slot) {
+  return recipeMealTypes(recipe).includes(/** @type {MealType} */ (slot === 'morning_snack' ? 'snack' : slot));
+}
+
+/**
  * @param {Recipe} recipe
  * @param {RecipeTag} tag
  * @returns {boolean}

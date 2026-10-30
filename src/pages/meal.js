@@ -3,7 +3,7 @@ import { formatIsoDay, formatMinutes, formatPortions, formatNumber } from '../ut
 import { addDays, parseIsoDate } from '../domain/planning/dates.js';
 import { SLOTS, mealPortionsFor } from '../domain/planning/planning.js';
 import { filterRecipes } from '../domain/recipes/recipeFiltering.js';
-import { totalMinutes, recipeMealTypes } from '../domain/recipes/recipes.js';
+import { totalMinutes, fitsSlot } from '../domain/recipes/recipes.js';
 import { personalPortion } from '../domain/nutrition/program.js';
 import { recipes, recipesById, filterContext, ingredientsById, preparationsById, nutritionByRecipe } from '../services/catalog.js';
 import { programSummary } from '../services/programService.js';
@@ -223,7 +223,7 @@ export async function renderMeal(el, params) {
   const renderRecipeChoices = () => {
     const current = selectedRecipeId;
     const slot = /** @type {Slot} */ (field('slot')?.value ?? meal.slot);
-    const matching = filterRecipes(recipes, { query, household }, filterContext).filter((r) => recipeMealTypes(r).includes(slot));
+    const matching = filterRecipes(recipes, { query, household }, filterContext).filter((r) => fitsSlot(r, slot));
     let options = matching.slice(0, MAX_CHOICES);
     const currentRecipe = recipesById.get(current);
     if (currentRecipe && !options.includes(currentRecipe)) options = [currentRecipe, ...options];
@@ -244,7 +244,7 @@ export async function renderMeal(el, params) {
     const target = program ? program.meals[draft.slot] : null;
     const values = draft.recipeId ? nutritionByRecipe().get(draft.recipeId) : undefined;
     const followed = program && (program.program.memberId === null || draft.attendees.includes(program.program.memberId));
-    if (target && values && followed && program && program.program.mealSplit[draft.slot] > 0) {
+    if (target && values && followed && program && program.program.method === 'count' && program.program.mealSplit[draft.slot] > 0) {
       const portion = personalPortion(values, target.kcal);
       personalOut.textContent = `Programme minceur : votre portion est de ${formatNumber(portion.portions)} portion (environ ${portion.kcal} kcal pour un objectif de ${target.kcal} kcal). Les grammes sont sur la fiche recette.`;
     } else personalOut.textContent = '';

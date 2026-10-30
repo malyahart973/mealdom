@@ -11,6 +11,7 @@ import { recipesById } from './catalog.js';
 
 const BREAKFAST_KEY = 'planningShowBreakfast';
 const SNACK_KEY = 'planningShowSnack';
+const MORNING_SNACK_KEY = 'planningShowMorningSnack';
 
 /** @returns {Promise<Meal[]>} */
 export function getMeals() {
@@ -76,4 +77,17 @@ export async function getShowSnack() {
  */
 export async function setShowSnack(value) {
   await setSetting(SNACK_KEY, value);
+}
+
+/** @returns {Promise<boolean>} */
+export async function getShowMorningSnack() {
+  return (await getSetting(MORNING_SNACK_KEY)) === true;
+}
+
+/**
+ * @param {boolean} value
+ * @returns {Promise<void>}
+ */
+export async function setShowMorningSnack(value) {
+  await setSetting(MORNING_SNACK_KEY, value);
 }

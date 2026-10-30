@@ -8,7 +8,7 @@ import { recipeContains, scoreRecipe } from '../src/domain/assistant/scoring.js'
 import { buildNutritionIndex, recipeNutrition } from '../src/domain/nutrition/nutrition.js';
 import { createDefaultHousehold, upsertMember } from '../src/domain/household/household.js';
 import { evaluateRecipeForHousehold } from '../src/domain/household/compatibility.js';
-import { totalMinutes, recipeMealTypes, hasTag } from '../src/domain/recipes/recipes.js';
+import { totalMinutes, recipeMealTypes, hasTag, fitsSlot } from '../src/domain/recipes/recipes.js';
 import { buildNameIndex } from '../src/domain/ingredients/ingredients.js';
 import { DEFAULT_PORTION_RULES } from '../src/data/portionRules.js';
 import { ALL_RECIPES } from '../src/data/allRecipes.js';
@@ -152,7 +152,7 @@ test('Générer la semaine : cases vides remplies, recettes adaptées au crénea
   if (added.length !== 14) throw new Error(String(added.length));
   const ids = added.map((o) => (o.type === 'add_meal' ? o.recipeId : ''));
   if (new Set(ids).size !== ids.length) throw new Error('doublon');
-  for (const o of added) if (o.type === 'add_meal' && !recipeMealTypes(/** @type {any} */ (recipesById.get(o.recipeId))).includes(o.slot)) throw new Error(o.recipeId);
+  for (const o of added) if (o.type === 'add_meal' && !fitsSlot(/** @type {any} */ (recipesById.get(o.recipeId)), o.slot)) throw new Error(o.recipeId);
   const asian = new Set(CUISINES.filter((c) => c.region === 'asia').map((c) => c.id));
   if (!ids.every((id) => asian.has(/** @type {any} */ (recipesById.get(id)).cuisine))) throw new Error('pas asiatique');
 });

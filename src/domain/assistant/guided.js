@@ -14,6 +14,7 @@ import { emptyRequest } from './intent.js';
  */
 export const WISHES = [
   { id: 'light', label: 'Léger', modes: ['light'] },
+  { id: 'protein', label: 'Riche en protéines', modes: ['protein'] },
   { id: 'economy', label: 'Économique', modes: ['economy'] },
   { id: 'gourmand', label: 'Gourmand', modes: ['gourmand'] },
   { id: 'vegetables', label: 'Plus de légumes', modes: ['vegetables'] },

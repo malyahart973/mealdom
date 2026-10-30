@@ -20,9 +20,9 @@ import { fitToBudget, rankThrifty } from '../domain/assistant/budgetFit.js';
 import { compareQuotes } from '../domain/drive/quote.js';
 import { isFresh, activePromotions, promotionStatus } from '../domain/drive/drive.js';
 import { roundNutrients } from '../domain/nutrition/nutrition.js';
-import { programFitScore } from '../domain/nutrition/program.js';
+import { programFitScore, programMeals } from '../domain/nutrition/program.js';
 import { evaluateRecipeForHousehold } from '../domain/household/compatibility.js';
-import { allIngredientIds, totalMinutes, recipeMealTypes, hasTag } from '../domain/recipes/recipes.js';
+import { allIngredientIds, totalMinutes, recipeMealTypes, hasTag, fitsSlot } from '../domain/recipes/recipes.js';
 import { buildNameIndex, normalizeText } from '../domain/ingredients/ingredients.js';
 import { SLOTS, mealPortionsFor } from '../domain/planning/planning.js';
 import { expiryStatus, itemsToUseFirst } from '../domain/shopping/shopping.js';
@@ -32,7 +32,7 @@ import { conversationStore, historyStore, preferenceStore, getHistory, getPrefer
 import { putMeal, deleteMealRecord } from '../db/repositories/mealRepository.js';
 import { getInventory } from '../db/repositories/shoppingRepository.js';
 import { getSetting, setSetting } from '../db/repositories/settingsRepository.js';
-import { getMeals, getShowBreakfast, getShowSnack, newMealId } from './planningService.js';
+import { getMeals, getShowBreakfast, getShowSnack, getShowMorningSnack, newMealId } from './planningService.js';
 import { getHousehold } from './householdService.js';
 import { getBudget, saveBudget } from './budgetService.js';
 import { loadPriceData, quoteForMeals, weekQuoter, productsByIngredient, unitPrices, saveDriveSettings } from './driveService.js';
@@ -109,7 +109,7 @@ async function loadEnvironment(monday) {
   const now = new Date();
   const today = toIsoDate(now);
   const days = weekDays(monday);
-  const [meals, household, budget, inventory, priceData, preferences, program, showBreakfast, showSnack, availability, season] = await Promise.all([
+  const [meals, household, budget, inventory, priceData, preferences, program, showBreakfast, showSnack, availability, season, showMorningSnack] = await Promise.all([
     getMeals(),
     getHousehold(),
     getBudget(),
@@ -121,6 +121,7 @@ async function loadEnvironment(monday) {
     getShowSnack(),
     loadAvailability(),
     seasonNow(now),
+    getShowMorningSnack(),
   ]);
   const byIngredient = productsByIngredient(priceData.products);
   const promoIngredients = new Set(
@@ -144,7 +145,7 @@ async function loadEnvironment(monday) {
     seasonalIngredients: season.favoured,
   };
   /** @type {Slot[]} */
-  const activeSlots = SLOTS.map((s) => s.id).filter((s) => (s !== 'breakfast' || showBreakfast) && (s !== 'snack' || showSnack));
+  const activeSlots = SLOTS.map((s) => s.id).filter((s) => (s !== 'breakfast' || showBreakfast) && (s !== 'morning_snack' || showMorningSnack) && (s !== 'snack' || showSnack));
   return {
     now,
     today,
@@ -424,32 +425,44 @@ export async function sendMessage(monday, text, opts = {}) {
 const regionLabels = new Map(REGIONS.map((r) => [r.id, r.label]));
 
 /**
+ * Envies du parcours guide qui decoulent du programme minceur.
+ * @param {import('../domain/nutrition/program.js').Program} p
+ * @returns {string[]}
+ */
+function programWishes(p) {
+  return [p.method === 'balance' ? 'vegetables' : 'light', ...(p.highProtein ? ['protein'] : [])];
+}
+
+/**
  * Valeurs de depart du parcours guide : derniers choix, sinon repas affiches,
  * « leger » si un programme minceur est actif et preference de temps retenue.
  * @returns {Promise<{ choices: import('../domain/assistant/guided.js').GuidedChoices, weeklyBudgetCents: number | null, programActive: boolean }>}
  */
 export async function guidedDefaults() {
-  const [stored, budget, program, showBreakfast, showSnack, preferences] = await Promise.all([
+  const [stored, budget, program, showBreakfast, showSnack, preferences, showMorningSnack] = await Promise.all([
     getSetting('guidedChoices'),
     getBudget(),
     programSummary(),
     getShowBreakfast(),
     getShowSnack(),
     getPreferences(),
+    getShowMorningSnack(),
   ]);
   const maxPref = preferences.find((p) => p.active && p.kind === 'max_minutes');
   /** @type {import('../domain/assistant/guided.js').GuidedChoices} */
   const fallback = {
-    slots: SLOTS.map((s) => s.id).filter((s) => (s !== 'breakfast' || showBreakfast) && (s !== 'snack' || showSnack)),
+    slots: SLOTS.map((s) => s.id).filter((s) => (s !== 'breakfast' || showBreakfast) && (s !== 'morning_snack' || showMorningSnack) && (s !== 'snack' || showSnack)),
     keepExisting: true,
     budgetCents: null,
     maxMinutes: maxPref ? Number(maxPref.value) : 45,
-    wishes: program ? ['light'] : [],
+    wishes: program ? programWishes(program.program) : [],
     region: null,
   };
   const last = /** @type {Partial<import('../domain/assistant/guided.js').GuidedChoices> | null} */ (stored && typeof stored === 'object' ? stored : null);
+  // Programme actif : ses repas (jeune intermittent compris) et sa methode priment.
+  const fromProgram = program ? { slots: programMeals(program.program), wishes: [...new Set([...(last?.wishes ?? []), ...programWishes(program.program)])] } : {};
   return {
-    choices: last ? { ...fallback, ...last, budgetCents: null } : fallback,
+    choices: { ...fallback, ...(last ?? {}), ...fromProgram, budgetCents: null },
     weeklyBudgetCents: budget.weeklyCents,
     programActive: program !== null,
   };
@@ -869,10 +882,10 @@ function searchRecipes(args, env) {
   const include = typeof args.includeIngredient === 'string' ? args.includeIngredient : null;
   const exclude = Array.isArray(args.excludeIngredients) ? args.excludeIngredients.map(String) : [];
   const limit = typeof args.limit === 'number' ? Math.min(20, Math.max(1, args.limit)) : 10;
-  const target = slot && env.program ? env.program.meals[/** @type {'breakfast' | 'lunch' | 'snack' | 'dinner'} */ (slot)] : null;
+  const target = slot && env.program ? env.program.meals[/** @type {Slot} */ (slot)] : null;
   const found = recipes
     .filter((r) => {
-      if (slot && !recipeMealTypes(r).includes(/** @type {Slot} */ (slot))) return false;
+      if (slot && !fitsSlot(r, slot)) return false;
       if (cuisine && r.cuisine !== cuisine) return false;
       if (region && cuisineRegion.get(r.cuisine) !== region) return false;
       if (maxMinutes !== null && totalMinutes(r) > maxMinutes) return false;

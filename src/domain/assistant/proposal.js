@@ -6,7 +6,7 @@
  */
 import { validateMeal, plannedEntries, slotKey, mealPortionsFor, SLOTS } from '../planning/planning.js';
 import { addDays } from '../planning/dates.js';
-import { applySubstitutions, recipeMealTypes } from '../recipes/recipes.js';
+import { applySubstitutions, fitsSlot } from '../recipes/recipes.js';
 import { evaluateRecipeForHousehold } from '../household/compatibility.js';
 import { aggregateNeeds, mealNeedLines } from '../shopping/shopping.js';
 
@@ -325,7 +325,7 @@ export function planDiff(before, after, days, ctx) {
 export function mismatchedSlots(meals, recipes) {
   return meals.filter((m) => {
     const r = recipes.get(m.recipeId);
-    return r ? !recipeMealTypes(r).includes(m.slot) : false;
+    return r ? !fitsSlot(r, m.slot) : false;
   });
 }
 

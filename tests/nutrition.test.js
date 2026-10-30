@@ -124,7 +124,7 @@ test('Objectif sous un IMC de 18,5 refusé', () => {
   assertEqual(weightForBmi(18.5, 162), 48.6);
 });
 test('Répartition qui ne fait pas 100 % refusée', () => {
-  if (validateProgram(program({ mealSplit: { breakfast: 30, lunch: 30, snack: 10, dinner: 20 } }), '2026-10-22').length === 0) throw new Error('acceptée');
+  if (validateProgram(program({ mealSplit: { breakfast: 30, morning_snack: 0, lunch: 30, snack: 10, dinner: 20 } }), '2026-10-22').length === 0) throw new Error('acceptée');
 });
 test('Portion personnelle : 420 kcal visées pour une recette à 600 kcal = 0,7 portion', () =>
   assertEqual(personalPortion({ kcal: 600, protein: 30, carbs: 60, fat: 20, fiber: 5 }, 420), { portions: 0.7, kcal: 420, protein: 21, fits: true }));
@@ -175,4 +175,75 @@ test('Calories prévues du jour : portions personnelles, absences et restes du d
   const n = { kcal: 400, protein: 20, carbs: 40, fat: 10, fiber: 5 };
   const r = plannedKcalForDay(entries, '2026-10-23', { memberId: 'm1', mealSplit: { breakfast: 25, lunch: 35, snack: 10, dinner: 30 } }, { breakfast: { kcal: 300 }, lunch: { kcal: 420 }, snack: { kcal: 120 }, dinner: { kcal: 360 } }, () => n);
   assertEqual(r, { kcal: 420 + 360, meals: 2 });
+});
+
+// --- Programme : methodes, repas, jeune, sport, rythmes, trame ---
+import {
+  splitForMeals as splitFor,
+  programMeals as mealsOf,
+  slotsInWindow as windowSlots,
+  eatingWindow as windowOf,
+  sessionKcal as kcalOfSession,
+  dayTargets as targetsOfDay,
+  paceComparison as comparePaces,
+  defaultTrame as trameDefaults,
+  programTrame as trameOf,
+  normalizeProgram as normalize,
+  validateProgram as validate,
+  dailyTargets as targetsOf,
+  mealTargets as mealsTargets,
+} from '../src/domain/nutrition/program.js';
+
+test('Répartition automatique : 3, 4 ou 5 repas, toujours 100 %', () => {
+  const three = splitFor(['breakfast', 'lunch', 'dinner']);
+  const five = splitFor(['breakfast', 'morning_snack', 'lunch', 'snack', 'dinner']);
+  assertEqual([Object.values(three).reduce((a, b) => a + b, 0), Object.values(five).reduce((a, b) => a + b, 0), three.snack, five.morning_snack > 0], [100, 100, 0, true]);
+});
+test('Programme à 5 repas accepté, à 2 repas refusé', () => {
+  assertEqual(validate(program({ mealSplit: splitFor(['breakfast', 'morning_snack', 'lunch', 'snack', 'dinner']) }), '2026-10-22'), []);
+  assertEqual(validate(program({ mealSplit: splitFor(['lunch', 'dinner']) }), '2026-10-22').length, 1);
+});
+test('Jeûne 16/8 à partir de midi : déjeuner, goûter et dîner', () => {
+  const fasting = { pattern: /** @type {const} */ ('16_8'), windowStart: 12 };
+  assertEqual([windowOf(fasting), windowSlots(fasting)], [{ start: 12, end: 20 }, ['lunch', 'snack', 'dinner']]);
+});
+test('Jeûne : un repas hors de la fenêtre est refusé, avec explication', () => {
+  const errors = validate(program({ fasting: { pattern: '16_8', windowStart: 12 } }), '2026-10-22');
+  assertEqual([errors.length, /petit-déjeuner/.test(errors[0] ?? '')], [1, true]);
+  assertEqual(validate(program({ fasting: { pattern: '16_8', windowStart: 12 }, mealSplit: splitFor(['lunch', 'snack', 'dinner']) }), '2026-10-22'), []);
+});
+test('Sport : calories d’une séance (marche rapide 45 min, 71 kg)', () =>
+  assertEqual(kcalOfSession({ day: 0, kind: 'walk', minutes: 45, intensity: 'moderate' }, 71), 176));
+test('Jour de sport : la moitié des calories dépensées est ajoutée', () => {
+  const p = program({ sport: [{ day: 0, kind: 'walk', minutes: 45, intensity: 'moderate' }] });
+  const base = targetsOf(p, 71.4, '2026-10-26');
+  const monday = targetsOfDay(p, base, 71.4, '2026-10-26');
+  const tuesday = targetsOfDay(p, base, 71.4, '2026-10-27');
+  assertEqual([monday.kcal - base.kcal, tuesday.kcal - base.kcal, monday.sessions.length], [90, 0, 1]);
+});
+test('Plus de protéines : 1,8 g par kilo de poids de référence (IMC 27 au plus : 70,9 kg)', () => assertEqual(targetsOf(program({ highProtein: true }), 71.4, '2026-10-22').proteinG, 128));
+test('Rythmes comparés : le rapide n’est pas proposé sous un IMC de 30', () => {
+  const paces = comparePaces(program(), 71.4, '2026-10-22');
+  assertEqual([paces.length, paces.find((p) => p.kg === 1)?.allowed, paces.find((p) => p.kg === 0)?.goalDate], [5, false, null]);
+  assertEqual(validate(program({ weeklyLossKg: 1 }), '2026-10-22').length, 1);
+});
+test('Stabiliser son poids : objectif égal au poids actuel accepté, sans déficit', () => {
+  const p = program({ weeklyLossKg: 0, goalWeightKg: 71.4 });
+  assertEqual([validate(p, '2026-10-22'), targetsOf(p, 71.4, '2026-10-22').deficit, targetsOf(p, 71.4, '2026-10-22').weeksToGoal], [[], 0, 0]);
+});
+test('Trame conseillée : grammes en comptant, assiette sans compter', () => {
+  const p = program();
+  const perMeal = mealsTargets(targetsOf(p, 71.4, '2026-10-22'), p.mealSplit);
+  assertEqual(/^Protéines : \d+ g/.test(trameDefaults(p, perMeal).lunch[0]), true);
+  assertEqual(/moitié de l’assiette/.test(trameDefaults(program({ method: 'balance' }), perMeal).lunch[0]), true);
+});
+test('Trame personnelle (coach) prioritaire, ligne par ligne', () => {
+  const p = program({ trame: { lunch: '150 g de poulet\n200 g de riz cuit\n' } });
+  const t = trameOf(p, mealsTargets(targetsOf(p, 71.4, '2026-10-22'), p.mealSplit));
+  assertEqual([t.lunch, t.dinner.custom], [{ lines: ['150 g de poulet', '200 g de riz cuit'], custom: true }, false]);
+});
+test('Programme d’une version précédente complété (collation du matin, méthode)', () => {
+  const old = /** @type {any} */ ({ id: 'main', sex: 'female', mealSplit: { breakfast: 25, lunch: 35, snack: 10, dinner: 30 }, weeklyLossKg: 0.5 });
+  const p = normalize(old, '2026-10-22');
+  assertEqual([p.mealSplit.morning_snack, p.method, p.sport, p.fasting, mealsOf(p)], [0, 'count', [], null, ['breakfast', 'lunch', 'snack', 'dinner']]);
 });

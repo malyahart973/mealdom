@@ -2,7 +2,7 @@ import { escapeHtml } from '../utils/html.js';
 import { formatIsoDay, formatIsoDayMonth, formatPortions } from '../utils/format.js';
 import { addDays, toIsoDate, weekDays, weekStart, parseIsoDate } from '../domain/planning/dates.js';
 import { SLOTS, mealPortionsFor, planningGrid } from '../domain/planning/planning.js';
-import { getMeals, getShowBreakfast, setShowBreakfast, getShowSnack, setShowSnack } from '../services/planningService.js';
+import { getMeals, getShowBreakfast, setShowBreakfast, getShowSnack, getShowMorningSnack, setShowMorningSnack, setShowSnack } from '../services/planningService.js';
 import { mountAssistant } from './assistantPanel.js';
 import { getHousehold } from '../services/householdService.js';
 
@@ -43,7 +43,7 @@ function entryHtml(entry, household) {
 export async function renderPlanning(el, params) {
   const today = toIsoDate(new Date());
   const monday = weekStart(params.date && parseIsoDate(params.date) ? params.date : today);
-  const [meals, household, showBreakfast, showSnack] = await Promise.all([getMeals(), getHousehold(), getShowBreakfast(), getShowSnack()]);
+  const [meals, household, showBreakfast, showSnack, showMorningSnack] = await Promise.all([getMeals(), getHousehold(), getShowBreakfast(), getShowSnack(), getShowMorningSnack()]);
 
   if (household.members.length === 0) {
     el.innerHTML = `
@@ -55,7 +55,7 @@ export async function renderPlanning(el, params) {
     return;
   }
 
-  const slots = SLOTS.filter((s) => (showBreakfast || s.id !== 'breakfast') && (showSnack || s.id !== 'snack')).map((s) => s.id);
+  const slots = SLOTS.filter((s) => (showBreakfast || s.id !== 'breakfast') && (showMorningSnack || s.id !== 'morning_snack') && (showSnack || s.id !== 'snack')).map((s) => s.id);
   const grid = planningGrid(meals, weekDays(monday), slots);
 
   el.innerHTML = `
@@ -99,6 +99,7 @@ export async function renderPlanning(el, params) {
           .join('')}
       </ol>
       <label class="check"><input type="checkbox" data-action="breakfast"${showBreakfast ? ' checked' : ''} /> <span>Planifier aussi le petit-déjeuner</span></label>
+      <label class="check"><input type="checkbox" data-action="morning-snack"${showMorningSnack ? ' checked' : ''} /> <span>Planifier aussi la collation du matin</span></label>
       <label class="check"><input type="checkbox" data-action="snack"${showSnack ? ' checked' : ''} /> <span>Planifier aussi le goûter</span></label>
     </section>
     <aside class="planning-layout__assistant" data-assistant${assistantOpen ? '' : ' hidden'} aria-label="Assistant"></aside>
@@ -107,6 +108,10 @@ export async function renderPlanning(el, params) {
 
   el.querySelector('[data-action="breakfast"]')?.addEventListener('change', async (event) => {
     await setShowBreakfast(/** @type {HTMLInputElement} */ (event.target).checked);
+    await renderPlanning(el, params);
+  });
+  el.querySelector('[data-action="morning-snack"]')?.addEventListener('change', async (event) => {
+    await setShowMorningSnack(/** @type {HTMLInputElement} */ (event.target).checked);
     await renderPlanning(el, params);
   });
   el.querySelector('[data-action="snack"]')?.addEventListener('change', async (event) => {

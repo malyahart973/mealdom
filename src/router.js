@@ -43,7 +43,7 @@ const routes = [
   { pattern: /^\/planning$/, title: 'Planning', tab: '/planning', render: renderPlanning },
   { pattern: /^\/planning\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/, title: 'Planning', tab: '/planning', render: renderPlanning },
   {
-    pattern: /^\/planning\/ajouter\/(?<date>\d{4}-\d{2}-\d{2})\/(?<slot>[a-z]+)$/,
+    pattern: /^\/planning\/ajouter\/(?<date>\d{4}-\d{2}-\d{2})\/(?<slot>[a-z_]+)$/,
     title: 'Ajouter un repas',
     tab: '/planning',
     render: renderMeal,
