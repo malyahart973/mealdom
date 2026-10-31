@@ -10,6 +10,7 @@
 import { chooseProduct } from '../drive/drive.js';
 import { purchaseCost } from '../stores/stores.js';
 import { parseIsoDate, addDays } from '../planning/dates.js';
+import { calendarFile, addMinutes } from '../planning/calendar.js';
 
 /** @typedef {import('../stores/stores.js').Store} Store */
 /** @typedef {import('../stores/stores.js').Price} Price */
@@ -526,38 +527,7 @@ export function mealsBeforeTrip(meals, trip, monday) {
 }
 
 /**
- * Texte echappe pour un fichier agenda.
- * @param {string} text
- * @returns {string}
- */
-function icsText(text) {
-  return text.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\;');
-}
-
-/**
- * @param {string} date AAAA-MM-JJ
- * @param {string} time HH:MM
- * @returns {string} AAAAMMJJTHHMM00 (heure locale de l'appareil)
- */
-function icsDateTime(date, time) {
-  return `${date.replace(/-/g, '')}T${time.replace(':', '')}00`;
-}
-
-/**
- * Ajoute des minutes a une heure HH:MM (sans changer de jour au-dela de 23:59).
- * @param {string} time
- * @param {number} minutes
- * @returns {string}
- */
-function addMinutes(time, minutes) {
-  const [h, m] = time.split(':').map(Number);
-  const total = Math.min(23 * 60 + 59, h * 60 + m + minutes);
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-}
-
-/**
  * Fichier agenda (.ics) : la sortie courses et, s'il existe, le retrait Drive, avec un rappel.
- * Les heures sont "flottantes" : le telephone les lit dans son propre fuseau horaire.
  * @param {ShoppingTrip} trip
  * @param {Map<string, string>} storeNames
  * @param {number | null} durationMinutes
@@ -567,46 +537,31 @@ function addMinutes(time, minutes) {
  */
 export function tripCalendar(trip, storeNames, durationMinutes, details, stamp) {
   const names = trip.storeIds.map((id) => storeNames.get(id) ?? id);
-  /** @type {string[]} */
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//MealDom//Courses//FR', 'CALSCALE:GREGORIAN'];
-  const event = (/** @type {string} */ uid, /** @type {string} */ start, /** @type {string} */ end, /** @type {string} */ summary, /** @type {string} */ description, /** @type {number} */ alarm) => {
-    lines.push(
-      'BEGIN:VEVENT',
-      `UID:${uid}@mealdom`,
-      `DTSTAMP:${stamp}`,
-      `DTSTART:${start}`,
-      `DTEND:${end}`,
-      `SUMMARY:${icsText(summary)}`,
-      `DESCRIPTION:${icsText(description)}`,
-      'BEGIN:VALARM',
-      'ACTION:DISPLAY',
-      `DESCRIPTION:${icsText(summary)}`,
-      `TRIGGER:-PT${alarm}M`,
-      'END:VALARM',
-      'END:VEVENT',
-    );
-  };
   const duration = Math.max(30, durationMinutes ?? 60);
-  event(
-    `courses-${trip.week}`,
-    icsDateTime(trip.date, trip.time),
-    icsDateTime(trip.date, addMinutes(trip.time, duration)),
-    `Courses : ${names.join(', ')}`,
-    [...details, trip.note].filter(Boolean).join('\n'),
-    60,
-  );
+  /** @type {import('../planning/calendar.js').CalendarEvent[]} */
+  const events = [
+    {
+      uid: `courses-${trip.week}`,
+      date: trip.date,
+      start: trip.time,
+      end: addMinutes(trip.time, duration),
+      summary: `Courses : ${names.join(', ')}`,
+      description: [...details, trip.note].filter(Boolean).join('\n'),
+      alarmMinutes: 60,
+    },
+  ];
   if (trip.driveSlot) {
-    event(
-      `drive-${trip.week}`,
-      icsDateTime(trip.driveSlot.date, trip.driveSlot.start),
-      icsDateTime(trip.driveSlot.date, trip.driveSlot.end),
-      'Retrait Drive',
-      'Créneau de retrait réservé sur le site du Drive.',
-      30,
-    );
+    events.push({
+      uid: `drive-${trip.week}`,
+      date: trip.driveSlot.date,
+      start: trip.driveSlot.start,
+      end: trip.driveSlot.end,
+      summary: 'Retrait Drive',
+      description: 'Créneau de retrait réservé sur le site du Drive.',
+      alarmMinutes: 30,
+    });
   }
-  lines.push('END:VCALENDAR');
-  return `${lines.join('\r\n')}\r\n`;
+  return calendarFile('Courses', events, stamp);
 }
 
 /**

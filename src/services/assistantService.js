@@ -42,7 +42,8 @@ import { substitutesFor } from '../domain/assistant/substitutes.js';
 import { loadAvailability, autoSubstituter } from './territoryService.js';
 import { seasonNow } from './seasonService.js';
 import { callClaude, responseText, LlmError, DEFAULT_MODEL } from './llmService.js';
-import { recipes, recipesById, ingredientsById, preparationsById, cuisineLabels, familyOf, nutritionContext, nutritionByRecipe as recipeNutritionMap } from './catalog.js';
+import { recipes, recipesById, ingredientsById, preparationsById, cuisineLabels, familyOf, keepingOf, nutritionContext, nutritionByRecipe as recipeNutritionMap } from './catalog.js';
+import { batchSessions } from './batchService.js';
 import { INGREDIENTS } from '../data/ingredients.js';
 import { CUISINES, REGIONS } from '../data/cuisines.js';
 import { formatIsoDay } from '../utils/format.js';
@@ -109,7 +110,7 @@ async function loadEnvironment(monday) {
   const now = new Date();
   const today = toIsoDate(now);
   const days = weekDays(monday);
-  const [meals, household, budget, inventory, priceData, preferences, program, showBreakfast, showSnack, availability, season, showMorningSnack] = await Promise.all([
+  const [meals, household, budget, inventory, priceData, preferences, program, showBreakfast, showSnack, availability, season, showMorningSnack, sessions] = await Promise.all([
     getMeals(),
     getHousehold(),
     getBudget(),
@@ -122,6 +123,7 @@ async function loadEnvironment(monday) {
     loadAvailability(),
     seasonNow(now),
     getShowMorningSnack(),
+    batchSessions(monday),
   ]);
   const byIngredient = productsByIngredient(priceData.products);
   const promoIngredients = new Set(
@@ -143,6 +145,7 @@ async function loadEnvironment(monday) {
     programTargets: program ? program.meals : null,
     availability,
     seasonalIngredients: season.favoured,
+    keepingOf,
   };
   /** @type {Slot[]} */
   const activeSlots = SLOTS.map((s) => s.id).filter((s) => (s !== 'breakfast' || showBreakfast) && (s !== 'morning_snack' || showMorningSnack) && (s !== 'snack' || showSnack));
@@ -175,6 +178,7 @@ async function loadEnvironment(monday) {
       cuisineRegion,
       preferredCuisines: preferredCuisines(preferences, cuisineRegion),
       familyOf,
+      batchSessions: sessions,
     },
     /** @type {import('../domain/assistant/proposal.js').ApplyContext} */
     apply: { household, recipes: recipesById, ingredients: ingredientsById, preparations: preparationsById, productsByIngredient: byIngredient, newId: newMealId, autoSubstitutions: autoSubstituter(availability) },

@@ -5,6 +5,8 @@ import { SLOTS } from '../domain/planning/planning.js';
 import { toIsoDate, weekStart, addDays, parseIsoDate } from '../domain/planning/dates.js';
 import { WISHES, TIME_CHOICES } from '../domain/assistant/guided.js';
 import { REGIONS } from '../data/cuisines.js';
+import { BATCH_DAYS } from '../domain/batchCooking/keeping.js';
+import { getBatchPlan, saveBatchPlan } from '../services/batchService.js';
 import { getHousehold } from '../services/householdService.js';
 import { setShowBreakfast, setShowSnack, setShowMorningSnack } from '../services/planningService.js';
 import {
@@ -41,7 +43,7 @@ export async function renderPlanWeek(el, params) {
       <a class="button" href="#/foyer">Présenter mon foyer</a></section>`;
     return;
   }
-  const { choices, weeklyBudgetCents, programActive } = await guidedDefaults();
+  const [{ choices, weeklyBudgetCents, programActive }, batchPlan] = await Promise.all([guidedDefaults(), getBatchPlan()]);
   const weeks = [thisMonday, addDays(thisMonday, 7)];
   if (!weeks.includes(monday)) weeks.push(monday);
   const weekLabel = (/** @type {string} */ m) => (m === thisMonday ? 'Cette semaine (à partir d’aujourd’hui)' : `Semaine du ${formatIsoDayMonth(m)}`);
@@ -76,13 +78,21 @@ export async function renderPlanWeek(el, params) {
 
         <fieldset class="guided__step">
           <legend><span class="guided__num" aria-hidden="true">3</span> Combien de temps, quelles envies ?</legend>
-          <p class="guided__label">Temps de cuisine par repas</p>
-          <div class="chips" role="radiogroup" aria-label="Temps de cuisine par repas">
+          <p class="guided__label" data-time-label>Temps de cuisine par repas</p>
+          <div class="chips" role="radiogroup" aria-label="Temps de cuisine par repas" data-time-group>
             ${TIME_CHOICES.map((t) => `<button type="button" class="chip" role="radio" data-time="${t.minutes ?? ''}" aria-checked="${t.minutes === choices.maxMinutes}" aria-pressed="${t.minutes === choices.maxMinutes}">${escapeHtml(t.label)}</button>`).join('')}
           </div>
           <p class="guided__label">Envies (plusieurs possibles)</p>
           <div class="chips">
             ${WISHES.map((w) => `<button type="button" class="chip" data-wish="${w.id}" aria-pressed="${choices.wishes.includes(w.id)}">${escapeHtml(w.label)}</button>`).join('')}
+          </div>
+          <div class="guided__batch" data-batch${choices.wishes.includes('batch') ? '' : ' hidden'}>
+            <p class="guided__label">Séance de batch cooking</p>
+            <div class="radios">
+              ${BATCH_DAYS.map((d) => `<label class="check"><input type="radio" name="batch-day" value="${d.id}"${d.id === batchPlan.day ? ' checked' : ''} /> <span>${escapeHtml(d.label)}</span></label>`).join('')}
+            </div>
+            <label class="check"><input type="checkbox" id="g-midweek"${batchPlan.midweek ? ' checked' : ''} /> <span>Deuxième séance le mercredi (plats plus frais en fin de semaine)</span></label>
+            <p class="hint">Je choisis des plats qui se gardent jusqu’au jour du repas : au réfrigérateur, ou au congélateur pour la fin de semaine. Le temps par repas ne compte pas : tout cuit pendant la séance.</p>
           </div>
           ${programActive ? '<p class="hint">Votre programme minceur est actif : « Léger » tient compte de vos objectifs par repas.</p>' : ''}
           <div class="field">
@@ -118,9 +128,21 @@ export async function renderPlanWeek(el, params) {
       });
     }),
   );
+  const batchBox = /** @type {HTMLElement} */ (el.querySelector('[data-batch]'));
+  const syncBatch = () => {
+    const on = el.querySelector('[data-wish="batch"]')?.getAttribute('aria-pressed') === 'true';
+    batchBox.hidden = !on;
+    // En batch cooking, le temps par repas ne s'applique pas.
+    /** @type {HTMLElement} */ (el.querySelector('[data-time-label]')).hidden = on;
+    /** @type {HTMLElement} */ (el.querySelector('[data-time-group]')).hidden = on;
+  };
   el.querySelectorAll('[data-wish]').forEach((b) =>
-    b.addEventListener('click', () => b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'))),
+    b.addEventListener('click', () => {
+      b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
+      syncBatch();
+    }),
   );
+  syncBatch();
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -145,6 +167,10 @@ export async function renderPlanWeek(el, params) {
       region: /** @type {HTMLSelectElement} */ (el.querySelector('#g-region')).value || null,
     };
     const week = String(data.get('week') ?? monday);
+    if (picked.wishes.includes('batch')) {
+      const day = BATCH_DAYS.find((d) => d.id === data.get('batch-day'))?.id ?? batchPlan.day;
+      await saveBatchPlan({ day, midweek: /** @type {HTMLInputElement} */ (el.querySelector('#g-midweek')).checked });
+    }
     const button = /** @type {HTMLButtonElement} */ (form.querySelector('[type="submit"]'));
     button.disabled = true;
     status.textContent = 'Je compose votre semaine…';

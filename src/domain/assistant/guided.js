@@ -22,6 +22,7 @@ export const WISHES = [
   { id: 'promotions', label: 'Promotions du Drive', modes: ['promotions'] },
   { id: 'few_dishes', label: 'Peu de vaisselle', modes: ['few_dishes'] },
   { id: 'antiwaste', label: 'Finir le frigo', modes: ['antiwaste'] },
+  { id: 'batch', label: 'Batch cooking', modes: ['batch'] },
 ];
 
 /**
@@ -48,6 +49,7 @@ export const TIME_CHOICES = [
 
 /**
  * Demande equivalente pour le moteur. L'equilibre et la variete sont toujours recherches.
+ * En batch cooking, tout cuit pendant la seance : le temps par repas ne limite pas le choix.
  * @param {GuidedChoices} choices
  * @returns {Request}
  */
@@ -59,7 +61,7 @@ export function guidedRequest(choices) {
     ...emptyRequest(),
     modes: [...modes],
     budgetCents: choices.budgetCents,
-    maxMinutes: choices.maxMinutes,
+    maxMinutes: modes.has('batch') ? null : choices.maxMinutes,
     slots: [...choices.slots],
     region: choices.region,
     generate: true,
@@ -78,7 +80,7 @@ export function guidedRequest(choices) {
 export function describeChoices(choices, slotLabels, regionLabels) {
   const parts = [choices.slots.map((s) => (slotLabels.get(s) ?? s).toLowerCase()).join(', ')];
   parts.push(choices.keepExisting ? 'en gardant les repas déjà prévus' : 'en refaisant les repas non verrouillés');
-  if (choices.maxMinutes !== null) parts.push(`${choices.maxMinutes} min maximum`);
+  if (choices.maxMinutes !== null && !choices.wishes.includes('batch')) parts.push(`${choices.maxMinutes} min maximum`);
   const wishes = choices.wishes.map((id) => WISHES.find((w) => w.id === id)?.label.toLowerCase()).filter(Boolean);
   if (wishes.length) parts.push(wishes.join(', '));
   if (choices.region) parts.push(`cuisine : ${regionLabels.get(choices.region) ?? choices.region}`);

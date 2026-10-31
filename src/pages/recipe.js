@@ -13,7 +13,7 @@ import {
   recipeMealTypes,
   totalMinutes,
 } from '../domain/recipes/recipes.js';
-import { recipes, recipesById, preparationsById, ingredientsById, cuisineLabels, nutritionContext } from '../services/catalog.js';
+import { recipes, recipesById, preparationsById, ingredientsById, cuisineLabels, nutritionContext, keepingOf } from '../services/catalog.js';
 import { recipeNutrition, roundNutrients, portionLines } from '../domain/nutrition/nutrition.js';
 import { personalPortion } from '../domain/nutrition/program.js';
 import { programSummary } from '../services/programService.js';
@@ -247,6 +247,7 @@ export async function renderRecipe(el, params) {
         <div><dt>Difficulté</dt><dd>${escapeHtml(DIFFICULTY_LABELS[recipe.difficulty])}</dd></div>
         ${recipe.vessel ? `<div><dt>Vaisselle</dt><dd>${escapeHtml(VESSEL_LABELS[recipe.vessel])}</dd></div>` : ''}
         <div><dt>Repas</dt><dd>${escapeHtml(types.map((t) => mealTypeLabels.get(t)).join(', '))}</dd></div>
+        ${keepingFact(keepingOf.get(recipe.id))}
       </dl>
       ${(recipe.tags ?? []).length ? `<p>${(recipe.tags ?? []).map((t) => `<span class="tag">${escapeHtml(tagLabels.get(t) ?? t)}</span>`).join(' ')}</p>` : ''}
       ${local.length ? `<p class="hint">De saison ou péyi en ce moment : ${escapeHtml(local.map((id) => ingredientsById.get(id)?.name ?? id).join(', '))}. <a href="#/saison">Produits de saison</a></p>` : ''}
@@ -297,4 +298,15 @@ export async function renderRecipe(el, params) {
       el.querySelector('.local-box')?.scrollIntoView({ block: 'center' });
     }),
   );
+}
+
+/**
+ * Conservation du plat (batch cooking).
+ * @param {import('../domain/batchCooking/keeping.js').Keeping | undefined} k
+ * @returns {string}
+ */
+function keepingFact(k) {
+  if (!k) return '';
+  const text = k.batch ? `${k.fridgeDays} jour${k.fridgeDays > 1 ? 's' : ''} au frais${k.freezes ? ', se congèle' : ''}` : 'À cuisiner le jour même';
+  return `<div><dt>Conservation</dt><dd>${escapeHtml(text)}</dd></div>`;
 }

@@ -1057,6 +1057,31 @@ a.button {
   font-size: 0.9375rem;
 }
 
+.batch-plan .radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-4);
+}
+
+.batch-session h2 .hint {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.keep {
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 4px solid var(--fleuve);
+  border-radius: var(--radius-small);
+  background: var(--fleuve-soft);
+  font-size: 0.9375rem;
+}
+
+.keep--freezer {
+  border-left-color: var(--chart-series);
+}
+
 /* ---------- Courses et stock ---------- */
 
 .shop,

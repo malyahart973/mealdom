@@ -9,6 +9,7 @@ import { CUISINES } from '../data/cuisines.js';
 import { NUTRITION } from '../data/nutrition.js';
 import { buildNutritionIndex, recipeNutrition } from '../domain/nutrition/nutrition.js';
 import { recipeFamily } from '../domain/recipes/families.js';
+import { recipeKeeping } from '../domain/batchCooking/keeping.js';
 
 export const ingredientsById = new Map(INGREDIENTS.map((i) => [i.id, i]));
 export const preparationsById = new Map(PREPARATIONS.map((p) => [p.id, p]));
@@ -20,6 +21,9 @@ export const recipes = [...ALL_RECIPES];
 
 /** Famille de chaque recette (une seule par plat). */
 export const familyOf = new Map(ALL_RECIPES.map((r) => [r.id, recipeFamily(r, ingredientsById)]));
+
+/** Conservation de chaque plat cuisine a l'avance (batch cooking). */
+export const keepingOf = new Map(ALL_RECIPES.map((r) => [r.id, recipeKeeping(r, familyOf.get(r.id) ?? '', ingredientsById)]));
 
 /** Contexte utilise par le filtrage des recettes. */
 export const filterContext = { ingredients: ingredientsById, preparations: preparationsById, cuisineLabels };
@@ -47,6 +51,7 @@ export function nutritionByRecipe() {
 export function registerRecipe(recipe) {
   recipesById.set(recipe.id, recipe);
   familyOf.set(recipe.id, recipeFamily(recipe, ingredientsById));
+  keepingOf.set(recipe.id, recipeKeeping(recipe, familyOf.get(recipe.id) ?? '', ingredientsById));
   nutritionCache?.set(recipe.id, recipeNutrition(recipe, nutritionContext).perPortion);
   const index = recipes.findIndex((r) => r.id === recipe.id);
   if (recipe.status === 'archived') {

@@ -12,6 +12,7 @@ import { loadPriceData } from './driveService.js';
 import { getHousehold } from './householdService.js';
 import { getMeals } from './planningService.js';
 import { ingredientsById } from './catalog.js';
+import { downloadText, calendarStamp } from '../utils/download.js';
 
 /** @typedef {import('../domain/trips/trips.js').CarSettings} CarSettings */
 /** @typedef {import('../domain/trips/trips.js').ShoppingTrip} ShoppingTrip */
@@ -110,14 +111,6 @@ export async function nextTrip() {
  */
 export async function downloadTripCalendar(trip, durationMinutes, details) {
   const stores = await getStores();
-  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
-  const text = tripCalendar(trip, new Map(stores.map((s) => [s.id, s.name])), durationMinutes, details, stamp);
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/calendar;charset=utf-8' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `courses-${trip.date}.ics`;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const text = tripCalendar(trip, new Map(stores.map((s) => [s.id, s.name])), durationMinutes, details, calendarStamp());
+  downloadText(text, `courses-${trip.date}.ics`, 'text/calendar;charset=utf-8');
 }

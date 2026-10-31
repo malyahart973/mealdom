@@ -11,7 +11,7 @@ import { addDays } from '../planning/dates.js';
 
 /**
  * Objectifs d'optimisation combinables.
- * @typedef {'promotions' | 'gourmand' | 'economy' | 'balance' | 'vegetables' | 'quick' | 'antiwaste' | 'light' | 'few_dishes' | 'quality' | 'seasonal' | 'protein'} Mode
+ * @typedef {'promotions' | 'gourmand' | 'economy' | 'balance' | 'vegetables' | 'quick' | 'antiwaste' | 'light' | 'few_dishes' | 'quality' | 'seasonal' | 'protein' | 'batch'} Mode
  */
 
 /** @type {{ id: Mode, label: string }[]} */
@@ -28,6 +28,7 @@ export const MODES = [
   { id: 'quality', label: 'Meilleure qualité' },
   { id: 'seasonal', label: 'Produits de saison et péyi' },
   { id: 'protein', label: 'Riche en protéines' },
+  { id: 'batch', label: 'Batch cooking (cuisiner à l’avance)' },
 ];
 
 /**
@@ -198,6 +199,7 @@ export function parseRequest(rawText, ctx) {
   if (has(text, /meilleure qualite|qualite|\bbio\b|label rouge/)) modes.add('quality');
   if (has(text, /de saison|produits? locaux|produits? du pays|produits? pei|\bpeyi\b|\blocal\b/)) modes.add('seasonal');
   if (has(text, /proteine/)) modes.add('protein');
+  if (has(text, /\bbatch|meal prep|(cuisiner|preparer|cuisine|prepare)\w* (tout )?(a|en) l'avance|en avance/)) modes.add('batch');
 
   const percent = /(\d+(?:[.,]\d+)?)\s*(?:%|pour ?cent)/.exec(text);
   let budgetPercent = null;

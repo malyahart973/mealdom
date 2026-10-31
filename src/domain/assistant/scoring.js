@@ -42,6 +42,8 @@ import { substitutesFor } from './substitutes.js';
  * @property {Partial<Record<Slot, { kcal: number, proteinG: number }>> | null} programTargets
  * @property {import('../ingredients/territory.js').AvailabilityOf} [availability]
  *   Disponibilite locale (Guyane) : recettes impossibles exclues, ingredients rares penalises
+ * @property {Map<string, import('../batchCooking/keeping.js').Keeping>} [keepingOf]
+ *   Conservation des plats, pour le batch cooking
  */
 
 /**
@@ -219,7 +221,8 @@ export function isEligible(recipe, c, ctx) {
  * Note d'une recette (plus haut = mieux) et raisons lisibles.
  * @param {Recipe} recipe
  * @param {Weights} weights
- * @param {{ slot: Slot | null, medianCostIndex: number, maxMinutes: number | null, weekCuisines: string[], weekRecipeIds: string[], weekIngredients: Set<string> }} env
+ * @param {{ slot: Slot | null, medianCostIndex: number, maxMinutes: number | null, weekCuisines: string[], weekRecipeIds: string[], weekIngredients: Set<string>, batchAge?: number | null }} env
+ *   batchAge : jours entre la seance de batch et ce repas (null : pas de seance avant)
  * @param {ScoringContext} ctx
  * @returns {{ score: number, reasons: string[] }}
  */
@@ -312,9 +315,27 @@ export function scoreRecipe(recipe, weights, env, ctx) {
     score += 8 * w('few_dishes');
     reasons.push('un seul récipient');
   }
+  // Batch cooking : le plat doit se garder jusqu'au jour du repas (refrigerateur ou congelateur).
+  let batchReady = false;
+  const keeping = ctx.keepingOf?.get(recipe.id);
+  const age = env.batchAge ?? null;
+  if (w('batch') && keeping && age !== null && env.slot !== 'breakfast') {
+    if (!keeping.batch) score -= 15 * w('batch');
+    else if (age <= keeping.fridgeDays) {
+      batchReady = true;
+      score += 8 * w('batch');
+      reasons.push(`se garde ${keeping.fridgeDays} jours au réfrigérateur`);
+    } else if (keeping.freezes) {
+      batchReady = true;
+      score += 5 * w('batch');
+      reasons.push('se congèle : à sortir du congélateur la veille');
+    } else score -= 12 * w('batch');
+  }
   // Variete : chaque repetition dans la semaine coute de plus en plus cher.
+  // En batch cooking, cuisiner un plat en double (deux repas) est le principe : la premiere repetition est offerte.
   const repeats = env.weekRecipeIds.filter((id) => id === recipe.id).length;
-  score -= 8 * repeats * (repeats + 1) / 2;
+  const counted = batchReady ? Math.max(0, repeats - 1) : repeats;
+  score -= 8 * counted * (counted + 1) / 2;
   return { score: Math.round(score * 100) / 100, reasons };
 }
 

@@ -13,6 +13,7 @@ import { activePromotions } from '../drive/drive.js';
 import { isEligible, scoreRecipe, recipeCost, recipeContains, matchesTarget, tieBreak } from './scoring.js';
 import { substitutesFor } from './substitutes.js';
 import { freeSlots } from './proposal.js';
+import { sessionFor, daysBetween } from '../batchCooking/keeping.js';
 
 /** @typedef {import('./intent.js').Request} Request */
 /** @typedef {import('./intent.js').Mode} Mode */
@@ -41,6 +42,7 @@ import { freeSlots } from './proposal.js';
  * @property {Map<string, string>} cuisineRegion
  * @property {Set<string>} [preferredCuisines]   Cuisines retenues dans les preferences (bonus leger)
  * @property {Map<string, string>} [familyOf]       Famille de chaque recette (variete : pas cinq salades dans la semaine)
+ * @property {string[]} [batchSessions]           Dates des seances de batch cooking (objectif « batch »)
  */
 
 /**
@@ -96,7 +98,7 @@ function targetMeals(req, ctx) {
 }
 
 /**
- * @typedef {{ chosen: string[], cuisines: string[], families: string[], ingredients: Set<string>, preferCuisine?: string | null, preferTag?: import('../recipes/recipes.js').RecipeTag | null, medianCostIndex: number, maxMinutes: number | null }} WeekEnv
+ * @typedef {{ chosen: string[], cuisines: string[], families: string[], ingredients: Set<string>, dates: Map<string, string[]>, preferCuisine?: string | null, preferTag?: import('../recipes/recipes.js').RecipeTag | null, medianCostIndex: number, maxMinutes: number | null }} WeekEnv
  */
 
 /**
@@ -116,13 +118,47 @@ function varietyPenalty(recipe, env, ctx) {
 }
 
 /**
+ * Jours entre la seance de batch cooking qui prepare ce repas et le repas. null sans seance avant.
+ * @param {string} date
+ * @param {EngineContext} ctx
+ * @returns {number | null}
+ */
+function batchAge(date, ctx) {
+  const session = sessionFor(date, ctx.batchSessions ?? []);
+  return session === null ? null : daysBetween(session, date);
+}
+
+/**
+ * Batch cooking : un plat deja prevu dans la meme seance se cuisine en double (une seule fois
+ * aux fourneaux pour deux repas) ; le meme plat deux fois le meme jour est evite.
+ * @param {Recipe} recipe
+ * @param {string} date
+ * @param {Weights} weights
+ * @param {WeekEnv} env
+ * @param {EngineContext} ctx
+ * @returns {{ bonus: number, reason: string | null }}
+ */
+function batchTwin(recipe, date, weights, env, ctx) {
+  const w = weights.batch ?? 0;
+  const before = env.dates.get(recipe.id) ?? [];
+  if (!w || !before.length) return { bonus: 0, reason: null };
+  if (before.includes(date)) return { bonus: -10 * w, reason: null };
+  const session = sessionFor(date, ctx.batchSessions ?? []);
+  const keeping = ctx.scoring.keepingOf?.get(recipe.id);
+  if (session === null || !keeping?.batch || !before.some((d) => sessionFor(d, ctx.batchSessions ?? []) === session)) return { bonus: 0, reason: null };
+  return { bonus: 6 * w, reason: 'cuisinée en double pendant la même séance' };
+}
+
+/**
  * Retient un plat choisi pour la suite de la semaine.
  * @param {WeekEnv} env
  * @param {Recipe} recipe
  * @param {EngineContext} ctx
+ * @param {string} date
  */
-function remember(env, recipe, ctx) {
+function remember(env, recipe, ctx, date) {
   env.chosen.push(recipe.id);
+  env.dates.set(recipe.id, [...(env.dates.get(recipe.id) ?? []), date]);
   env.cuisines.push(recipe.cuisine);
   env.families.push(ctx.familyOf?.get(recipe.id) ?? '');
 }
@@ -144,14 +180,15 @@ function bestRecipe(where, constraints, weights, env, ctx) {
     const s = scoreRecipe(
       recipe,
       weights,
-      { slot: where.slot, medianCostIndex: env.medianCostIndex, maxMinutes: env.maxMinutes, weekCuisines: env.cuisines, weekRecipeIds: env.chosen, weekIngredients: env.ingredients },
+      { slot: where.slot, medianCostIndex: env.medianCostIndex, maxMinutes: env.maxMinutes, weekCuisines: env.cuisines, weekRecipeIds: env.chosen, weekIngredients: env.ingredients, batchAge: batchAge(where.date, ctx) },
       ctx.scoring,
     );
-    let score = s.score + tieBreak(`${recipe.id}|${where.date}|${where.slot}`) - varietyPenalty(recipe, env, ctx);
+    const twin = batchTwin(recipe, where.date, weights, env, ctx);
+    let score = s.score + twin.bonus + tieBreak(`${recipe.id}|${where.date}|${where.slot}`) - varietyPenalty(recipe, env, ctx);
     if (env.preferCuisine && recipe.cuisine === env.preferCuisine) score += 3;
     if (ctx.preferredCuisines?.has(recipe.cuisine)) score += 2;
     if (env.preferTag && hasTag(recipe, env.preferTag)) score += 6;
-    if (!best || score > best.score) best = { recipe, score, reasons: s.reasons };
+    if (!best || score > best.score) best = { recipe, score, reasons: twin.reason ? [...s.reasons, twin.reason] : s.reasons };
   }
   return best;
 }
@@ -186,6 +223,7 @@ function prepare(req, ctx) {
     cuisines: weekMeals.map((m) => ctx.recipesById.get(m.recipeId)?.cuisine ?? ''),
     families: weekMeals.map((m) => ctx.familyOf?.get(m.recipeId) ?? ''),
     ingredients: new Set(weekMeals.flatMap((m) => ctx.recipesById.get(m.recipeId)?.ingredients.map((l) => l.ingredientId) ?? [])),
+    /** @type {Map<string, string[]>} */ dates: weekMeals.reduce((map, m) => map.set(m.recipeId, [...(map.get(m.recipeId) ?? []), m.date]), new Map()),
     medianCostIndex,
     maxMinutes: req.maxMinutes,
     /** @type {string | null} */ preferCuisine: null,
@@ -213,12 +251,13 @@ export function suggestRecipes(req, where, ctx, exclude, limit = 3) {
     const s = scoreRecipe(
       recipe,
       weights,
-      { slot: where.slot, medianCostIndex: env.medianCostIndex, maxMinutes: env.maxMinutes, weekCuisines: env.cuisines, weekRecipeIds: env.chosen, weekIngredients: env.ingredients },
+      { slot: where.slot, medianCostIndex: env.medianCostIndex, maxMinutes: env.maxMinutes, weekCuisines: env.cuisines, weekRecipeIds: env.chosen, weekIngredients: env.ingredients, batchAge: batchAge(where.date, ctx) },
       ctx.scoring,
     );
-    let score = s.score + tieBreak(`${recipe.id}|${where.date}|${where.slot}`) - varietyPenalty(recipe, env, ctx);
+    const twin = batchTwin(recipe, where.date, weights, env, ctx);
+    let score = s.score + twin.bonus + tieBreak(`${recipe.id}|${where.date}|${where.slot}`) - varietyPenalty(recipe, env, ctx);
     if (ctx.preferredCuisines?.has(recipe.cuisine)) score += 2;
-    ranked.push({ recipe, score, reasons: s.reasons });
+    ranked.push({ recipe, score, reasons: twin.reason ? [...s.reasons, twin.reason] : s.reasons });
   }
   return ranked.sort((a, b) => b.score - a.score).slice(0, limit);
 }
@@ -336,7 +375,7 @@ export function proposeChanges(req, ctx) {
       }
       const pick = bestRecipe(meal, { ...base, include: [to], avoid: [...base.avoid, from] }, weights, { ...env, preferCuisine: recipe.cuisine }, ctx);
       if (pick) {
-        remember(env, pick.recipe, ctx);
+        remember(env, pick.recipe, ctx, meal.date);
         operations.push({ type: 'replace_recipe', mealId: meal.id, recipeId: pick.recipe.id, reason: `Avec ${to.label} à la place de ${from.label}${pick.reasons.length ? ` ; ${pick.reasons.join(', ')}` : ''}.` });
       } else notes.push(`Aucune recette compatible avec ${to.label} pour ${mealLabel(meal)}.`);
     }
@@ -367,7 +406,7 @@ export function proposeChanges(req, ctx) {
       if (!free.length) continue;
       const pick = bestRecipe({ date, slot }, base, { ...weights, gourmand: Math.max(weights.gourmand ?? 0, 0.6) }, { ...env, preferTag: 'convivial' }, ctx);
       if (pick) {
-        remember(env, pick.recipe, ctx);
+        remember(env, pick.recipe, ctx, date);
         const guests = req.guests.mode === 'add' ? req.guests.count : Math.max(0, req.guests.count - ctx.scoring.household.members.length);
         operations.push({ type: 'add_meal', date, slot, recipeId: pick.recipe.id, guests, reason: `Repas à partager avec vos invités${pick.reasons.length ? ` ; ${pick.reasons.join(', ')}` : ''}.` });
       }
@@ -399,7 +438,7 @@ export function proposeChanges(req, ctx) {
           ctx,
         );
         if (pick) {
-          remember(env, pick.recipe, ctx);
+          remember(env, pick.recipe, ctx, target.date);
           operations.push({ type: 'replace_recipe', mealId: target.id, recipeId: pick.recipe.id, reason: `Réutilise les ingrédients déjà ouverts pour ${before.recipeName}.` });
         }
       }
@@ -418,7 +457,7 @@ export function proposeChanges(req, ctx) {
           notes.push(`Aucune recette compatible trouvée pour le ${date}.`);
           continue;
         }
-        remember(env, pick.recipe, ctx);
+        remember(env, pick.recipe, ctx, date);
         const why = `${req.convivial ? 'Repas convivial' : 'Repas ajouté'}${pick.reasons.length ? ` ; ${pick.reasons.join(', ')}` : ''}.`;
         if (!existing) operations.push({ type: 'add_meal', date, slot, recipeId: pick.recipe.id, guests: 0, reason: why });
         else if (existing.locked) notes.push(`${mealLabel(existing)} est verrouillé.`);
@@ -469,10 +508,10 @@ export function proposeChanges(req, ctx) {
       if (!pick) continue;
       const currentEligible = isEligible(current, { ...base, slot: meal.slot }, ctx.scoring) && fitsSlot(current, meal.slot);
       const currentScore = currentEligible
-        ? scoreRecipe(current, weights, { slot: meal.slot, medianCostIndex, maxMinutes: req.maxMinutes, weekCuisines: env.cuisines, weekRecipeIds: [], weekIngredients: env.ingredients }, ctx.scoring).score
+        ? scoreRecipe(current, weights, { slot: meal.slot, medianCostIndex, maxMinutes: req.maxMinutes, weekCuisines: env.cuisines, weekRecipeIds: [], weekIngredients: env.ingredients, batchAge: batchAge(meal.date, ctx) }, ctx.scoring).score
         : -100;
       if (!req.redo && pick.score - currentScore < IMPROVEMENT) continue;
-      remember(env, pick.recipe, ctx);
+      remember(env, pick.recipe, ctx, meal.date);
       saved += (currentCost - recipeCost(pick.recipe, ctx.scoring).index) * mealPortionsFor(meal, ctx.scoring.household).total;
       operations.push({ type: 'replace_recipe', mealId: meal.id, recipeId: pick.recipe.id, reason: pick.reasons.length ? `${pick.reasons.join(', ')}.` : 'Correspond mieux à votre demande.' });
     }
@@ -485,7 +524,7 @@ export function proposeChanges(req, ctx) {
       for (const free of freeSlots(ctx.meals, days, slots)) {
         const pick = bestRecipe(free, base, weights, env, ctx);
         if (!pick) continue;
-        remember(env, pick.recipe, ctx);
+        remember(env, pick.recipe, ctx, free.date);
         operations.push({ type: 'add_meal', date: free.date, slot: free.slot, recipeId: pick.recipe.id, guests: 0, reason: pick.reasons.length ? `${pick.reasons.join(', ')}.` : 'Complète le planning.' });
       }
     }
