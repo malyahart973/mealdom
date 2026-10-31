@@ -89,6 +89,11 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/* « hidden » cache toujours, meme un element mis en page par une classe (display: flex...). */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   min-height: 100dvh;
@@ -2372,6 +2377,7 @@ line.series-3 {
 }
 
 .guided__step {
+  min-width: 0;
   margin: 0 0 var(--space-4);
   padding: var(--space-4);
   border: 1px solid var(--line);
@@ -2404,7 +2410,8 @@ line.series-3 {
   font-size: 0.9375rem;
 }
 
-.guided__step > legend + * {
+/* Tout ce qui suit le titre passe dessous (meme quand le premier element est cache). */
+.guided__step > legend ~ * {
   clear: both;
 }
 
