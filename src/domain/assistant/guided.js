@@ -45,6 +45,7 @@ export const TIME_CHOICES = [
  * @property {number | null} maxMinutes
  * @property {string[]} wishes             Identifiants de WISHES
  * @property {string | null} region        Region culinaire privilegiee (null : toutes)
+ * @property {boolean} [leftovers]          Les diners servent aussi au dejeuner du lendemain
  */
 
 /**
@@ -66,6 +67,7 @@ export function guidedRequest(choices) {
     region: choices.region,
     generate: true,
     redo: !choices.keepExisting,
+    nextLunchLeftovers: choices.leftovers === true,
     understood: true,
   };
 }
@@ -80,6 +82,7 @@ export function guidedRequest(choices) {
 export function describeChoices(choices, slotLabels, regionLabels) {
   const parts = [choices.slots.map((s) => (slotLabels.get(s) ?? s).toLowerCase()).join(', ')];
   parts.push(choices.keepExisting ? 'en gardant les repas déjà prévus' : 'en refaisant les repas non verrouillés');
+  if (choices.leftovers) parts.push('les restes du dîner pour le déjeuner du lendemain');
   if (choices.maxMinutes !== null && !choices.wishes.includes('batch')) parts.push(`${choices.maxMinutes} min maximum`);
   const wishes = choices.wishes.map((id) => WISHES.find((w) => w.id === id)?.label.toLowerCase()).filter(Boolean);
   if (wishes.length) parts.push(wishes.join(', '));

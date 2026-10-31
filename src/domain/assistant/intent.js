@@ -52,6 +52,7 @@ export const MODES = [
  * @property {{ count: number, mode: 'add' | 'total' } | null} guests
  * @property {boolean} convivial
  * @property {boolean} leftovers
+ * @property {boolean} nextLunchLeftovers          les diners servent aussi au dejeuner du lendemain
  * @property {string | null} cheaperAlternativeFor   ingredient (ou focus de l'ecran)
  * @property {string | null} unavailable              ingredient indisponible
  * @property {boolean} keepMeals                garder les repas, changer les produits
@@ -276,6 +277,7 @@ export function parseRequest(rawText, ctx) {
   const convivial = /convivial|recevoir|on recoit|je recois|fete|anniversaire|a partager|apero|invites/.test(text);
   const leftovers = /restes?\b/.test(text) && /utilise|reutilise|avec les|finir|recycle|repas precedent/.test(text);
   const keepMeals = /garde\w* (les memes|mes|le meme|les) (repas|recettes|plats|menus)|meme(s)? repas/.test(text);
+  const nextLunchLeftovers = /(restes?|cuisiner plus|en double|double portion)\b.*\b(lendemain|midi)\b/.test(text) && !/utilise|reutilise|finir/.test(text);
   const addMeal = /prevoi\w*|ajoute\w*|planifie\w*|rajoute\w*/.test(text) && /repas|diner|dejeuner|gouter|petit/.test(text);
   const generate = /(fais|fait|propose|prepare|genere|cree|compose|organise|remplis|complete)\w*(?:[\s-]+(?:moi|nous))?\s+(?:un|le|mon|des|les|une|ma)\s+(planning|menu|menus|repas de la semaine|semaine)/.test(text);
   const redo = /\brefai\w*|\brefaire\b|\brecompose\w*|\bchange tout\b/.test(text);
@@ -286,7 +288,7 @@ export function parseRequest(rawText, ctx) {
 
   const understood =
     modes.size > 0 || replace !== null || guests !== null || budgetPercent !== null || budgetCents !== null || budgetCap !== null || convivial ||
-    leftovers || cheaperAlternativeFor !== null || unavailable !== null || keepMeals || addMeal || generate || redo || cuisine !== null ||
+    leftovers || nextLunchLeftovers || cheaperAlternativeFor !== null || unavailable !== null || keepMeals || addMeal || generate || redo || cuisine !== null ||
     region !== null || reset || undo || avoid.length > 0 || include.length > 0 || maxMinutes !== null;
 
   return {
@@ -304,6 +306,7 @@ export function parseRequest(rawText, ctx) {
     guests,
     convivial,
     leftovers,
+    nextLunchLeftovers,
     cheaperAlternativeFor,
     unavailable,
     keepMeals,
@@ -346,7 +349,7 @@ export function mergeRequests(previous, next) {
   if (!previous || next.reset) return next;
   const hasOwnAction =
     next.replace !== null || next.guests !== null || next.cheaperAlternativeFor !== null || next.unavailable !== null || next.addMeal ||
-    next.leftovers || next.generate || next.undo;
+    next.leftovers || next.nextLunchLeftovers || next.generate || next.undo;
   const onlyConstraints = !hasOwnAction && next.modes.length === 0 && next.cuisine === null && next.region === null;
   if (!next.refinement && !onlyConstraints) return next;
   /** @param {any[]} a @param {any[]} b */
@@ -373,6 +376,7 @@ export function mergeRequests(previous, next) {
     unavailable: next.unavailable,
     addMeal: next.addMeal,
     leftovers: next.leftovers,
+    nextLunchLeftovers: next.nextLunchLeftovers || previous.nextLunchLeftovers,
     generate: next.generate || previous.generate,
     redo: next.redo || previous.redo,
     convivial: next.convivial || previous.convivial,
@@ -409,6 +413,7 @@ export function describeRequest(r, dayLabel, slotLabels, placeLabels) {
   if (r.guests) parts.push(r.guests.mode === 'add' ? `${r.guests.count} invité(s) en plus` : `${r.guests.count} personnes à table`);
   if (r.convivial) parts.push('repas convivial');
   if (r.leftovers) parts.push('utiliser les restes');
+  if (r.nextLunchLeftovers) parts.push('les restes du dîner pour le déjeuner du lendemain');
   const place = r.cuisine ?? r.region;
   if (place) parts.push(`cuisine : ${placeLabels?.get(place) ?? place}`);
   if (r.keepMeals) parts.push('garder les mêmes repas');

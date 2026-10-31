@@ -26,7 +26,7 @@ import { allIngredientIds, totalMinutes, recipeMealTypes, hasTag, fitsSlot } fro
 import { buildNameIndex, normalizeText } from '../domain/ingredients/ingredients.js';
 import { SLOTS, mealPortionsFor } from '../domain/planning/planning.js';
 import { expiryStatus, itemsToUseFirst } from '../domain/shopping/shopping.js';
-import { weekDays, toIsoDate } from '../domain/planning/dates.js';
+import { weekDays, toIsoDate, addDays } from '../domain/planning/dates.js';
 import { formatCents } from '../domain/budget/money.js';
 import { conversationStore, historyStore, preferenceStore, getHistory, getPreferences } from '../db/repositories/assistantRepository.js';
 import { putMeal, deleteMealRecord } from '../db/repositories/mealRepository.js';
@@ -461,6 +461,7 @@ export async function guidedDefaults() {
     maxMinutes: maxPref ? Number(maxPref.value) : 45,
     wishes: program ? programWishes(program.program) : [],
     region: null,
+    leftovers: false,
   };
   const last = /** @type {Partial<import('../domain/assistant/guided.js').GuidedChoices> | null} */ (stored && typeof stored === 'object' ? stored : null);
   // Programme actif : ses repas (jeune intermittent compris) et sa methode priment.
@@ -551,6 +552,9 @@ export async function previewProposal(monday, proposalId) {
           changed: changed.has(`${date}|${s.id}`),
           reason: reasons.get(`${date}|${s.id}`) ?? null,
           locked: meal?.locked ?? false,
+          cooksNextLunch: Boolean(meal?.nextLunch),
+          // Dejeuner servi par les restes du diner de la veille
+          leftoverOf: !meal && s.id === 'lunch' ? state.meals.find((m) => m.slot === 'dinner' && m.nextLunch && addDays(m.date, 1) === date)?.recipeName ?? null : null,
         };
       }),
     }));

@@ -5,7 +5,7 @@ import { SLOTS, mealPortionsFor } from '../domain/planning/planning.js';
 import { filterRecipes } from '../domain/recipes/recipeFiltering.js';
 import { totalMinutes, fitsSlot } from '../domain/recipes/recipes.js';
 import { personalPortion } from '../domain/nutrition/program.js';
-import { recipes, recipesById, filterContext, ingredientsById, preparationsById, nutritionByRecipe } from '../services/catalog.js';
+import { recipes, recipesById, filterContext, ingredientsById, preparationsById, nutritionByRecipe, keepingOf } from '../services/catalog.js';
 import { programSummary } from '../services/programService.js';
 import { loadAvailability, autoSubstituter } from '../services/territoryService.js';
 import { recipeLocalIssues } from '../domain/ingredients/territory.js';
@@ -133,6 +133,13 @@ export async function renderMeal(el, params) {
           </div>
         </fieldset>
 
+        <fieldset class="field" data-group="batch"${disabled}>
+          <legend>Batch cooking</legend>
+          <label class="check" data-batch-choice><input type="checkbox" name="batch"${meal.cookSameDay ? '' : ' checked'} />
+            <span>Préparer ce repas pendant la séance de batch cooking</span></label>
+          <p class="hint" data-output="keeping"></p>
+        </fieldset>
+
         <fieldset class="field" data-block="subs"${disabled}></fieldset>
 
         <p class="portions" data-output="portions" aria-live="polite"></p>
@@ -218,6 +225,7 @@ export async function renderMeal(el, params) {
       nextLunch: wantsLunch ? { attendees: checked('lunchAttendees'), guests: readCount(field('lunchGuests')) } : null,
       locked: Boolean(field('locked')?.checked),
       ...(subs.length || meal.substitutions ? { substitutions: subs } : {}),
+      cookSameDay: keepingOf.get(recipeId)?.batch === true && !field('batch')?.checked,
     };
   };
 
@@ -251,6 +259,13 @@ export async function renderMeal(el, params) {
     } else personalOut.textContent = '';
     nextLunchGroup.hidden = draft.slot !== 'dinner';
     nextLunchBlock.hidden = !draft.nextLunch;
+    const keeping = keepingOf.get(draft.recipeId);
+    /** @type {HTMLElement} */ (el.querySelector('[data-batch-choice]')).hidden = !keeping?.batch;
+    /** @type {HTMLElement} */ (el.querySelector('[data-output="keeping"]')).textContent = !keeping
+      ? ''
+      : keeping.batch
+        ? `Se garde ${keeping.fridgeDays} jour${keeping.fridgeDays > 1 ? 's' : ''} au réfrigérateur${keeping.freezes ? ' et se congèle' : ''}. Décochez pour le cuisiner le jour même.`
+        : keeping.note;
     if (draft.guests < 0 || (draft.nextLunch && draft.nextLunch.guests < 0)) {
       portionsOut.textContent = 'Nombre d’invités invalide.';
       return;

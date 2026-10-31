@@ -98,7 +98,7 @@ function targetMeals(req, ctx) {
 }
 
 /**
- * @typedef {{ chosen: string[], cuisines: string[], families: string[], ingredients: Set<string>, dates: Map<string, string[]>, preferCuisine?: string | null, preferTag?: import('../recipes/recipes.js').RecipeTag | null, medianCostIndex: number, maxMinutes: number | null }} WeekEnv
+ * @typedef {{ chosen: string[], cuisines: string[], families: string[], ingredients: Set<string>, dates: Map<string, string[]>, leftoverDinners?: boolean, preferCuisine?: string | null, preferTag?: import('../recipes/recipes.js').RecipeTag | null, medianCostIndex: number, maxMinutes: number | null }} WeekEnv
  */
 
 /**
@@ -185,6 +185,8 @@ function bestRecipe(where, constraints, weights, env, ctx) {
     );
     const twin = batchTwin(recipe, where.date, weights, env, ctx);
     let score = s.score + twin.bonus + tieBreak(`${recipe.id}|${where.date}|${where.slot}`) - varietyPenalty(recipe, env, ctx);
+    // Les restes du diner servent le lendemain midi : le plat doit se garder une nuit.
+    if (env.leftoverDinners && where.slot === 'dinner' && ctx.scoring.keepingOf?.get(recipe.id)?.batch === false) score -= 12;
     if (env.preferCuisine && recipe.cuisine === env.preferCuisine) score += 3;
     if (ctx.preferredCuisines?.has(recipe.cuisine)) score += 2;
     if (env.preferTag && hasTag(recipe, env.preferTag)) score += 6;
@@ -226,6 +228,7 @@ function prepare(req, ctx) {
     /** @type {Map<string, string[]>} */ dates: weekMeals.reduce((map, m) => map.set(m.recipeId, [...(map.get(m.recipeId) ?? []), m.date]), new Map()),
     medianCostIndex,
     maxMinutes: req.maxMinutes,
+    /** @type {boolean} */ leftoverDinners: req.nextLunchLeftovers,
     /** @type {string | null} */ preferCuisine: null,
     /** @type {import('../recipes/recipes.js').RecipeTag | null} */ preferTag: null,
   };
@@ -483,6 +486,38 @@ export function proposeChanges(req, ctx) {
     if (!count) notes.push(weights.quality ? 'Aucun produit de meilleure qualité n’est enregistré pour vos ingrédients : importez les produits du Drive pour que je puisse comparer.' : 'Aucune promotion vérifiée ne concerne vos ingrédients.');
   }
 
+  // --- Restes du diner pour le dejeuner du lendemain ---
+  /** Dejeuners servis par les restes du diner de la veille. */
+  /** @type {Set<string>} */
+  const leftoverLunches = new Set();
+  /**
+   * Les diners deja prevus (ou leur remplacant) qui se gardent servent aussi au dejeuner du lendemain,
+   * si ce dejeuner est libre ou, en « tout refaire », s'il n'est pas verrouille.
+   */
+  function leftoversFromExistingDinners() {
+    if (req.slots.length && !req.slots.includes('lunch')) return;
+    for (const dinner of targetMeals({ ...req, slots: [] }, ctx).filter((m) => m.slot === 'dinner')) {
+      const nextDate = addDays(dinner.date, 1);
+      if (dinner.locked || dinner.nextLunch || !ctx.days.includes(nextDate)) continue;
+      const replaced = operations.find((o) => o.type === 'replace_recipe' && o.mealId === dinner.id);
+      const recipeId = replaced && replaced.type === 'replace_recipe' ? replaced.recipeId : dinner.recipeId;
+      if (ctx.scoring.keepingOf?.get(recipeId)?.batch === false) continue;
+      const lunch = ctx.meals.find((m) => m.date === nextDate && m.slot === 'lunch');
+      if (lunch && (lunch.locked || !req.redo)) continue;
+      if (lunch) {
+        // Le dejeuner remplace par les restes n'a plus besoin d'une nouvelle recette.
+        for (let i = operations.length - 1; i >= 0; i -= 1) {
+          const o = operations[i];
+          if (o.type === 'replace_recipe' && o.mealId === lunch.id) operations.splice(i, 1);
+        }
+        operations.push({ type: 'remove_meal', mealId: lunch.id, reason: 'Remplacé par les restes du dîner de la veille.' });
+      }
+      const name = ctx.recipesById.get(recipeId)?.name ?? dinner.recipeName;
+      operations.push({ type: 'set_next_lunch', mealId: dinner.id, reason: `Cuisiner plus de ${name} pour le déjeuner du lendemain.` });
+      leftoverLunches.add(`${nextDate}|lunch`);
+    }
+  }
+
   // --- Generer ou refaire des repas, optimiser selon les objectifs ---
   const generic = !req.keepMeals && (req.generate || req.redo || req.modes.length > 0 || req.cuisine || req.region || req.include.length || req.avoid.length || req.budgetPercent !== null || req.budgetCap);
   const alreadyHandled = new Set(operations.flatMap((o) => ('mealId' in o ? [o.mealId] : [])));
@@ -517,18 +552,35 @@ export function proposeChanges(req, ctx) {
     }
     if (savingGoal !== null && saved < savingGoal * 0.8) notes.push('Je n’ai pas trouvé assez de remplacements pour atteindre toute la baisse demandée sans changer vos contraintes.');
 
+    if (req.nextLunchLeftovers) leftoversFromExistingDinners();
+
     // Cases vides a remplir si l'on demande un planning
     if (req.generate || (req.redo && !targets.length)) {
       const days = (req.days.length ? req.days : ctx.days).filter((d) => d >= ctx.today);
       const slots = req.slots.length ? req.slots : ctx.activeSlots;
-      for (const free of freeSlots(ctx.meals, days, slots)) {
-        const pick = bestRecipe(free, base, weights, env, ctx);
+      const free = freeSlots(ctx.meals, days, slots);
+      const isFree = (/** @type {string} */ date, /** @type {Slot} */ slot) => free.some((f) => f.date === date && f.slot === slot) && !leftoverLunches.has(`${date}|${slot}`);
+      for (const slot of free) {
+        if (leftoverLunches.has(`${slot.date}|${slot.slot}`)) continue;
+        const pick = bestRecipe(slot, base, weights, env, ctx);
         if (!pick) continue;
-        remember(env, pick.recipe, ctx, free.date);
-        operations.push({ type: 'add_meal', date: free.date, slot: free.slot, recipeId: pick.recipe.id, guests: 0, reason: pick.reasons.length ? `${pick.reasons.join(', ')}.` : 'Complète le planning.' });
+        remember(env, pick.recipe, ctx, slot.date);
+        const nextDate = addDays(slot.date, 1);
+        const withLeftovers = req.nextLunchLeftovers && slot.slot === 'dinner' && pick.recipe && ctx.scoring.keepingOf?.get(pick.recipe.id)?.batch !== false && isFree(nextDate, 'lunch');
+        if (withLeftovers) leftoverLunches.add(`${nextDate}|lunch`);
+        const reasons = withLeftovers ? [...pick.reasons, 'les restes servent au déjeuner du lendemain'] : pick.reasons;
+        operations.push({
+          type: 'add_meal',
+          date: slot.date,
+          slot: slot.slot,
+          recipeId: pick.recipe.id,
+          guests: 0,
+          reason: reasons.length ? `${reasons.join(', ')}.` : 'Complète le planning.',
+          ...(withLeftovers ? { nextLunch: true } : {}),
+        });
       }
     }
-  }
+  } else if (req.nextLunchLeftovers) leftoversFromExistingDinners();
 
   if (!operations.length && !notes.length) {
     notes.push(req.understood ? 'Votre planning correspond déjà bien à cette demande : je n’ai rien trouvé de nettement meilleur.' : 'Je n’ai pas compris la demande. Essayez par exemple « des repas plus rapides cette semaine » ou « remplace le poisson de mardi par du poulet ».');

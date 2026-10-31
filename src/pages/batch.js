@@ -10,7 +10,7 @@ import { calendarFile } from '../domain/planning/calendar.js';
 import { equipmentLabel } from '../domain/recipes/equipment.js';
 import { recipesById, preparationsById, ingredientsById, keepingOf } from '../services/catalog.js';
 import { getHousehold } from '../services/householdService.js';
-import { getMeals } from '../services/planningService.js';
+import { getMeals, saveMeal } from '../services/planningService.js';
 import { getBatchPlan, saveBatchPlan, batchSessions } from '../services/batchService.js';
 
 /** @typedef {import('../domain/batchCooking/batchCooking.js').CookingTask} CookingTask */
@@ -43,11 +43,15 @@ export async function renderBatch(el, params) {
    */
   const storageHtml = (d) =>
     d.servings
-      .map((sv) =>
-        sv.storage === 'freezer'
-          ? `<p class="keep keep--freezer"><strong>${escapeHtml(mealWhen(sv.meal))}</strong> (${sv.portions} portion${sv.portions > 1 ? 's' : ''}) : congélateur dès que le plat a refroidi, à sortir ${escapeHtml(formatIsoDay(/** @type {string} */ (sv.thawOn)))} soir.</p>`
-          : `<p class="keep keep--fridge"><strong>${escapeHtml(mealWhen(sv.meal))}</strong> (${sv.portions} portion${sv.portions > 1 ? 's' : ''}) : réfrigérateur jusqu’au repas.</p>`,
-      )
+      .map((sv) => {
+        const who = `<strong>${escapeHtml(mealWhen(sv.meal))}</strong>${sv.meal.nextLunch ? ' et restes du lendemain midi' : ''} (${sv.portions} portion${sv.portions > 1 ? 's' : ''})`;
+        const how =
+          sv.storage === 'freezer'
+            ? `congélateur dès que le plat a refroidi, à sortir ${escapeHtml(formatIsoDay(/** @type {string} */ (sv.thawOn)))} soir.`
+            : 'réfrigérateur jusqu’au repas.';
+        return `<div class="keep keep--${sv.storage}"><p>${who} : ${how}</p>
+          <button type="button" class="button button--small button--secondary" data-same-day="${escapeHtml(sv.meal.id)}">Le cuisiner plutôt le jour même</button></div>`;
+      })
       .join('');
 
   /**
@@ -157,7 +161,12 @@ export async function renderBatch(el, params) {
       ${
         week.sameDay.length
           ? `<h2>À cuisiner le jour même</h2>
-             <ul class="task__uses">${week.sameDay.map((x) => `<li><strong>${escapeHtml(mealWhen(x.meal))}</strong> : ${escapeHtml(x.meal.recipeName)}<br /><span class="hint">${escapeHtml(x.note)}</span></li>`).join('')}</ul>`
+             <ul class="task__uses">${week.sameDay
+               .map(
+                 (x) => `<li><strong>${escapeHtml(mealWhen(x.meal))}</strong> : ${escapeHtml(x.meal.recipeName)}<br /><span class="hint">${escapeHtml(x.note)}</span>
+                   ${x.meal.cookSameDay ? `<br /><button type="button" class="button button--small button--secondary" data-to-batch="${escapeHtml(x.meal.id)}">Le préparer pendant la séance</button>` : ''}</li>`,
+               )
+               .join('')}</ul>`
           : ''
       }
       ${
@@ -183,6 +192,18 @@ export async function renderBatch(el, params) {
     await saveBatchPlan({ day, midweek: data.get('midweek') === 'on' });
     await renderBatch(el, params);
   });
+
+  // Choix par repas : seance de batch ou jour meme.
+  el.querySelectorAll('[data-same-day], [data-to-batch]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const id = b.getAttribute('data-same-day') ?? b.getAttribute('data-to-batch');
+      const target = meals.find((m) => m.id === id);
+      if (!target) return;
+      const errors = await saveMeal({ ...target, cookSameDay: b.hasAttribute('data-same-day') });
+      if (errors.length) window.alert(errors.join('\n'));
+      await renderBatch(el, params);
+    }),
+  );
 
   el.querySelector('[data-action="calendar"]')?.addEventListener('click', () => {
     const text = calendarFile('Batch', batchCalendarEvents(week, (/** @type {Meal} */ m) => mealWhen(m)), calendarStamp());

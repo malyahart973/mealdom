@@ -10,7 +10,7 @@ import { compatibleMethods } from '../recipes/recipes.js';
 import { mealPortionsFor } from '../planning/planning.js';
 import { sessionFor, storagePlan, preparationKeeping } from './keeping.js';
 import { addMinutes } from '../planning/calendar.js';
-import { parseIsoDate } from '../planning/dates.js';
+import { parseIsoDate, addDays } from '../planning/dates.js';
 
 /** @typedef {import('../planning/planning.js').Meal} Meal */
 /** @typedef {import('../household/household.js').Household} Household */
@@ -248,7 +248,8 @@ const UNKNOWN_KEEPING = { batch: false, fridgeDays: 0, freezes: false, note: 'Co
  * 1. chaque repas depend de la seance la plus recente, le jour meme ou avant (les repas d'avant la
  *    premiere seance ne sont pas concernes) ;
  * 2. un plat qui se garde jusqu'au repas est cuisine entier pendant la seance : au refrigerateur s'il
- *    tient jusque-la, sinon au congelateur (a sortir la veille) ; sinon il se cuisine le jour meme ;
+ *    tient jusque-la (restes du lendemain midi compris), sinon au congelateur (a sortir la veille) ;
+ *    sinon, ou si la personne l'a choisi pour ce repas, il se cuisine le jour meme ;
  *    le meme plat pour plusieurs repas d'une seance est cuisine une seule fois (portions additionnees) ;
  * 3. les preparations de base sont faites pendant la seance pour les repas qu'elles peuvent attendre ;
  * 4. les appareils sont repartis : un plat qui peut se faire sur plusieurs appareils va sur le moins charge.
@@ -276,8 +277,14 @@ export function planBatchWeek(meals, sessions, household, ctx) {
       problems.push(`La recette de « ${meal.recipeName} » n’existe plus.`);
       continue;
     }
+    if (meal.cookSameDay) {
+      sameDay.push({ meal, note: 'Vous avez choisi de le cuisiner le jour même.' });
+      continue;
+    }
     const keeping = ctx.keepingOf.get(recipe.id) ?? UNKNOWN_KEEPING;
-    const plan = storagePlan(keeping, session, meal.date);
+    // Avec des restes pour le lendemain midi, le plat doit tenir jusqu'au lendemain.
+    const last = storagePlan(keeping, session, meal.nextLunch ? addDays(meal.date, 1) : meal.date);
+    const plan = last.storage === 'freezer' ? { storage: last.storage, thawOn: addDays(meal.date, -1) } : last;
     if (plan.storage === 'same_day') {
       if (meal.slot === 'lunch' || meal.slot === 'dinner') {
         sameDay.push({ meal, note: keeping.batch ? `Se garde ${keeping.fridgeDays} jour${keeping.fridgeDays > 1 ? 's' : ''} au frais et ne se congèle pas : trop loin de la séance.` : keeping.note });

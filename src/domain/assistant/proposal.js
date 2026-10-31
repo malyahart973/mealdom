@@ -22,7 +22,7 @@ import { aggregateNeeds, mealNeedLines } from '../shopping/shopping.js';
 /**
  * Operations que l'assistant peut proposer.
  * @typedef {{ type: 'replace_recipe', mealId: string, recipeId: string, reason: string }
- *   | { type: 'add_meal', date: string, slot: Slot, recipeId: string, guests: number, reason: string }
+ *   | { type: 'add_meal', date: string, slot: Slot, recipeId: string, guests: number, reason: string, nextLunch?: boolean }
  *   | { type: 'remove_meal', mealId: string, reason: string }
  *   | { type: 'set_guests', mealId: string, guests: number, reason: string }
  *   | { type: 'substitute', mealId: string, from: string, to: string, reason: string }
@@ -131,7 +131,7 @@ export function applyOperations(state, operations, ctx) {
             recipeName: recipe.name,
             attendees: ctx.household.members.map((m) => m.id),
             guests: op.guests,
-            nextLunch: null,
+            nextLunch: op.nextLunch && op.slot === 'dinner' ? { attendees: ctx.household.members.map((m) => m.id), guests: 0 } : null,
             locked: false,
           };
           const subs = ctx.autoSubstitutions?.(recipe) ?? [];
@@ -225,7 +225,7 @@ export function parseOperations(value) {
       case 'add_meal': {
         const slot = str('slot');
         if (!SLOTS.some((s) => s.id === slot)) return { ok: false, error: `Créneau inconnu : ${slot}` };
-        out.push({ type: 'add_meal', date: str('date'), slot: /** @type {Slot} */ (slot), recipeId: str('recipeId'), guests: Number.isNaN(num('guests')) ? 0 : num('guests'), reason });
+        out.push({ type: 'add_meal', date: str('date'), slot: /** @type {Slot} */ (slot), recipeId: str('recipeId'), guests: Number.isNaN(num('guests')) ? 0 : num('guests'), reason, ...(o.nextLunch === true ? { nextLunch: true } : {}) });
         break;
       }
       case 'remove_meal':

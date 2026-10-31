@@ -3,6 +3,7 @@ import { recipeKeeping, preparationKeeping, batchSessionDates, storagePlan, sess
 import { planBatchWeek, batchCalendarEvents } from '../src/domain/batchCooking/batchCooking.js';
 import { scoreRecipe } from '../src/domain/assistant/scoring.js';
 import { proposeChanges } from '../src/domain/assistant/engine.js';
+import { applyOperations, parseOperations } from '../src/domain/assistant/proposal.js';
 import { buildNutritionIndex } from '../src/domain/nutrition/nutrition.js';
 import { CUISINES } from '../src/data/cuisines.js';
 import { NUTRITION } from '../src/data/nutrition.js';
@@ -192,4 +193,61 @@ test('Planifier en batch cooking : plats qui se gardent, cuisinés en double, ja
   });
   const keeps = ops.every((o) => storagePlan(keepingFor(o.recipeId), '2026-11-01', o.date).storage !== 'same_day');
   assertEqual([ops.length, new Set(ops.map((o) => o.recipeId)).size <= 9, sameDayTwice, keeps], [14, true, false, true]);
+});
+
+// --- Restes du diner pour le dejeuner du lendemain, choix par repas ---
+const DAYS = ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08'];
+/** @param {Meal[]} meals @param {string[]} sessions */
+const engineFor = (meals, sessions) => ({
+  scoring: { household, ingredients, preparations, nutrition: buildNutritionIndex(NUTRITION), nutritionByRecipe: new Map(), unitPrices: new Map(), promoIngredients: new Set(), stockIngredients: new Set(), programTargets: null, keepingOf },
+  recipes: ALL_RECIPES, recipesById: recipes, meals, today: '2026-10-31', days: DAYS, activeSlots: /** @type {import('../src/domain/planning/planning.js').Slot[]} */ (['lunch', 'dinner']),
+  weeklyBudgetCents: null, learnedWeights: {}, productsByIngredient: new Map(), cuisineRegion: new Map(CUISINES.map((c) => [c.id, c.region])),
+  familyOf: new Map(ALL_RECIPES.map((r) => [r.id, recipeFamily(r, ingredients)])), batchSessions: sessions,
+});
+let idCounter = 0;
+const applyCtx = { household, recipes, ingredients, preparations, productsByIngredient: new Map(), newId: () => `n${++idCounter}` };
+
+test('Demande « les restes du soir pour le lendemain midi » comprise, distincte de « utilise les restes »', () => {
+  const finder = makeIngredientFinder(buildNameIndex(INGREDIENTS), ingredients);
+  const c = { today: '2026-10-31', monday: '2026-11-02', ...finder };
+  const a = parseRequest('Quand je cuisine le soir, les restes servent pour le lendemain midi', c);
+  const b = parseRequest('Utilise les restes du repas précédent', c);
+  assertEqual([a.nextLunchLeftovers, a.understood, b.nextLunchLeftovers, b.leftovers], [true, true, false, true]);
+});
+
+test('Planifier avec les restes : chaque dîner sert le déjeuner du lendemain', () => {
+  const req = guidedRequest({ slots: ['lunch', 'dinner'], keepExisting: true, budgetCents: null, maxMinutes: null, wishes: [], region: null, leftovers: true });
+  const ops = proposeChanges(req, engineFor([], [])).operations.flatMap((o) => (o.type === 'add_meal' ? [o] : []));
+  const lunches = ops.filter((o) => o.slot === 'lunch').map((o) => o.date);
+  const withLeftovers = ops.filter((o) => o.nextLunch).map((o) => o.date);
+  // Lundi midi cuisiné ; mardi -> dimanche midi : restes de la veille ; le dîner de dimanche n'a pas de lendemain dans la semaine.
+  assertEqual([lunches, withLeftovers, ops.filter((o) => o.nextLunch).every((o) => keepingFor(o.recipeId).batch)], [['2026-11-02'], DAYS.slice(0, 6), true]);
+  const result = applyOperations({ meals: [], weeklyBudgetCents: null, preferredProducts: {} }, ops, applyCtx);
+  assertEqual([result.errors, result.state.meals.filter((m) => m.nextLunch).length], [[], 6]);
+});
+
+test('Tout refaire avec les restes : le déjeuner du lendemain laisse la place aux restes', () => {
+  const dinner = { ...meal('d1', '2026-11-02', 'chicken_colombo'), attendees: ['A', 'B'] };
+  const lunch = { ...meal('l1', '2026-11-03', 'one_pot_pasta_tomato_basil'), slot: /** @type {const} */ ('lunch') };
+  const req = { ...guidedRequest({ slots: ['lunch', 'dinner'], keepExisting: false, budgetCents: null, maxMinutes: null, wishes: [], region: null, leftovers: true }), generate: false };
+  const ops = proposeChanges(req, engineFor([dinner, lunch], [])).operations;
+  assertEqual([ops.some((o) => o.type === 'remove_meal' && o.mealId === 'l1'), ops.some((o) => o.type === 'set_next_lunch' && o.mealId === 'd1'), ops.some((o) => o.type === 'replace_recipe' && o.mealId === 'l1')], [true, true, false]);
+  const result = applyOperations({ meals: [dinner, lunch], weeklyBudgetCents: null, preferredProducts: {} }, ops, applyCtx);
+  assertEqual([result.errors, result.state.meals.find((m) => m.id === 'd1')?.nextLunch !== null, result.state.meals.some((m) => m.id === 'l1')], [[], true, false]);
+});
+
+test('Opération de l’IA : un nouveau dîner peut servir au déjeuner du lendemain', () => {
+  const r = parseOperations([{ type: 'add_meal', date: '2026-11-02', slot: 'dinner', recipeId: 'chicken_colombo', guests: 0, nextLunch: true }]);
+  assertEqual(r.ok && r.operations[0].type === 'add_meal' ? r.operations[0].nextLunch : null, true);
+});
+
+test('Batch : un repas qu’on préfère cuisiner le jour même sort de la séance', () => {
+  const w = planBatchWeek([{ ...meal('x', '2026-11-03', 'chicken_colombo'), cookSameDay: true }], ['2026-11-01'], household, ctx);
+  assertEqual([w.sessions.flatMap((s) => s.dishes).length, w.sameDay.map((x) => x.note)], [0, ['Vous avez choisi de le cuisiner le jour même.']]);
+});
+
+test('Batch : un dîner avec restes doit tenir jusqu’au lendemain midi', () => {
+  const plain = planBatchWeek([meal('y', '2026-11-04', 'chicken_colombo')], ['2026-11-01'], household, ctx).sessions[0].dishes[0].servings[0];
+  const withLunch = planBatchWeek([{ ...meal('z', '2026-11-04', 'chicken_colombo'), nextLunch: { attendees: ['A', 'B'], guests: 0 } }], ['2026-11-01'], household, ctx).sessions[0].dishes[0].servings[0];
+  assertEqual([plain.storage, withLunch.storage, withLunch.thawOn, withLunch.portions], ['fridge', 'freezer', '2026-11-03', 4]);
 });

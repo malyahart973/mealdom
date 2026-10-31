@@ -65,6 +65,7 @@ export async function renderPlanWeek(el, params) {
             <label class="check"><input type="radio" name="keep" value="keep"${choices.keepExisting ? ' checked' : ''} /> <span>Garder les repas déjà prévus</span></label>
             <label class="check"><input type="radio" name="keep" value="redo"${choices.keepExisting ? '' : ' checked'} /> <span>Tout refaire (sauf les repas verrouillés)</span></label>
           </div>
+          <label class="check"><input type="checkbox" name="leftovers"${choices.leftovers ? ' checked' : ''} /> <span>Les restes du dîner pour le déjeuner du lendemain (on cuisine plus le soir)</span></label>
         </fieldset>
 
         <fieldset class="guided__step">
@@ -165,6 +166,7 @@ export async function renderPlanWeek(el, params) {
       maxMinutes,
       wishes: [...el.querySelectorAll('[data-wish][aria-pressed="true"]')].map((b) => b.getAttribute('data-wish') ?? ''),
       region: /** @type {HTMLSelectElement} */ (el.querySelector('#g-region')).value || null,
+      leftovers: data.get('leftovers') === 'on',
     };
     const week = String(data.get('week') ?? monday);
     if (picked.wishes.includes('batch')) {
@@ -322,15 +324,18 @@ export async function renderWeekPreview(el, params) {
 
 /**
  * @param {string} date
- * @param {{ slot: Slot, slotLabel: string, recipeId: string | null, recipeName: string | null, minutes: number | null, kcal: number | null, changed: boolean, reason: string | null, locked: boolean }} m
+ * @param {{ slot: Slot, slotLabel: string, recipeId: string | null, recipeName: string | null, minutes: number | null, kcal: number | null, changed: boolean, reason: string | null, locked: boolean, cooksNextLunch?: boolean, leftoverOf?: string | null }} m
  * @returns {string}
  */
 function mealHtml(date, m) {
   const key = `${date}|${m.slot}`;
+  if (!m.recipeId && m.leftoverOf) {
+    return `<li class="gmeal gmeal--leftover"><span class="gmeal__slot">${escapeHtml(m.slotLabel)} · restes</span><span class="gmeal__name">${escapeHtml(m.leftoverOf)}</span><span class="gmeal__meta">Restes du dîner de la veille</span></li>`;
+  }
   if (!m.recipeId) {
     return `<li class="gmeal gmeal--empty"><span class="gmeal__slot">${escapeHtml(m.slotLabel)}</span><span class="gmeal__name">Libre</span></li>`;
   }
-  const meta = [m.minutes !== null ? `${m.minutes} min` : '', m.kcal !== null ? `${m.kcal} kcal` : ''].filter(Boolean).join(' · ');
+  const meta = [m.minutes !== null ? `${m.minutes} min` : '', m.kcal !== null ? `${m.kcal} kcal` : '', m.cooksNextLunch ? 'et pour demain midi' : ''].filter(Boolean).join(' · ');
   return `<li class="gmeal${m.changed ? ' gmeal--new' : ''}">
     <span class="gmeal__slot">${escapeHtml(m.slotLabel)}${m.changed ? '' : ` · ${m.locked ? 'verrouillé' : 'déjà prévu'}`}</span>
     <a class="gmeal__name" href="#/recettes/${encodeURIComponent(m.recipeId)}">${escapeHtml(m.recipeName ?? '')}</a>

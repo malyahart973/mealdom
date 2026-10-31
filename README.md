@@ -55,15 +55,15 @@ src/
     portions/         Portions adulte/enfant, arrondi, dîner + déjeuner du lendemain
     recipes/          Recettes, préparations réutilisables, équipements, filtrage
     household/        Foyer, membres, régimes, compatibilité recette / foyer
-    planning/         Dates, planning manuel, portions par repas, restes, verrouillage
-    batchCooking/     Préparations de la semaine, quantités totales, ordre et durée de la session
+    planning/         Dates, planning manuel, portions par repas, restes, verrouillage, fichier agenda
+    batchCooking/     Séances de batch (plats entiers et bases), conservation des plats, ordre et durée de la session
     shopping/         Besoins de la semaine, agrégation, stock, conditionnements, liste de courses
     stores/           Magasins, prix relevés, disponibilité, coût estimé des courses
     budget/           Montants en centimes, budget, dépenses réelles, prévision
     nutrition/        Valeurs nutritionnelles, programme minceur (besoins, portions), suivi du poids
     drive/            Produits Drive, promotions, chiffrage vérifié/estimé, contrôle de commande
     assistant/        Compréhension des demandes, moteur de propositions, opérations, préférences, outils de l'IA
-    trips/            Coût des trajets, regroupement des achats par magasin, sortie courses et agenda, positions et distances
+    trips/            Circuit de courses, regroupement des achats par magasin, sortie courses et agenda, positions et distances
   data/               Données de référence (ingrédients, valeurs nutritionnelles, cuisines, préparations, portions)
     catalog/          Catalogue de recettes par famille (petit-déjeuner, goûter, Asie, monde, léger)
   db/                 Base locale et accès aux données
@@ -88,6 +88,7 @@ tests/                Tests des règles métier (ouvrir tests/index.html)
 
 ## Historique
 
+- **0.15.0** — Circuit de courses : domicile → magasins → domicile dans l’ordre le plus court, trajets entre magasins calculés (OSRM, une seule demande) ou estimés d’après les positions, jamais sous-estimés ; le regroupement des magasins compte le carburant du circuit, finit si possible par le magasin du frais et propose un ordre plus court pour la sortie enregistrée. Batch cooking relié au planning : conservation de chaque plat (jours au réfrigérateur, congélation), envie « Batch cooking » dans « Planifier ma semaine » avec le jour de la séance et une séance le mercredi en option, plats cuisinés en double dans la même séance, écran Batch cooking par séance (plats entiers et bases, appareils en parallèle, réfrigérateur ou congélateur pour chaque repas), rappels de décongélation dans l’agenda, choix « séance » ou « jour même » pour chaque repas. Option « les restes du dîner pour le déjeuner du lendemain » dans « Planifier ma semaine ». Mode cuisine pas à pas : ingrédients à cocher pour le nombre de portions voulu, une étape par écran en gros caractères, minuteurs repérés dans les étapes, écran toujours allumé.
 - **0.14.0** — Assistant guidé « Planifier ma semaine » : trois questions, la semaine en cartes, « Changer » ou « Retirer » un plat, un seul bouton « Valider » (annulable). Recettes rangées par famille (un plat dans une seule famille), semaine variée en familles et en régions. 48 recettes faciles du quotidien (quiches, tartes salées, pizzas, gratins, veloutés, omelettes, plats au four, desserts), dont 13 avec une méthode au robot cuiseur (type Thermomix). « Mes recettes » : saisie, import d’un texte collé (sans IA), d’un lien ou d’une photo / capture d’écran (IA), à vérifier avant enregistrement. Écran unique « Ajouter un prix » : scan du code-barres (lecteur du téléphone ou lecteur ZXing intégré, hors ligne), fiche Open Food Facts, prix toujours saisi ou lu sur l’étiquette. Programme minceur : compter les calories ou rééquilibrage sans compter, option « plus de protéines », jeûne intermittent (12/12, 14/10, 16/8), 3 à 5 repas par jour avec collation du matin, semaine type de sport (calories en partie remangées les jours de séance), trame de repas personnelle (coach, diététicienne), cinq rythmes comparés dont la stabilisation. Base v9.
 - **0.13.2** — Correction : le bouton « Accepter » de l’assistant restait grisé pour les gros changements (planning de la semaine) tant qu’une case peu visible n’était pas cochée ; il est maintenant toujours actif et demande une confirmation claire. « Fais-moi un planning » est désormais résumé comme compris.
 - **0.13.1** — Nouvelle icône « couï garni » : un couï (calebasse) aux couleurs roucou et mangue, avec un fruit et une feuille, sur fond vert fleuve.

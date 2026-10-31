@@ -34,6 +34,7 @@ export const SLOTS = [
  * @property {string[]} attendees      Membres presents
  * @property {number} guests           Invites, comptes comme adultes
  * @property {{ attendees: string[], guests: number } | null} nextLunch
+ * @property {boolean} [cookSameDay]   Batch cooking : a cuisiner le jour meme, pas pendant la seance
  *   Diner cuisine en plus grande quantite pour le dejeuner du lendemain
  * @property {boolean} locked
  * @property {Substitution[]} [substitutions]   Ingredients remplaces pour ce repas uniquement
