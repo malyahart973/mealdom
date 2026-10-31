@@ -3,7 +3,7 @@ import { formatIsoDay, formatIsoDayMonth, formatMinutes, formatTime } from '../u
 import { parseDecimal } from '../utils/units-select.js';
 import { addDays, parseIsoDate, toIsoDate, weekStart } from '../domain/planning/dates.js';
 import { formatCents } from '../domain/budget/money.js';
-import { tripCostCents, MAX_STORES_PER_TRIP } from '../domain/trips/trips.js';
+import { circuitFor, bestCircuit, fuelCostCents, legKey, MAX_STORES_PER_TRIP } from '../domain/trips/trips.js';
 import { SLOTS } from '../domain/planning/planning.js';
 import { ingredientsById } from '../services/catalog.js';
 import { saveStore } from '../services/budgetService.js';
@@ -75,6 +75,7 @@ function mountPlaceSearch(root, key, onPick) {
 }
 
 /** @typedef {import('../domain/trips/trips.js').GroupingPlan} GroupingPlan */
+/** @typedef {import('../domain/trips/trips.js').Circuit} Circuit */
 /** @typedef {import('../domain/trips/trips.js').ShoppingTrip} ShoppingTrip */
 /** @typedef {import('../domain/stores/stores.js').Store} Store */
 
@@ -94,7 +95,7 @@ const decimalInput = (v) => (v === null || v === undefined ? '' : String(v).repl
 export async function renderTrip(el, params) {
   const today = toIsoDate(new Date());
   const monday = weekStart(params.date && parseIsoDate(params.date) ? params.date : today);
-  const [{ mealCount, lines, grouping, stores, car, fewerTrips }, trip, home] = await Promise.all([weekGrouping(monday), getTrip(monday), getHome()]);
+  const [{ mealCount, lines, grouping, stores, car, fewerTrips, legs }, trip, home] = await Promise.all([weekGrouping(monday), getTrip(monday), getHome()]);
   const storesById = new Map(stores.map((s) => [s.id, s]));
   const storeName = (/** @type {string} */ id) => storesById.get(id)?.name ?? 'Magasin supprimé';
   const lineName = new Map(lines.map((l) => [l.key, ingredientsById.get(l.ingredientId)?.name ?? l.ingredientId]));
@@ -105,6 +106,24 @@ export async function renderTrip(el, params) {
 
   /** @param {GroupingPlan} p */
   const planStores = (p) => p.storeIds.map(storeName).join(' + ');
+  /** @param {Circuit} c */
+  const circuitPath = (c) => ['Domicile', ...c.storeIds.map(storeName), 'Domicile'].join(' → ');
+  /** @param {number} km */
+  const kmText = (km) => `${String(km).replace('.', ',')}\u00a0km`;
+  /**
+   * Circuit et reserves sur les distances.
+   * @param {Circuit} c
+   */
+  const circuitHtml = (c) => {
+    const saved = Math.round((c.separateKm - c.km) * 10) / 10;
+    const notes = [
+      ...c.viaHome.map(([a, b]) => `Trajet direct ${storeName(a)} – ${storeName(b)} inconnu : compté comme un retour à la maison. Indiquez la position des deux magasins (en bas de page).`),
+      ...(c.estimated ? ['Trajet entre magasins estimé à vol d’oiseau : touchez « Calculer les distances » (en bas de page) pour l’itinéraire réel.'] : []),
+    ];
+    return `<p class="trip-circuit"><strong>${escapeHtml(circuitPath(c))}</strong> : ${escapeHtml(kmText(c.km))}${
+      saved >= 0.5 ? `, soit ${escapeHtml(kmText(saved))} de moins que des allers-retours séparés` : ''
+    }.</p>${notes.map((n) => `<p class="hint">${escapeHtml(n)}</p>`).join('')}`;
+  };
   /** @param {GroupingPlan} p */
   const tripText = (p) =>
     p.unknownTrips.length === p.storeIds.length ? 'non chiffré' : `${formatCents(p.tripCents)}${p.unknownTrips.length ? ' (incomplet)' : ''}`;
@@ -113,9 +132,10 @@ export async function renderTrip(el, params) {
     <div class="proposal trip-plan">
       <h3>${escapeHtml(planStores(p))}</h3>
       <p class="hint">${escapeHtml(grouping.reason)}</p>
+      ${p.circuit ? circuitHtml(p.circuit) : ''}
       <dl class="budget-card">
         <div><dt>Articles</dt><dd>${escapeHtml(formatCents(p.itemsCents))}</dd></div>
-        <div><dt>Trajets (aller-retour)</dt><dd>${escapeHtml(tripText(p))}</dd></div>
+        <div><dt>${p.circuit ? 'Carburant' : 'Trajets (aller-retour)'}</dt><dd>${escapeHtml(tripText(p))}</dd></div>
         <div><dt>Total</dt><dd>${escapeHtml(formatCents(p.totalCents))}</dd></div>
         <div><dt>Temps de route</dt><dd>${p.minutes === null ? '—' : escapeHtml(formatMinutes(p.minutes))}</dd></div>
       </dl>
@@ -135,9 +155,16 @@ export async function renderTrip(el, params) {
   const otherPlans = grouping.plans.filter((p) => p !== rec).slice(0, MAX_PLANS_SHOWN);
   const stops = trip?.storeIds ?? rec?.storeIds ?? [];
   const tripStores = (trip?.storeIds ?? []).map((id) => storesById.get(id)).filter((s) => s !== undefined);
-  const tripMinutes = tripStores.every((s) => (s.travelMinutes ?? null) !== null) ? tripStores.reduce((n, s) => n + 2 * (s.travelMinutes ?? 0), 0) : null;
-  const tripCosts = tripStores.map((s) => tripCostCents(s, car));
-  const tripCost = tripCosts.every((c) => c !== null) ? tripCosts.reduce((n, c) => n + (c ?? 0), 0) : null;
+  // Sortie enregistree : circuit dans l'ordre choisi, et ordre plus court s'il existe.
+  const tripCircuit = circuitFor(tripStores, legs);
+  const shorter = tripCircuit && tripStores.length > 1 ? bestCircuit(tripStores, legs) : null;
+  const gainKm = tripCircuit && shorter ? Math.round((tripCircuit.km - shorter.km) * 10) / 10 : 0;
+  const betterOrder = gainKm >= 0.5 ? shorter : null;
+  const tripMinutes = tripCircuit ? tripCircuit.minutes : null;
+  const tripCost = tripCircuit ? fuelCostCents(tripCircuit.km, car) : null;
+  // Trajets entre magasins positionnes, pour la section Trajets.
+  const located = stores.filter((s) => s.location);
+  const pairs = located.flatMap((a, i) => located.slice(i + 1).map((b) => ({ a, b, leg: legs.get(legKey(a.id, b.id)) ?? null })));
 
   /** @param {number} index */
   const stopSelect = (index) => `<select data-stop="${index}" aria-label="Arrêt ${index + 1}">
@@ -160,7 +187,14 @@ export async function renderTrip(el, params) {
               <p><strong>Courses prévues ${escapeHtml(formatIsoDay(trip.date))} à ${escapeHtml(formatTime(trip.time))}</strong> :
                 ${trip.storeIds.map((id, i) => `${i ? 'puis ' : ''}${escapeHtml(storeName(id))}`).join(', ')}.</p>
               ${trip.driveSlot ? `<p>Retrait Drive ${escapeHtml(formatIsoDay(trip.driveSlot.date))}, de ${escapeHtml(formatTime(trip.driveSlot.start))} à ${escapeHtml(formatTime(trip.driveSlot.end))}.</p>` : ''}
+              ${tripCircuit ? circuitHtml(tripCircuit) : '<p class="hint">Distance inconnue pour au moins un magasin : indiquez-la en bas de page pour calculer le circuit.</p>'}
               <p class="hint">${tripMinutes !== null ? `Environ ${escapeHtml(formatMinutes(tripMinutes))} de route` : 'Temps de route inconnu'}${tripCost !== null ? `, ${escapeHtml(formatCents(tripCost))} de carburant` : ''}.${trip.note ? ` ${escapeHtml(trip.note)}` : ''}</p>
+              ${
+                betterOrder
+                  ? `<div class="fit fit--warn"><p><strong>Plus court : ${escapeHtml(betterOrder.storeIds.map(storeName).join(' puis '))}</strong>, ${escapeHtml(kmText(gainKm))} de moins.</p>
+                      <button type="button" class="button button--small" data-action="reorder" data-order="${escapeHtml(betterOrder.storeIds.join(','))}">Prendre cet ordre</button></div>`
+                  : ''
+              }
               ${
                 before.length
                   ? `<div class="fit fit--ko"><p><strong>${before.length} repas avant les courses</strong> : vérifiez que vous avez déjà leurs ingrédients.</p>
@@ -199,7 +233,7 @@ export async function renderTrip(el, params) {
                     </table>`
                   : ''
               }
-              <p class="hint">Chaque magasin compte pour un aller-retour depuis chez vous (MealDom ne calcule pas d’itinéraire). Seuls les prix relevés sont utilisés, jamais de prix inventés. Pour comparer, relevez les prix des mêmes articles dans plusieurs magasins.</p>`
+              <p class="hint">Le trajet est compté en circuit : de chez vous, chaque magasin dans l’ordre le plus court, puis retour. À distance égale, MealDom finit par le magasin où vous achetez le plus de frais et de surgelés. Seuls les prix relevés sont utilisés, jamais de prix inventés. Pour comparer, relevez les prix des mêmes articles dans plusieurs magasins.</p>`
       }
 
       <h2>Planifier la sortie</h2>
@@ -211,7 +245,7 @@ export async function renderTrip(el, params) {
         </div>
         <fieldset class="field"><legend>Ordre de passage</legend>
           ${Array.from({ length: MAX_STORES_PER_TRIP }, (_, i) => stopSelect(i)).join('')}
-          <p class="hint">Conseil : finissez par le magasin des produits frais et surgelés, et prévoyez une glacière.</p>
+          <p class="hint">« Planifier cette sortie » met les magasins dans l’ordre du circuit le plus court. Si vous changez l’ordre, MealDom vous dira s’il existe plus court. Prévoyez une glacière pour le frais.</p>
         </fieldset>
         <label class="check"><input type="checkbox" id="trip-has-slot"${trip?.driveSlot ? ' checked' : ''} /> <span>J’ai réservé un créneau de retrait au Drive</span></label>
         <div class="field when" data-block="slot"${trip?.driveSlot ? '' : ' hidden'}>
@@ -237,8 +271,19 @@ export async function renderTrip(el, params) {
             <div class="field"><label for="store-pick">Magasin à positionner</label>
               <select id="store-pick">${stores.map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('')}</select></div>
             ${placeSearchHtml('store', 'Adresse du magasin, ex. ZI Collery, Cayenne', 'Je suis dans ce magasin : utiliser ma position')}
-            <p><button type="button" class="button" data-action="compute-distances"${home ? '' : ' disabled'}>Calculer les distances depuis chez moi</button></p>
-            <p class="hint" data-compute-status role="status"></p>`
+            <p><button type="button" class="button" data-action="compute-distances"${home ? '' : ' disabled'}>Calculer les distances (domicile et entre magasins)</button></p>
+            <p class="hint" data-compute-status role="status"></p>
+            ${
+              pairs.length
+                ? `<details class="proposal__ingredients"><summary>Distances entre magasins (${pairs.length})</summary>
+                    <ul>${pairs
+                      .map(
+                        ({ a, b, leg }) =>
+                          `<li>${escapeHtml(a.name)} – ${escapeHtml(b.name)} : ${leg ? `${escapeHtml(kmText(leg.km))}${leg.minutes !== null ? `, ${escapeHtml(formatMinutes(leg.minutes))}` : ''} <span class="hint">(${escapeHtml(leg.source === 'via_home' ? 'via le domicile' : SOURCE_LABELS[leg.source])})</span>` : 'inconnue'}</li>`,
+                      )
+                      .join('')}</ul></details>`
+                : ''
+            }`
           : ''
       }
       <p class="hint">L’adresse tapée est envoyée au service d’adresses de l’IGN (Géoplateforme) ; pour l’itinéraire, seules les coordonnées sont envoyées au service OSRM. Votre position reste sur ce téléphone. Itinéraires : OSRM, données © contributeurs OpenStreetMap. Sans réponse de ces services, la distance est estimée à vol d’oiseau (× 1,3) et signalée comme telle.</p>
@@ -319,6 +364,14 @@ export async function renderTrip(el, params) {
     }
   });
 
+  el.querySelector('[data-action="reorder"]')?.addEventListener('click', async (event) => {
+    if (!trip) return;
+    const order = (/** @type {HTMLElement} */ (event.currentTarget).getAttribute('data-order') ?? '').split(',').filter(Boolean);
+    const errors = await saveTrip({ ...trip, storeIds: order });
+    if (errors.length) say('trip', errors);
+    else await renderTrip(el, params);
+  });
+
   el.querySelector('[data-action="delete-trip"]')?.addEventListener('click', async () => {
     if (!window.confirm('Supprimer la sortie courses de cette semaine ?')) return;
     await deleteTrip(monday);
@@ -366,6 +419,7 @@ export async function renderTrip(el, params) {
     }
     await renderTrip(el, params);
     const parts = [`${result.updated} magasin(s) mis à jour.`];
+    if (result.between) parts.push(`${result.between} trajet(s) entre magasins calculé(s).`);
     if (result.estimated) parts.push(`${result.estimated} estimé(s) à vol d’oiseau : service d’itinéraire injoignable.`);
     if (result.missing.length) parts.push(`Position inconnue : ${result.missing.join(', ')}.`);
     const after = /** @type {HTMLElement | null} */ (el.querySelector('[data-compute-status]'));

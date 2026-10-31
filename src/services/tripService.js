@@ -7,6 +7,7 @@ import { getSetting, setSetting } from '../db/repositories/settingsRepository.js
 import { getStores } from '../db/repositories/budgetRepository.js';
 import { getTrips, tripStore } from '../db/repositories/tripRepository.js';
 import { weekShoppingList } from './shoppingService.js';
+import { storeLegs } from './geoService.js';
 import { loadPriceData } from './driveService.js';
 import { getHousehold } from './householdService.js';
 import { getMeals } from './planningService.js';
@@ -37,12 +38,13 @@ export async function saveCarSettings(car) {
 }
 
 /**
- * Comparaison des facons de faire les courses de la semaine (prix et trajets).
+ * Comparaison des facons de faire les courses de la semaine (prix et circuit).
  * @param {string} monday
  */
 export async function weekGrouping(monday) {
   const now = new Date();
   const [list, data, stores, car, household] = await Promise.all([weekShoppingList(monday), loadPriceData(), getStores(), getCarSettings(), getHousehold()]);
+  const legs = await storeLegs(stores);
   const costs = storeLineCosts(list.lines, stores, {
     products: data.products,
     prices: data.prices,
@@ -54,8 +56,8 @@ export async function weekGrouping(monday) {
     preferredProducts: new Map(Object.entries(data.settings.preferredProducts)),
   });
   const fewerTrips = household.goals.includes('fewer_trips');
-  const grouping = groupShopping(list.lines, costs, stores, car, { fewerTrips });
-  return { mealCount: list.mealCount, lines: list.lines, costs, grouping, stores, car, fewerTrips };
+  const grouping = groupShopping(list.lines, costs, stores, car, { fewerTrips, legs });
+  return { mealCount: list.mealCount, lines: list.lines, costs, grouping, stores, car, fewerTrips, legs };
 }
 
 /**

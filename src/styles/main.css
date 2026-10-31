@@ -763,6 +763,10 @@ a.button {
   border-left: 5px solid var(--danger);
 }
 
+.fit--warn {
+  border-left: 5px solid var(--maracuja);
+}
+
 .fit p {
   margin-bottom: var(--space-1);
 }
@@ -1772,6 +1776,10 @@ h3 {
 
 .trip-summary {
   margin-bottom: var(--space-6);
+}
+
+.trip-circuit {
+  overflow-wrap: anywhere;
 }
 
 .travel-table input {

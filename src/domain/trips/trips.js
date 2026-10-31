@@ -1,8 +1,9 @@
 /**
  * Trajets et organisation des courses :
  * - cout d'un aller-retour en voiture jusqu'a un magasin ;
+ * - circuit domicile -> magasins -> domicile dans l'ordre le plus court ;
  * - cout de chaque article dans chaque magasin (Drive puis prix releves) ;
- * - regroupement des achats sur 1, 2 ou 3 magasins, trajets compris ;
+ * - regroupement des achats sur 1, 2 ou 3 magasins, circuit compris ;
  * - sortie courses de la semaine (jour, heure, ordre de passage, creneau Drive) et rappel agenda.
  * Aucun prix n'est invente : un article sans prix dans un magasin n'y est pas compte.
  */
@@ -52,11 +53,162 @@ export function validateCar(car) {
  */
 export function tripCostCents(store, car) {
   const km = store.distanceKm ?? null;
-  if (km === null || car.consumptionL100 === null) return null;
+  return km === null ? null : fuelCostCents(2 * km, car);
+}
+
+/**
+ * Cout du carburant pour une distance, en centimes. null si la voiture est inconnue.
+ * @param {number} km
+ * @param {CarSettings} car
+ * @returns {number | null}
+ */
+export function fuelCostCents(km, car) {
+  if (car.consumptionL100 === null) return null;
   if (car.consumptionL100 === 0) return 0;
   if (car.fuelCentsPerLiter === null) return null;
-  return Math.round(((2 * km * car.consumptionL100) / 100) * car.fuelCentsPerLiter);
+  return Math.round(((km * car.consumptionL100) / 100) * car.fuelCentsPerLiter);
 }
+
+// ---------------------------------------------------------------------------
+// Circuit de courses : domicile -> magasins -> domicile
+// ---------------------------------------------------------------------------
+
+/**
+ * Trajet direct entre deux magasins (aller simple, le sens n'est pas distingue).
+ * 'via_home' : trajet direct inconnu, compte comme un passage par le domicile (jamais sous-estime).
+ * @typedef {{ km: number, minutes: number | null, source: import('./geo.js').DistanceSource | 'via_home' }} Leg
+ */
+
+/**
+ * Cle d'un trajet entre deux magasins.
+ * @param {string} a
+ * @param {string} b
+ * @returns {string}
+ */
+export function legKey(a, b) {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+/**
+ * @typedef {Object} Circuit
+ * @property {string[]} storeIds     Ordre de passage
+ * @property {number} km             Domicile -> magasins -> domicile
+ * @property {number | null} minutes Temps de route, null si un temps manque
+ * @property {number} separateKm     Les memes magasins en allers-retours separes depuis le domicile
+ * @property {string[][]} viaHome    Paires de magasins sans trajet direct connu (comptees via le domicile)
+ * @property {boolean} estimated     Au moins un trajet entre magasins estime a vol d'oiseau
+ */
+
+/** Au-dela, l'ordre est choisi de proche en proche (le nombre d'ordres possibles explose). */
+const MAX_EXACT_STOPS = 7;
+/** Deux circuits a moins de 100 m d'ecart sont aussi courts l'un que l'autre. */
+const SAME_KM = 0.1;
+
+/** @param {number} n */
+const round1 = (n) => Math.round(n * 10) / 10;
+
+/**
+ * Trajet entre deux magasins dont la distance au domicile est connue.
+ * @param {Store} a
+ * @param {Store} b
+ * @param {Map<string, Leg>} legs
+ * @returns {Leg}
+ */
+function legBetween(a, b, legs) {
+  const direct = legs.get(legKey(a.id, b.id));
+  if (direct) return direct;
+  const ma = a.travelMinutes ?? null;
+  const mb = b.travelMinutes ?? null;
+  return { km: (a.distanceKm ?? 0) + (b.distanceKm ?? 0), minutes: ma === null || mb === null ? null : ma + mb, source: 'via_home' };
+}
+
+/**
+ * Circuit dans l'ordre donne. null si la distance d'un magasin au domicile est inconnue.
+ * @param {Store[]} stops
+ * @param {Map<string, Leg>} legs
+ * @returns {Circuit | null}
+ */
+export function circuitFor(stops, legs) {
+  if (stops.length === 0 || stops.some((s) => (s.distanceKm ?? null) === null)) return null;
+  const first = stops[0];
+  const last = stops[stops.length - 1];
+  let km = (first.distanceKm ?? 0) + (last.distanceKm ?? 0);
+  const fm = first.travelMinutes ?? null;
+  const lm = last.travelMinutes ?? null;
+  let minutes = fm === null || lm === null ? null : fm + lm;
+  /** @type {string[][]} */
+  const viaHome = [];
+  let estimated = false;
+  for (let i = 1; i < stops.length; i += 1) {
+    const leg = legBetween(stops[i - 1], stops[i], legs);
+    km += leg.km;
+    minutes = minutes === null || leg.minutes === null ? null : minutes + leg.minutes;
+    if (leg.source === 'via_home') viaHome.push([stops[i - 1].id, stops[i].id]);
+    if (leg.source === 'estimate') estimated = true;
+  }
+  return {
+    storeIds: stops.map((s) => s.id),
+    km: round1(km),
+    minutes,
+    separateKm: round1(stops.reduce((n, s) => n + 2 * (s.distanceKm ?? 0), 0)),
+    viaHome,
+    estimated,
+  };
+}
+
+/**
+ * Tous les ordres possibles.
+ * @template T
+ * @param {T[]} items
+ * @returns {T[][]}
+ */
+function permutations(items) {
+  if (items.length <= 1) return [items];
+  return items.flatMap((item, i) => permutations([...items.slice(0, i), ...items.slice(i + 1)]).map((rest) => [item, ...rest]));
+}
+
+/**
+ * Ordre de proche en proche, en partant du magasin le plus proche du domicile.
+ * @param {Store[]} stops
+ * @param {Map<string, Leg>} legs
+ * @returns {Store[]}
+ */
+function nearestOrder(stops, legs) {
+  const left = [...stops].sort((a, b) => (a.distanceKm ?? 0) - (b.distanceKm ?? 0));
+  const order = [/** @type {Store} */ (left.shift())];
+  while (left.length) {
+    const from = order[order.length - 1];
+    left.sort((a, b) => legBetween(from, a, legs).km - legBetween(from, b, legs).km);
+    order.push(/** @type {Store} */ (left.shift()));
+  }
+  return order;
+}
+
+/**
+ * Circuit le plus court passant par ces magasins. A distance egale (un circuit et son inverse),
+ * on finit par le magasin ou l'on achete le plus de produits frais et surgeles.
+ * null si la distance d'un magasin au domicile est inconnue.
+ * @param {Store[]} stops
+ * @param {Map<string, Leg>} legs
+ * @param {Map<string, number>} [chilled]   magasin -> nombre d'articles frais ou surgeles
+ * @returns {Circuit | null}
+ */
+export function bestCircuit(stops, legs, chilled = new Map()) {
+  const orders = stops.length <= MAX_EXACT_STOPS ? permutations(stops) : [nearestOrder(stops, legs)];
+  /** @param {Circuit} c */
+  const chilledLast = (c) => chilled.get(c.storeIds[c.storeIds.length - 1]) ?? 0;
+  /** @type {Circuit | null} */
+  let best = null;
+  for (const order of orders) {
+    const c = circuitFor(order, legs);
+    if (!c) return null;
+    if (!best || c.km < best.km - SAME_KM || (Math.abs(c.km - best.km) <= SAME_KM && chilledLast(c) > chilledLast(best))) best = c;
+  }
+  return best;
+}
+
+/** Rayons dont les produits doivent rester au frais : achetes en dernier si possible. */
+const CHILLED_AISLES = new Set(['frozen', 'meat_fish', 'dairy_eggs']);
 
 /**
  * @typedef {'drive_verified' | 'drive_stale' | 'manual'} CostKind
@@ -126,7 +278,7 @@ export function storeLineCosts(lines, stores, ctx) {
 
 /**
  * @typedef {Object} GroupingPlan
- * @property {string[]} storeIds            Magasins utilises (le plus gros panier d'abord)
+ * @property {string[]} storeIds            Magasins utilises, dans l'ordre du circuit (sinon le plus gros panier d'abord)
  * @property {Map<string, string>} assignment  cle de ligne -> magasin
  * @property {number} itemsCents            Articles chiffres
  * @property {number} covered               Nombre d'articles chiffres
@@ -134,7 +286,8 @@ export function storeLineCosts(lines, stores, ctx) {
  * @property {number} tripCents             Trajets dont le cout est connu
  * @property {string[]} unknownTrips        Magasins dont le trajet n'est pas chiffre
  * @property {number} totalCents            Articles + trajets connus
- * @property {number | null} minutes        Temps de trajet (allers-retours), null si inconnu
+ * @property {number | null} minutes        Temps de route, null si inconnu
+ * @property {Circuit | null} circuit       Circuit domicile -> magasins -> domicile (null si une distance au domicile manque)
  * @property {'verified' | 'estimated'} level
  * @property {boolean} perItem              Plan "article par article" (le moins cher partout)
  */
@@ -172,14 +325,17 @@ function subsets(items, max) {
 /**
  * Plan d'achat sur un ensemble de magasins : chaque article chez le moins cher de l'ensemble.
  * null si un magasin de l'ensemble ne sert a rien (le plan existe deja sans lui).
+ * Le trajet est le circuit le plus court ; si la distance d'un magasin au domicile manque,
+ * chaque magasin connu compte pour un aller-retour.
  * @param {string[]} keys
  * @param {Map<string, Map<string, StoreCost>>} costs
  * @param {Store[]} set
  * @param {CarSettings} car
  * @param {boolean} perItem
+ * @param {{ legs: Map<string, Leg>, chilledKeys: Set<string> }} travel
  * @returns {GroupingPlan | null}
  */
-function planFor(keys, costs, set, car, perItem) {
+function planFor(keys, costs, set, car, perItem, travel) {
   /** @type {Map<string, string>} */
   const assignment = new Map();
   /** @type {Map<string, number>} */
@@ -208,19 +364,30 @@ function planFor(keys, costs, set, car, perItem) {
   if (!perItem && set.some((s) => !count.has(s.id))) return null;
   const used = set.filter((s) => count.has(s.id)).sort((a, b) => (count.get(b.id) ?? 0) - (count.get(a.id) ?? 0));
   if (used.length === 0) return null;
+  /** @type {Map<string, number>} */
+  const chilled = new Map();
+  for (const [key, storeId] of assignment) if (travel.chilledKeys.has(key)) chilled.set(storeId, (chilled.get(storeId) ?? 0) + 1);
+  const circuit = bestCircuit(used, travel.legs, chilled);
   let tripCents = 0;
   /** @type {string[]} */
-  const unknownTrips = [];
+  let unknownTrips = [];
   let minutes = /** @type {number | null} */ (0);
-  for (const s of used) {
-    const trip = tripCostCents(s, car);
-    if (trip === null) unknownTrips.push(s.id);
-    else tripCents += trip;
-    const m = s.travelMinutes ?? null;
-    minutes = m === null || minutes === null ? null : minutes + 2 * m;
+  if (circuit) {
+    const cost = fuelCostCents(circuit.km, car);
+    if (cost === null) unknownTrips = used.map((s) => s.id);
+    else tripCents = cost;
+    minutes = circuit.minutes;
+  } else {
+    for (const s of used) {
+      const trip = tripCostCents(s, car);
+      if (trip === null) unknownTrips.push(s.id);
+      else tripCents += trip;
+      const m = s.travelMinutes ?? null;
+      minutes = m === null || minutes === null ? null : minutes + 2 * m;
+    }
   }
   return {
-    storeIds: used.map((s) => s.id),
+    storeIds: circuit ? circuit.storeIds : used.map((s) => s.id),
     assignment,
     itemsCents,
     covered: assignment.size,
@@ -231,6 +398,7 @@ function planFor(keys, costs, set, car, perItem) {
     minutes,
     level: allVerified ? 'verified' : 'estimated',
     perItem,
+    circuit,
   };
 }
 
@@ -238,26 +406,31 @@ function planFor(keys, costs, set, car, perItem) {
  * Compare les facons de faire les courses : 1, 2 ou 3 magasins, ou chaque article la ou il est
  * le moins cher. Le plan conseille couvre le plus d'articles possible ; chaque magasin de plus n'est
  * conseille que s'il fait economiser au moins le seuil, trajets compris.
- * Hypothese : chaque magasin compte pour un aller-retour depuis le domicile (sans calcul d'itineraire).
+ * Trajet : circuit domicile -> magasins -> domicile. Un trajet entre deux magasins absent de legs
+ * compte comme un passage par le domicile.
  * @param {ShoppingLine[]} lines
  * @param {Map<string, Map<string, StoreCost>>} costs
  * @param {Store[]} stores
  * @param {CarSettings} car
- * @param {{ fewerTrips: boolean }} options
+ * @param {{ fewerTrips: boolean, legs?: Map<string, Leg> }} options
  * @returns {Grouping}
  */
 export function groupShopping(lines, costs, stores, car, options) {
   const keys = toBuy(lines).map((l) => l.key);
+  const travel = {
+    legs: options.legs ?? new Map(),
+    chilledKeys: new Set(lines.filter((l) => CHILLED_AISLES.has(l.aisle)).map((l) => l.key)),
+  };
   const threshold = options.fewerTrips ? EXTRA_STORE_MIN_SAVING_FEWER_TRIPS : EXTRA_STORE_MIN_SAVING;
   const priced = stores.filter((s) => keys.some((k) => costs.get(k)?.has(s.id)));
   const unpricedKeys = keys.filter((k) => !priced.some((s) => costs.get(k)?.has(s.id)));
   /** @type {GroupingPlan[]} */
   const plans = [];
   for (const set of subsets(priced, MAX_STORES_PER_TRIP)) {
-    const plan = planFor(keys, costs, set, car, false);
+    const plan = planFor(keys, costs, set, car, false, travel);
     if (plan) plans.push(plan);
   }
-  const perItem = planFor(keys, costs, priced, car, true);
+  const perItem = planFor(keys, costs, priced, car, true, travel);
   if (perItem && perItem.storeIds.length > MAX_STORES_PER_TRIP) plans.push(perItem);
   else if (perItem) {
     const same = plans.find((p) => p.storeIds.length === perItem.storeIds.length && p.storeIds.every((id) => perItem.storeIds.includes(id)));

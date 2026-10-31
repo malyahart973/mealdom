@@ -1,5 +1,5 @@
 import { test, assertEqual } from './runner.js';
-import { haversineKm, estimateTravel, parseGeocode, parseRoute, isInGuyane, isPlace } from '../src/domain/trips/geo.js';
+import { haversineKm, estimateTravel, parseGeocode, parseRoute, parseTable, isInGuyane, isPlace } from '../src/domain/trips/geo.js';
 
 const cayenne = { label: 'Cayenne', lat: 4.9372, lon: -52.326 };
 const matoury = { label: 'Matoury', lat: 4.8473, lon: -52.3313 };
@@ -38,4 +38,10 @@ test('Itinéraire OSRM : mètres et secondes convertis en km et minutes', () => 
 
 test('Position valide', () => {
   assertEqual([isPlace(cayenne), isPlace({ label: 'x', lat: 120, lon: 0 }), isPlace({ lat: 1, lon: 1 })], [true, false, false]);
+});
+
+test('Matrice OSRM : moyenne aller / retour, case sans itinéraire = null', () => {
+  const t = parseTable({ code: 'Ok', distances: [[0, 12000, 5000], [12400, 0, null], [5200, 7000, 0]], durations: [[0, 900, 400], [960, 0, 500], [440, 520, 0]] }, 3);
+  assertEqual([t?.[0][1], t?.[2][0], t?.[1][2], t?.[0][0]], [{ km: 12.2, minutes: 16 }, { km: 5.1, minutes: 7 }, null, { km: 0, minutes: 0 }]);
+  assertEqual([parseTable({ code: 'Ok', distances: [[0]], durations: [[0]] }, 2), parseTable(null, 1), parseTable({ code: 'NoTable' }, 1)], [null, null, null]);
 });

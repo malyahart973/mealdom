@@ -102,3 +102,30 @@ export function parseRoute(json) {
   if (!route || typeof route.distance !== 'number' || typeof route.duration !== 'number' || route.distance < 0) return null;
   return { km: Math.round(route.distance / 100) / 10, minutes: Math.max(1, Math.round(route.duration / 60)), source: 'route' };
 }
+
+/**
+ * Lecture d'une reponse de matrice OSRM (service « table ») : trajets entre n positions.
+ * Le sens n'est pas distingue : on garde la moyenne aller / retour. null si la reponse est inutilisable.
+ * Une case sans itineraire vaut null.
+ * @param {unknown} json
+ * @param {number} n   Nombre de positions envoyees
+ * @returns {({ km: number, minutes: number } | null)[][] | null}
+ */
+export function parseTable(json, n) {
+  const r = /** @type {{ code?: unknown, distances?: unknown, durations?: unknown }} */ (json ?? {});
+  const d = r.distances;
+  const t = r.durations;
+  const square = (/** @type {unknown} */ m) => Array.isArray(m) && m.length === n && m.every((row) => Array.isArray(row) && row.length === n);
+  if (r.code !== 'Ok' || !square(d) || !square(t)) return null;
+  const dist = /** @type {unknown[][]} */ (d);
+  const dur = /** @type {unknown[][]} */ (t);
+  const ok = (/** @type {unknown} */ v) => typeof v === 'number' && v >= 0;
+  return Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) => {
+      const values = [dist[i][j], dist[j][i], dur[i][j], dur[j][i]];
+      if (!values.every(ok)) return null;
+      const [m1, m2, s1, s2] = /** @type {number[]} */ (values);
+      return { km: Math.round((m1 + m2) / 200) / 10, minutes: Math.max(i === j ? 0 : 1, Math.round((s1 + s2) / 120)) };
+    }),
+  );
+}

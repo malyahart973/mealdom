@@ -1,6 +1,10 @@
 import { test, assertEqual } from './runner.js';
 import {
   tripCostCents,
+  fuelCostCents,
+  circuitFor,
+  bestCircuit,
+  legKey,
   storeLineCosts,
   groupShopping,
   validateTrip,
@@ -112,6 +116,56 @@ test('Regroupement : article sans prix nulle part listé à part, jamais invent�
 test('Regroupement : sans aucun prix, aucune recommandation', () => {
   const g = groupShopping(lines, new Map(), stores, car, { fewerTrips: false });
   assertEqual([g.recommended, g.plans.length], [null, 0]);
+});
+
+test('Circuit : domicile → Marché → Hyper U → domicile compte le trajet direct entre magasins', () => {
+  const legs = new Map([[legKey('A', 'B'), { km: 4, minutes: 8, source: /** @type {const} */ ('route') }]]);
+  const c = circuitFor([stores[1], stores[0]], legs);
+  assertEqual([c?.km, c?.minutes, c?.separateKm, c?.viaHome, c?.estimated], [13, 33, 18, [], false]);
+  assertEqual(fuelCostCents(13, car), 148);
+});
+
+test('Circuit : trajet direct inconnu = passage par le domicile, jamais sous-estimé', () => {
+  const c = circuitFor([stores[0], stores[1]], new Map());
+  assertEqual([c?.km, c?.separateKm, c?.viaHome], [18, 18, [['A', 'B']]]);
+});
+
+test('Circuit : distance au domicile inconnue = pas de circuit', () => {
+  assertEqual(circuitFor([stores[0], { ...stores[1], distanceKm: null }], new Map()), null);
+  assertEqual(bestCircuit([{ ...stores[1], distanceKm: null }], new Map()), null);
+});
+
+test('Circuit : le meilleur ordre parmi trois magasins', () => {
+  // Domicile au centre, Hyper U et Discount voisins : passer de l'un a l'autre sans rentrer.
+  const legs = new Map([
+    [legKey('A', 'B'), { km: 8, minutes: 15, source: /** @type {const} */ ('route') }],
+    [legKey('A', 'C'), { km: 7, minutes: 10, source: /** @type {const} */ ('route') }],
+    [legKey('B', 'C'), { km: 20, minutes: 30, source: /** @type {const} */ ('estimate') }],
+  ]);
+  const c = bestCircuit(stores, legs);
+  // B -> A -> C : 3 + 8 + 7 + 12 = 30 km (au lieu de 42 en allers-retours)
+  assertEqual([c?.km, c?.separateKm, c?.storeIds.join('>') === 'B>A>C' || c?.storeIds.join('>') === 'C>A>B', c?.estimated], [30, 42, true, false]);
+});
+
+test('Circuit : à distance égale, on finit par le magasin du frais et des surgelés', () => {
+  const legs = new Map([[legKey('A', 'B'), { km: 4, minutes: 8, source: /** @type {const} */ ('route') }]]);
+  assertEqual(bestCircuit([stores[0], stores[1]], legs, new Map([['A', 2]]))?.storeIds, ['B', 'A']);
+  assertEqual(bestCircuit([stores[0], stores[1]], legs, new Map([['B', 1]]))?.storeIds, ['A', 'B']);
+});
+
+test('Regroupement : le circuit rend rentable un magasin voisin', () => {
+  /** @type {Store[]} */
+  const withD = [...stores, { id: 'D', name: 'Boucherie', type: 'butcher', commune: 'Cayenne', distanceKm: 6, travelMinutes: 15 }];
+  const more = [...prices, price('D', 'chicken', 600)];
+  const meat = [line('rice_white', 1000), line('tomato', 1000), { ...line('chicken', 1000), aisle: /** @type {const} */ ('meat_fish') }];
+  const c = storeLineCosts(meat, withD, { products: [], prices: more, ingredients, today: '2026-10-22', now: NOW, hasLoyaltyCard: false, preference: 'cheapest' });
+  // Allers-retours separes : 24 km, economie 1,63 € < 2 € : un seul magasin.
+  const separate = groupShopping(meat, c, withD, car, { fewerTrips: false });
+  assertEqual(separate.recommended?.storeIds, ['A']);
+  // Boucherie a 500 m de l'Hyper U : circuit 12,5 km, economie 2,94 € : deux magasins, viande en dernier.
+  const legs = new Map([[legKey('A', 'D'), { km: 0.5, minutes: 2, source: /** @type {const} */ ('route') }]]);
+  const circuit = groupShopping(meat, c, withD, car, { fewerTrips: false, legs });
+  assertEqual([circuit.recommended?.storeIds, circuit.recommended?.circuit?.km, circuit.recommended?.tripCents, circuit.recommended?.totalCents], [['A', 'D'], 12.5, 143, 1343]);
 });
 
 test('Validation : trajet, voiture et sortie courses', () => {
