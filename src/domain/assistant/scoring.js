@@ -44,6 +44,8 @@ import { substitutesFor } from './substitutes.js';
  *   Disponibilite locale (Guyane) : recettes impossibles exclues, ingredients rares penalises
  * @property {Map<string, import('../batchCooking/keeping.js').Keeping>} [keepingOf]
  *   Conservation des plats, pour le batch cooking
+ * @property {Map<string, 'like' | 'dislike'>} [ratings]
+ *   Plats aimes (proposes plus souvent) ou pas aimes (jamais proposes)
  */
 
 /**
@@ -202,6 +204,7 @@ const LIGHT_KCAL = { breakfast: 350, morning_snack: 150, lunch: 500, snack: 150,
  */
 export function isEligible(recipe, c, ctx) {
   if (recipe.status !== 'validated' || c.excludeRecipeIds.has(recipe.id)) return false;
+  if (ctx.ratings?.get(recipe.id) === 'dislike') return false;
   if (c.slot && !fitsSlot(recipe, c.slot)) return false;
   if (c.maxMinutes !== null && totalMinutes(recipe) > c.maxMinutes) return false;
   if (c.cuisine && recipe.cuisine !== c.cuisine) return false;
@@ -233,6 +236,10 @@ export function scoreRecipe(recipe, weights, env, ctx) {
   /** @param {Mode} m */
   const w = (m) => weights[m] ?? 0;
 
+  if (ctx.ratings?.get(recipe.id) === 'like') {
+    score += 6;
+    reasons.push('un plat que vous aimez');
+  }
   // Ingredients souvent introuvables en Guyane : la recette passe apres les autres.
   if (ctx.availability) score -= 5 * rareCount(recipe, ctx.preparations, ctx.availability);
 

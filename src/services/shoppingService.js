@@ -1,7 +1,7 @@
 /**
  * Stock et courses : relie les ecrans, les regles du domaine et la base.
  */
-import { aggregateNeeds, buildShoppingLines, mealNeedLines, validateInventoryItem, validatePackage } from '../domain/shopping/shopping.js';
+import { aggregateNeeds, buildShoppingLines, mealNeedLines, validateInventoryItem, validatePackage, consumeFromStock } from '../domain/shopping/shopping.js';
 import { weekDays } from '../domain/planning/dates.js';
 import { getInventory, getPackages, getShoppingList, inventoryStore, packageStore, shoppingListStore } from '../db/repositories/shoppingRepository.js';
 import { getMeals } from './planningService.js';
@@ -65,6 +65,26 @@ export async function saveInventoryItem(item) {
   const errors = validateInventoryItem(item, ingredientsById);
   if (errors.length === 0) await inventoryStore.put(item);
   return errors;
+}
+
+/**
+ * Ce qu'un repas cuisine retire du stock (apercu, rien n'est enregistre).
+ * @param {{ ingredientId: string, quantity: number | null, unit: string }[]} lines
+ */
+export async function previewStockUse(lines) {
+  return consumeFromStock(await getInventory(), lines, ingredientsById);
+}
+
+/**
+ * Enregistre le stock apres cuisson : un article vide est retire du stock.
+ * @param {InventoryItem[]} updated
+ * @returns {Promise<void>}
+ */
+export async function applyStockUse(updated) {
+  for (const item of updated) {
+    if (item.quantity <= 0) await inventoryStore.delete(item.id);
+    else await inventoryStore.put(item);
+  }
 }
 
 /**

@@ -8,6 +8,7 @@ import { scaledLines, cookingMethods, stepTimers, clampPortions } from '../domai
 import { recipesById, ingredientsById, preparationsById } from '../services/catalog.js';
 import { getHousehold } from '../services/householdService.js';
 import { getMeals } from '../services/planningService.js';
+import { previewStockUse, applyStockUse } from '../services/shoppingService.js';
 import { getTimers, remaining, onTimersChange, startTimer, togglePause, addTime, removeTimer, keepScreenOn, releaseScreen } from '../services/cookService.js';
 
 /** @typedef {import('../domain/recipes/recipes.js').Recipe} Recipe */
@@ -117,6 +118,9 @@ export async function renderCook(el, params) {
     if (step === 0) stepBox.innerHTML = ingredientsHtml();
     else if (step === total) {
       stepBox.innerHTML = `<p class="cook__text">C’est prêt. Bon appétit !</p>
+        <div class="cook__stock" data-stock>
+          <p><button type="button" class="button button--secondary" data-stock-preview>Retirer les ingrédients utilisés du stock</button></p>
+        </div>
         <p><a class="button" href="${backHref}">Terminer</a></p>`;
     } else {
       const text = method().steps[step - 1];
@@ -173,8 +177,29 @@ export async function renderCook(el, params) {
     if (/** @type {HTMLInputElement} */ (event.target).checked) checked.add(key);
     else checked.delete(key);
   });
-  stepBox.addEventListener('click', (event) => {
-    const button = /** @type {HTMLElement} */ (event.target).closest('[data-start]');
+  /** @type {Awaited<ReturnType<typeof previewStockUse>> | null} */
+  let stockUse = null;
+  stepBox.addEventListener('click', async (event) => {
+    const target = /** @type {HTMLElement} */ (event.target);
+    const box = /** @type {HTMLElement | null} */ (stepBox.querySelector('[data-stock]'));
+    if (box && target.hasAttribute('data-stock-preview')) {
+      stockUse = await previewStockUse(scaledLines(current, portions).ingredients);
+      const name = (/** @type {string} */ id) => ingredientsById.get(id)?.name ?? id;
+      box.innerHTML = stockUse.used.length
+        ? `<p><strong>À retirer du stock (${escapeHtml(formatPortions(portions))}) :</strong></p>
+           <ul>${stockUse.used.map((u) => `<li>${escapeHtml(name(u.ingredientId))} : ${escapeHtml(formatQuantity(u.quantity, u.unit))} <span class="hint">(il restera ${escapeHtml(formatQuantity(u.left, u.unit))})</span></li>`).join('')}</ul>
+           ${stockUse.missing.length ? `<p class="hint">Pas dans le stock : ${escapeHtml(stockUse.missing.map(name).join(', '))}.</p>` : ''}
+           <p><button type="button" class="button" data-stock-apply>Retirer du stock</button></p>`
+        : `<p class="hint">Aucun ingrédient de cette recette n’est dans votre stock.</p>`;
+      return;
+    }
+    if (box && target.hasAttribute('data-stock-apply') && stockUse) {
+      await applyStockUse(stockUse.updated);
+      box.innerHTML = '<p class="hint" role="status">Stock mis à jour.</p>';
+      stockUse = null;
+      return;
+    }
+    const button = target.closest('[data-start]');
     if (!button) return;
     startTimer(`${current.name.length > 28 ? `${current.name.slice(0, 27)}…` : current.name} · ${button.getAttribute('data-label') ?? ''}`, Number(button.getAttribute('data-start')));
   });

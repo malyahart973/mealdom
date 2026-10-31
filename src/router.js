@@ -11,6 +11,8 @@ import { renderMeal } from './pages/meal.js';
 import { renderBatch } from './pages/batch.js';
 import { renderCook } from './pages/cook.js';
 import { renderCoach } from './pages/coach.js';
+import { renderBatchLabels } from './pages/batchLabels.js';
+import { renderReceipt } from './pages/receipt.js';
 import { renderShopping } from './pages/shopping.js';
 import { renderPackage } from './pages/package.js';
 import { renderStock } from './pages/stock.js';
@@ -54,6 +56,7 @@ const routes = [
   { pattern: /^\/planning\/repas\/(?<id>[^/]+)$/, title: 'Repas', tab: '/planning', render: renderMeal, parent: () => '/planning' },
   { pattern: /^\/planning\/repas\/(?<mealId>[^/]+)\/cuisiner$/, title: 'Cuisiner', tab: '/planning', render: renderCook, parent: (p) => `/planning/repas/${p.mealId}` },
   { pattern: /^\/batch$/, title: 'Batch cooking', tab: '/planning', render: renderBatch, parent: () => '/planning' },
+  { pattern: /^\/batch\/etiquettes\/(?<date>\d{4}-\d{2}-\d{2})$/, title: 'Étiquettes des boîtes', tab: '/planning', render: renderBatchLabels, parent: (p) => `/batch/semaine/${p.date}` },
   {
     pattern: /^\/batch\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/,
     title: 'Batch cooking',
@@ -147,6 +150,7 @@ const routes = [
   { pattern: /^\/saison$/, title: 'Produits de saison', tab: '/plus', render: renderSeasons, parent: () => '/plus' },
   { pattern: /^\/prix$/, title: 'Historique des prix', tab: '/plus', render: renderPriceOverview, parent: () => '/plus' },
   { pattern: /^\/prix\/ajouter$/, title: 'Ajouter un prix', tab: '/courses', render: renderAddPrice, parent: () => '/courses' },
+  { pattern: /^\/prix\/ticket$/, title: 'Ticket de caisse', tab: '/courses', render: renderReceipt, parent: () => '/prix/ajouter' },
   {
     pattern: /^\/prix\/ajouter\/magasin\/(?<storeId>[^/]+)$/,
     title: 'Ajouter un prix',

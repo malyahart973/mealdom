@@ -155,6 +155,7 @@ export async function renderBatch(el, params) {
             : `${week.sessions.map(sessionHtml).join('')}
                <div class="form-actions">
                  <button type="button" class="button" data-action="calendar">Ajouter à mon agenda</button>
+                 <a class="button button--secondary" href="#/batch/etiquettes/${monday}">Étiquettes des boîtes</a>
                </div>
                <p class="hint">${thawCount ? `La séance et ${thawCount} rappel${thawCount > 1 ? 's' : ''} pour sortir un plat du congélateur la veille au soir.` : 'La séance, avec un rappel une heure avant.'}</p>`
       }

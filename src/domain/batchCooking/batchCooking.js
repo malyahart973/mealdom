@@ -8,7 +8,7 @@
 import { convertUniversal, roundUpQuantity } from '../units/units.js';
 import { compatibleMethods } from '../recipes/recipes.js';
 import { mealPortionsFor } from '../planning/planning.js';
-import { sessionFor, storagePlan, preparationKeeping } from './keeping.js';
+import { sessionFor, storagePlan, preparationKeeping, FREEZER_MONTHS } from './keeping.js';
 import { addMinutes } from '../planning/calendar.js';
 import { parseIsoDate, addDays } from '../planning/dates.js';
 
@@ -396,4 +396,44 @@ export function batchCalendarEvents(week, mealLabel) {
     }
   }
   return events;
+}
+
+/**
+ * @typedef {Object} BatchLabel
+ * @property {string} name
+ * @property {number} portions
+ * @property {string} cookedOn
+ * @property {'fridge' | 'freezer'} storage
+ * @property {string} useBy          Au refrigerateur : date limite ; au congelateur : FREEZER_MONTHS mois
+ * @property {string | null} thawOn
+ * @property {Meal} meal
+ */
+
+/**
+ * Etiquettes des boites d'une semaine de batch : une par repas servi.
+ * @param {BatchWeek} week
+ * @returns {BatchLabel[]}
+ */
+export function batchLabels(week) {
+  /** @type {BatchLabel[]} */
+  const out = [];
+  for (const s of week.sessions) {
+    for (const d of s.dishes) {
+      for (const sv of d.servings) {
+        const date = /** @type {Date} */ (parseIsoDate(s.date));
+        const months = new Date(date.getFullYear(), date.getMonth() + FREEZER_MONTHS, date.getDate());
+        const frozenUntil = `${months.getFullYear()}-${String(months.getMonth() + 1).padStart(2, '0')}-${String(months.getDate()).padStart(2, '0')}`;
+        out.push({
+          name: d.recipe.name,
+          portions: sv.portions,
+          cookedOn: s.date,
+          storage: sv.storage,
+          useBy: sv.storage === 'freezer' ? frozenUntil : addDays(s.date, d.keeping.fridgeDays),
+          thawOn: sv.thawOn,
+          meal: sv.meal,
+        });
+      }
+    }
+  }
+  return out;
 }

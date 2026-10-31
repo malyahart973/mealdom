@@ -1,7 +1,7 @@
 import { test, assertEqual } from './runner.js';
 import { recipeKeeping, preparationKeeping, batchSessionDates, storagePlan, sessionFor, daysBetween } from '../src/domain/batchCooking/keeping.js';
-import { planBatchWeek, batchCalendarEvents } from '../src/domain/batchCooking/batchCooking.js';
-import { scoreRecipe } from '../src/domain/assistant/scoring.js';
+import { planBatchWeek, batchCalendarEvents, batchLabels } from '../src/domain/batchCooking/batchCooking.js';
+import { scoreRecipe, isEligible } from '../src/domain/assistant/scoring.js';
 import { proposeChanges } from '../src/domain/assistant/engine.js';
 import { applyOperations, parseOperations } from '../src/domain/assistant/proposal.js';
 import { buildNutritionIndex } from '../src/domain/nutrition/nutrition.js';
@@ -250,4 +250,21 @@ test('Batch : un dîner avec restes doit tenir jusqu’au lendemain midi', () =>
   const plain = planBatchWeek([meal('y', '2026-11-04', 'chicken_colombo')], ['2026-11-01'], household, ctx).sessions[0].dishes[0].servings[0];
   const withLunch = planBatchWeek([{ ...meal('z', '2026-11-04', 'chicken_colombo'), nextLunch: { attendees: ['A', 'B'], guests: 0 } }], ['2026-11-01'], household, ctx).sessions[0].dishes[0].servings[0];
   assertEqual([plain.storage, withLunch.storage, withLunch.thawOn, withLunch.portions], ['fridge', 'freezer', '2026-11-03', 4]);
+});
+
+test('Étiquettes : une par boîte, date limite au frais ou 3 mois au congélateur', () => {
+  const labels = batchLabels(planBatchWeek(week, ['2026-11-01'], household, ctx));
+  assertEqual(labels.map((l) => [l.name, l.storage, l.useBy, l.thawOn]), [
+    ['Colombo de poulet', 'fridge', '2026-11-04', null],
+    ['Chili con carne', 'freezer', '2027-02-01', '2026-11-05'],
+  ]);
+});
+
+test('Plats aimés proposés plus souvent, plats pas aimés jamais proposés', () => {
+  const scoring = { household, ingredients, preparations, nutrition: new Map(), nutritionByRecipe: new Map(), unitPrices: new Map(), promoIngredients: new Set(), stockIngredients: new Set(), programTargets: null, ratings: new Map([['chili_con_carne', /** @type {const} */ ('like')], ['chicken_colombo', /** @type {const} */ ('dislike')]]) };
+  const env = { slot: /** @type {const} */ ('dinner'), medianCostIndex: 1, maxMinutes: null, weekCuisines: [], weekRecipeIds: [], weekIngredients: new Set() };
+  const liked = scoreRecipe(recipe('chili_con_carne'), {}, env, scoring);
+  const plain = scoreRecipe(recipe('chili_con_carne'), {}, env, { ...scoring, ratings: new Map() });
+  const constraints = { slot: null, maxMinutes: null, avoid: [], include: [], cuisine: null, cuisines: null, excludeRecipeIds: new Set(), maxCostIndex: null };
+  assertEqual([liked.score - plain.score, liked.reasons.includes('un plat que vous aimez'), isEligible(recipe('chicken_colombo'), constraints, scoring), isEligible(recipe('chili_con_carne'), constraints, scoring)], [6, true, false, true]);
 });

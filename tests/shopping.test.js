@@ -1,5 +1,5 @@
 import { test, assertEqual } from './runner.js';
-import { aggregateNeeds, buildShoppingLines, mealNeedLines, validateInventoryItem, validatePackage, shoppingListText, expiryStatus, itemsToUseFirst } from '../src/domain/shopping/shopping.js';
+import { aggregateNeeds, buildShoppingLines, mealNeedLines, validateInventoryItem, validatePackage, shoppingListText, expiryStatus, itemsToUseFirst, consumeFromStock } from '../src/domain/shopping/shopping.js';
 import { createDefaultHousehold, upsertMember } from '../src/domain/household/household.js';
 import { DEFAULT_PORTION_RULES } from '../src/data/portionRules.js';
 import { INGREDIENTS } from '../src/data/ingredients.js';
@@ -160,4 +160,20 @@ test('Péremption : produits à consommer en priorité, les plus urgents d’abo
 
 test('Péremption : date limite invalide refusée', () => {
   assertEqual(validateInventoryItem({ id: 'x', ingredientId: 'milk', quantity: 1, unit: 'l', location: 'fridge', expiresOn: '23/10/2026' }, ingredients).length, 1);
+});
+
+test('Après la cuisine : le stock qui périme le plus tôt est entamé d’abord, en convertissant les unités', () => {
+  const inventory = [
+    { id: 'a', ingredientId: 'rice_white', quantity: 1, unit: 'kg', location: /** @type {const} */ ('pantry'), expiresOn: '2027-01-01' },
+    { id: 'b', ingredientId: 'rice_white', quantity: 200, unit: 'g', location: /** @type {const} */ ('pantry'), expiresOn: '2026-11-05' },
+    { id: 'c', ingredientId: 'onion', quantity: 1, unit: 'piece', location: /** @type {const} */ ('pantry'), expiresOn: null },
+  ];
+  const r = consumeFromStock(inventory, [
+    { ingredientId: 'rice_white', quantity: 300, unit: 'g' },
+    { ingredientId: 'onion', quantity: 2, unit: 'piece' },
+    { ingredientId: 'chicken', quantity: 500, unit: 'g' },
+    { ingredientId: 'salt', quantity: null, unit: 'pinch' },
+  ], ingredients);
+  assertEqual(r.updated.map((i) => `${i.id}:${i.quantity}${i.unit}`), ['b:0g', 'a:0.9kg', 'c:0piece']);
+  assertEqual([r.used.length, r.missing], [3, ['chicken']]);
 });

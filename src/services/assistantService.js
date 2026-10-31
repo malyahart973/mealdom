@@ -45,6 +45,7 @@ import { callClaude, responseText, LlmError, DEFAULT_MODEL } from './llmService.
 import { recipes, recipesById, ingredientsById, preparationsById, cuisineLabels, familyOf, keepingOf, nutritionContext, nutritionByRecipe as recipeNutritionMap, registerPlannedRecipe, filterContext } from './catalog.js';
 import { batchSessions } from './batchService.js';
 import { getCoachPlan } from './coachService.js';
+import { getRatings } from './ratingService.js';
 import { getProgram } from './programService.js';
 import { planCoachWeek, COACH_SLOT_ORDER } from '../domain/nutrition/coach.js';
 import { INGREDIENTS } from '../data/ingredients.js';
@@ -113,7 +114,7 @@ async function loadEnvironment(monday) {
   const now = new Date();
   const today = toIsoDate(now);
   const days = weekDays(monday);
-  const [meals, household, budget, inventory, priceData, preferences, program, showBreakfast, showSnack, availability, season, showMorningSnack, sessions] = await Promise.all([
+  const [meals, household, budget, inventory, priceData, preferences, program, showBreakfast, showSnack, availability, season, showMorningSnack, sessions, ratings] = await Promise.all([
     getMeals(),
     getHousehold(),
     getBudget(),
@@ -127,6 +128,7 @@ async function loadEnvironment(monday) {
     seasonNow(now),
     getShowMorningSnack(),
     batchSessions(monday),
+    getRatings(),
   ]);
   const byIngredient = productsByIngredient(priceData.products);
   const promoIngredients = new Set(
@@ -149,6 +151,7 @@ async function loadEnvironment(monday) {
     availability,
     seasonalIngredients: season.favoured,
     keepingOf,
+    ratings,
   };
   /** @type {Slot[]} */
   const activeSlots = SLOTS.map((s) => s.id).filter((s) => (s !== 'breakfast' || showBreakfast) && (s !== 'morning_snack' || showMorningSnack) && (s !== 'snack' || showSnack));

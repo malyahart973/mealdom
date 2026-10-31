@@ -248,6 +248,48 @@ export function buildShoppingLines(needs, inventory, packages, ingredients) {
 }
 
 /**
+ * Retire du stock ce qu'un repas cuisine a utilise. Pour chaque ingredient, les articles qui
+ * perimment en premier sont entames d'abord. Rien n'est retire pour un ingredient absent du stock,
+ * « au gout » ou dans une unite impossible a convertir : il est seulement signale.
+ * @param {InventoryItem[]} inventory
+ * @param {{ ingredientId: string, quantity: number | null, unit: string }[]} lines
+ * @param {Map<string, Ingredient>} ingredients
+ * @returns {{ updated: InventoryItem[], used: { itemId: string, ingredientId: string, quantity: number, unit: string, left: number }[], missing: string[] }}
+ */
+export function consumeFromStock(inventory, lines, ingredients) {
+  /** @type {Map<string, InventoryItem>} */
+  const changed = new Map();
+  /** @type {{ itemId: string, ingredientId: string, quantity: number, unit: string, left: number }[]} */
+  const used = [];
+  /** @type {string[]} */
+  const missing = [];
+  for (const line of lines) {
+    const ingredient = ingredients.get(line.ingredientId) ?? null;
+    if (line.quantity === null || !ingredient || ingredient.notPurchased) continue;
+    const items = inventory
+      .filter((i) => i.ingredientId === line.ingredientId && (changed.get(i.id) ?? i).quantity > 0)
+      .sort((a, b) => String(a.expiresOn ?? '9999').localeCompare(String(b.expiresOn ?? '9999')));
+    let need = line.quantity;
+    let took = false;
+    for (const item of items) {
+      if (need <= 0) break;
+      const current = changed.get(item.id) ?? item;
+      const inItemUnit = convertUnit(need, line.unit, current.unit, ingredient);
+      if (!inItemUnit.ok) continue;
+      const take = Math.min(current.quantity, inItemUnit.value);
+      const left = cleanNumber(current.quantity - take);
+      changed.set(item.id, { ...current, quantity: left });
+      used.push({ itemId: item.id, ingredientId: line.ingredientId, quantity: cleanNumber(take), unit: current.unit, left });
+      took = true;
+      const back = convertUnit(take, current.unit, line.unit, ingredient);
+      need = back.ok ? need - back.value : 0;
+    }
+    if (!took) missing.push(line.ingredientId);
+  }
+  return { updated: [...changed.values()], used, missing };
+}
+
+/**
  * Valide un article de stock.
  * @param {InventoryItem} item
  * @param {Map<string, Ingredient>} ingredients

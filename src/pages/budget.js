@@ -96,6 +96,7 @@ export async function renderBudget(el, params) {
       }
 
       <h2>Dépenses réelles</h2>
+      <p><a class="button button--secondary button--small" href="#/prix/ticket">Photographier le ticket</a> <span class="hint">La dépense et les prix des articles en une fois.</span></p>
       <div class="alert" role="alert" hidden></div>
       <form class="stock-form" data-form="expense" novalidate>
         <div class="field when">

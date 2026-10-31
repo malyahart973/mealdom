@@ -27,6 +27,7 @@ import { getHousehold } from '../services/householdService.js';
 import { evaluateRecipeForHousehold } from '../domain/household/compatibility.js';
 import { DIETS } from '../domain/household/household.js';
 import { archiveUserRecipe } from '../services/userRecipeService.js';
+import { getRatings, setRating } from '../services/ratingService.js';
 
 /** @typedef {import('../domain/recipes/recipes.js').IngredientLine} IngredientLine */
 /** @typedef {import('../domain/recipes/recipes.js').CookingMethod} CookingMethod */
@@ -123,7 +124,8 @@ export async function renderRecipe(el, params) {
     return;
   }
 
-  const [household, program, availability, overrides, season] = await Promise.all([getHousehold(), programSummary(), loadAvailability(), getAvailabilityOverrides(), seasonNow()]);
+  const [household, program, availability, overrides, season, ratings] = await Promise.all([getHousehold(), programSummary(), loadAvailability(), getAvailabilityOverrides(), seasonNow(), getRatings()]);
+  const rating = ratings.get(recipe.id) ?? null;
   const local = seasonalIngredients(recipe, preparationsById, season.favoured);
   const issues = recipeLocalIssues(recipe, preparationsById, availability, substitutesFor);
   /** @param {string} id */
@@ -230,7 +232,10 @@ export async function renderRecipe(el, params) {
   el.innerHTML = `
     <article class="recipe">
       <h1 class="page-title">${escapeHtml(recipe.name)}</h1>
-      <p><a class="button" href="#/recettes/${encodeURIComponent(recipe.id)}/cuisiner">Cuisiner pas à pas</a></p>
+      <p class="recipe__actions"><a class="button" href="#/recettes/${encodeURIComponent(recipe.id)}/cuisiner">Cuisiner pas à pas</a>
+        <button type="button" class="chip" data-rate="like" aria-pressed="${rating === 'like'}">♥ J’aime</button>
+        <button type="button" class="chip" data-rate="dislike" aria-pressed="${rating === 'dislike'}">Je n’aime pas</button></p>
+      <p class="hint" data-rate-status role="status">${rating === 'like' ? 'Proposé plus souvent dans vos semaines.' : rating === 'dislike' ? 'Ne sera plus proposé par l’assistant.' : ''}</p>
       ${recipe.status === 'archived' ? '<p class="notice-inline">Recette supprimée : elle reste visible pour les repas déjà planifiés, mais n’est plus proposée.</p>' : ''}
       ${
         recipe.source.type === 'personal' && recipe.status !== 'archived'
@@ -285,6 +290,17 @@ export async function renderRecipe(el, params) {
       <p class="hint source">Source : ${escapeHtml(recipe.source.license)}.</p>
     </article>
   `;
+
+  el.querySelectorAll('[data-rate]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const value = /** @type {'like' | 'dislike'} */ (b.getAttribute('data-rate'));
+      const next = b.getAttribute('aria-pressed') === 'true' ? null : value;
+      await setRating(recipe.id, next);
+      el.querySelectorAll('[data-rate]').forEach((x) => x.setAttribute('aria-pressed', String(x.getAttribute('data-rate') === next)));
+      /** @type {HTMLElement} */ (el.querySelector('[data-rate-status]')).textContent =
+        next === 'like' ? 'Proposé plus souvent dans vos semaines.' : next === 'dislike' ? 'Ne sera plus proposé par l’assistant.' : '';
+    }),
+  );
 
   el.querySelector('[data-delete-recipe]')?.addEventListener('click', async () => {
     if (!window.confirm(`Supprimer « ${recipe.name} » ? Les repas déjà planifiés la gardent, mais elle ne sera plus proposée.`)) return;

@@ -22,7 +22,7 @@ test('Évolution : depuis la mesure précédente et depuis le début, mesure par
   );
 });
 
-test('Bilan pour le coach : poids et mensurations avec leur évolution, rien d’inventé', () => {
+test('Bilan pour le coach : poids et mensurations du jour avec leur évolution, rien d’inventé', () => {
   const weights = [{ date: '2026-10-01', kg: 75.6 }, { date: '2026-10-22', kg: 74.8 }, { date: '2026-11-12', kg: 74.1 }];
   const text = checkInReport(weights, list, '2026-11-12', day);
   assertEqual(text.split('\n'), [
@@ -31,7 +31,6 @@ test('Bilan pour le coach : poids et mensurations avec leur évolution, rien d�
     'Mensurations du 2026-11-12 :',
     '- Tour de taille : 89 cm (−1,5 cm depuis le bilan précédent, −3 cm depuis le début)',
     '- Hanches : 103 cm (stable depuis le bilan précédent, −1 cm depuis le début)',
-    '- Bras : 31 cm',
   ]);
   assertEqual(checkInReport([], [], '2026-11-12', day).split('\n')[1], 'Aucune pesée ni mensuration enregistrée.');
 });

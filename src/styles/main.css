@@ -3065,3 +3065,82 @@ line.series-3 {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.recipe__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ---------- Etiquettes du batch ---------- */
+
+.labels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-3);
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: var(--space-3);
+  border: 2px dashed var(--line);
+  border-left: 6px solid var(--fleuve);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  font-size: 0.9375rem;
+  break-inside: avoid;
+}
+
+.label--freezer {
+  border-left-color: var(--chart-series);
+}
+
+.label__name {
+  font-size: 1.0625rem;
+}
+
+@media print {
+  .topbar,
+  .tabbar,
+  .no-print,
+  #update-banner {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .labels {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .label {
+    border-color: #000;
+    background: #fff;
+    color: #000;
+  }
+}
+
+/* ---------- Ticket de caisse ---------- */
+
+.receipt__lines {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+}
+
+.receipt__line {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.receipt__price {
+  align-self: center;
+  font-weight: 700;
+  white-space: nowrap;
+}

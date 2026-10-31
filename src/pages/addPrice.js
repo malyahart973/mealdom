@@ -33,6 +33,7 @@ export async function renderAddPrice(el, params) {
   el.innerHTML = `
     <section class="add-price">
       <h1 class="page-title">Ajouter un prix</h1>
+      <p><a class="button button--secondary" href="#/prix/ticket">Photographier un ticket de caisse</a> <span class="hint">Tous les prix et la dépense d’un coup.</span></p>
       <div class="scan">
         ${
           canUseCamera()

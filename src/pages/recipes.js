@@ -2,6 +2,7 @@ import { escapeHtml } from '../utils/html.js';
 import { formatMinutes } from '../utils/format.js';
 import { filterRecipes } from '../domain/recipes/recipeFiltering.js';
 import { totalMinutes, recipeMealTypes, hasTag, MEAL_TYPES, RECIPE_TAGS, QUICK_MINUTES, VESSEL_LABELS } from '../domain/recipes/recipes.js';
+import { getRatings } from '../services/ratingService.js';
 import { recipes, cuisineLabels, familyOf, filterContext, nutritionByRecipe, preparationsById, ingredientsById } from '../services/catalog.js';
 import { FAMILIES, familyLabel } from '../domain/recipes/families.js';
 import { CUISINES, REGIONS } from '../data/cuisines.js';
@@ -78,7 +79,8 @@ export async function renderRecipes(el, params = {}) {
     state.query = focus.name;
     state.shown = PAGE_SIZE;
   }
-  const [household, availability, season] = await Promise.all([getHousehold(), loadAvailability(), seasonNow()]);
+  const [household, availability, season, ratings] = await Promise.all([getHousehold(), loadAvailability(), seasonNow(), getRatings()]);
+  const liked = (/** @type {import('../domain/recipes/recipes.js').Recipe} */ r) => ratings.get(r.id) === 'like';
   /** Recettes qui utilisent au moins deux produits de saison ou peyi. */
   const seasonal = new Set(recipes.filter((r) => seasonalIngredients(r, preparationsById, season.favoured).length >= SEASONAL_MIN_INGREDIENTS).map((r) => r.id));
   /** Recettes avec un ingredient rare ou introuvable (alternative possible ou non). */
@@ -149,19 +151,23 @@ export async function renderRecipes(el, params = {}) {
     if (!state.family && !state.query.trim()) {
       count.textContent = all.length === 1 ? '1 recette' : `${all.length} recettes, rangées en ${FAMILIES.length} familles`;
       const mine = all.filter((r) => r.source.type === 'personal').length;
+      const favorites = all.filter(liked).length;
       results.innerHTML = `<div class="family-grid">
-        <button type="button" class="family-tile family-tile--mine" data-open-family="mine"><strong>Mes recettes</strong><span>${mine ? `${mine} recette${mine > 1 ? 's' : ''}` : 'Ajoutez les vôtres'}</span></button>${FAMILIES.map((f) => {
+        <button type="button" class="family-tile family-tile--mine" data-open-family="mine"><strong>Mes recettes</strong><span>${mine ? `${mine} recette${mine > 1 ? 's' : ''}` : 'Ajoutez les vôtres'}</span></button>
+        <button type="button" class="family-tile family-tile--mine" data-open-family="favorites"><strong>♥ Mes favoris</strong><span>${favorites ? `${favorites} recette${favorites > 1 ? 's' : ''}` : 'Touchez « J’aime » sur une recette'}</span></button>${FAMILIES.map((f) => {
         const n = all.filter((r) => familyOf.get(r.id) === f.id).length;
         return `<button type="button" class="family-tile" data-open-family="${f.id}"${n ? '' : ' disabled'}><strong>${escapeHtml(f.label)}</strong><span>${n} recette${n > 1 ? 's' : ''}</span></button>`;
       }).join('')}</div>`;
       more.hidden = true;
     } else {
-      const list = state.family === 'mine' ? all.filter((r) => r.source.type === 'personal') : state.family ? all.filter((r) => familyOf.get(r.id) === state.family) : all;
+      const list =
+        state.family === 'mine' ? all.filter((r) => r.source.type === 'personal') : state.family === 'favorites' ? all.filter(liked) : state.family ? all.filter((r) => familyOf.get(r.id) === state.family) : all;
       count.textContent = list.length === 1 ? '1 recette' : `${list.length} recettes`;
       results.innerHTML = `${
         state.family
           ? `<div class="family-head"><button type="button" class="button button--small button--secondary" data-open-family="">‹ Toutes les familles</button>
-              <h2 class="family__title">${escapeHtml(state.family === 'mine' ? 'Mes recettes' : familyLabel(state.family))}</h2>
+              <h2 class="family__title">${escapeHtml(state.family === 'mine' ? 'Mes recettes' : state.family === 'favorites' ? 'Mes favoris' : familyLabel(state.family))}</h2>
+              ${state.family === 'favorites' && !list.length ? '<p>Aucun favori pour l’instant : ouvrez une recette et touchez « ♥ J’aime ».</p>' : ''}
               ${state.family === 'mine' && !list.length ? '<p>Aucune recette personnelle pour l’instant. Saisissez-en une, ou importez-la depuis un texte, un lien ou une photo.</p><p><a class="button" href="#/recettes/nouvelle">+ Ajouter une recette</a></p>' : ''}</div>`
           : ''
       }${list.length || state.family !== 'mine' ? listHtml(list.slice(0, state.shown), hard, !state.family) : ''}`;
