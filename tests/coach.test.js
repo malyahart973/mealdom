@@ -136,3 +136,26 @@ test('Consigne « Pas d’huile… » reconnue seule sur sa phrase', () => {
   const p = parseCoachText('DÉJEUNER 13H\n170 g de poulet\n200 g de haricots verts\nDÎNER 20H\n170 g de poisson\n200 g de brocolis\nPas de soda. Pas d’huile pour faire cuire les aliments.', '2026-11-01');
   assertEqual(p.rules, ['Pas de soda.', 'Pas d’huile pour faire cuire les aliments.']);
 });
+
+test('Aliment refusé par le foyer : seul cet aliment est écarté, les déjeuners et dîners restent', () => {
+  const noBeans = (/** @type {import('../src/domain/recipes/recipes.js').Recipe} */ r) => !r.ingredients.some((l) => l.ingredientId === 'green_beans');
+  const { picks } = planCoachWeek(plan, { days, slots: ['lunch', 'dinner'], meals: [], redo: false, sportDays: new Set(), allowed: noBeans });
+  assertEqual([picks.length, picks.every((p) => noBeans(p.recipe))], [14, true]);
+});
+
+test('Repas déjà prévus gardés : signalé, avec la marche à suivre', () => {
+  /** @type {import('../src/domain/planning/planning.js').Meal[]} */
+  const kept = days.flatMap((date) => /** @type {const} */ (['lunch', 'dinner']).map((slot) => ({ id: `${date}${slot}`, date, slot, recipeId: 'x', recipeName: 'X', attendees: [], guests: 0, nextLunch: null, locked: false })));
+  const r = planCoachWeek(plan, { days, slots: ['lunch', 'dinner'], meals: kept, redo: false, sportDays: new Set(), allowed: () => true });
+  assertEqual([r.picks.length, r.notes], [0, ['7 déjeuners et 7 dîners déjà prévus sont gardés. Pour les remplacer par les repas du programme, choisissez « Tout refaire ».']]);
+  assertEqual(planCoachWeek(plan, { days, slots: ['lunch', 'dinner'], meals: kept, redo: true, sportDays: new Set(), allowed: () => true }).picks.length, 14);
+});
+
+test('Rien ne convient au foyer : signalé au lieu de laisser les repas vides sans explication', () => {
+  const r = planCoachWeek(plan, { days, slots: ['lunch'], meals: [], redo: false, sportDays: new Set(), allowed: () => false });
+  assertEqual([r.picks.length, r.notes[0].startsWith('Aucun déjeuner du programme ne convient')], [0, true]);
+});
+
+test('Repas composé : aucun appareil imposé (poêle, four ou vapeur au choix)', () => {
+  assertEqual(coachRecipe(assembledId('lunch', 'chicken', 'broccoli', 'quinoa'), plan)?.methods[0].equipment, []);
+});

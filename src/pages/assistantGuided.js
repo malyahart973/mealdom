@@ -8,7 +8,7 @@ import { REGIONS } from '../data/cuisines.js';
 import { BATCH_DAYS } from '../domain/batchCooking/keeping.js';
 import { getBatchPlan, saveBatchPlan } from '../services/batchService.js';
 import { getHousehold } from '../services/householdService.js';
-import { setShowBreakfast, setShowSnack, setShowMorningSnack } from '../services/planningService.js';
+import { setShowBreakfast, setShowSnack, setShowMorningSnack, getMeals } from '../services/planningService.js';
 import {
   guidedDefaults,
   planWeek,
@@ -43,7 +43,16 @@ export async function renderPlanWeek(el, params) {
       <a class="button" href="#/foyer">Présenter mon foyer</a></section>`;
     return;
   }
-  const [{ choices, weeklyBudgetCents, programActive, coachActive }, batchPlan] = await Promise.all([guidedDefaults(), getBatchPlan()]);
+  const [{ choices, weeklyBudgetCents, programActive, coachActive }, batchPlan, allMeals] = await Promise.all([guidedDefaults(), getBatchPlan(), getMeals()]);
+  /**
+   * Repas deja prevus (hors programme du coach, non verrouilles) aux repas cochés d'une semaine.
+   * @param {string} week
+   * @param {string[]} slots
+   */
+  const plannedCount = (week, slots) => {
+    const end = addDays(week, 7);
+    return allMeals.filter((m) => m.date >= week && m.date < end && m.date >= today && slots.includes(m.slot) && !m.locked && !m.recipeId.startsWith('coach-')).length;
+  };
   const weeks = [thisMonday, addDays(thisMonday, 7)];
   if (!weeks.includes(monday)) weeks.push(monday);
   const weekLabel = (/** @type {string} */ m) => (m === thisMonday ? 'Cette semaine (à partir d’aujourd’hui)' : `Semaine du ${formatIsoDayMonth(m)}`);
@@ -65,6 +74,7 @@ export async function renderPlanWeek(el, params) {
             <label class="check"><input type="radio" name="keep" value="keep"${choices.keepExisting ? ' checked' : ''} /> <span>Garder les repas déjà prévus</span></label>
             <label class="check"><input type="radio" name="keep" value="redo"${choices.keepExisting ? '' : ' checked'} /> <span>Tout refaire (sauf les repas verrouillés)</span></label>
           </div>
+          <p class="notice-inline" data-planned hidden></p>
           <label class="check"><input type="checkbox" name="leftovers"${choices.leftovers ? ' checked' : ''} /> <span>Les restes du dîner pour le déjeuner du lendemain (on cuisine plus le soir)</span></label>
           ${
             coachActive
@@ -134,6 +144,17 @@ export async function renderPlanWeek(el, params) {
       });
     }),
   );
+  // Repas deja prevus : « Garder » les laisse en place, « Tout refaire » les remplace.
+  const plannedBox = /** @type {HTMLElement} */ (el.querySelector('[data-planned]'));
+  const syncPlanned = () => {
+    const data = new FormData(form);
+    const n = plannedCount(String(data.get('week') ?? monday), data.getAll('slot').map(String));
+    const coach = data.get('followCoach') === 'on';
+    plannedBox.hidden = n === 0 || data.get('keep') === 'redo';
+    plannedBox.textContent = `${n} repas ${n > 1 ? 'sont' : 'est'} déjà prévu${n > 1 ? 's' : ''} cette semaine${coach ? ' aux heures du programme de votre coach' : ''} : « Garder » ${n > 1 ? 'les laisse' : 'le laisse'} tel${n > 1 ? 's' : ''} quel${n > 1 ? 's' : ''}, « Tout refaire » ${n > 1 ? 'les remplace' : 'le remplace'}${coach ? ' par les repas du programme' : ''}.`;
+  };
+  form.addEventListener('change', syncPlanned);
+  syncPlanned();
   const batchBox = /** @type {HTMLElement} */ (el.querySelector('[data-batch]'));
   const syncBatch = () => {
     const on = el.querySelector('[data-wish="batch"]')?.getAttribute('aria-pressed') === 'true';
@@ -259,6 +280,7 @@ export async function renderWeekPreview(el, params) {
       <h1 class="page-title">Votre semaine</h1>
       <p class="guided__summary"><strong>${fresh.length} repas proposé${fresh.length > 1 ? 's' : ''}</strong>${avgKcal !== null ? ` · environ ${avgKcal} kcal par portion` : ''}</p>
       ${costHtml(c.afterCents, c.missingAfter, budget)}
+      ${proposal.notes.length ? `<div class="notice-inline"><p><strong>À savoir</strong></p><ul>${proposal.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ul></div>` : ''}
       <p class="hint">Touchez « Changer » pour une autre idée, « Retirer » pour laisser le repas libre. Rien n’est enregistré avant « Valider ».</p>
       <div class="form-actions"><button type="button" class="button" data-validate>Valider ma semaine</button></div>
       <p class="status" aria-live="polite"></p>

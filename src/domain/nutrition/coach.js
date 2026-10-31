@@ -595,7 +595,8 @@ function assembledRecipe(id, meal, parsed, protein, vegetable, starch, plan) {
     prepMinutes: 10,
     cookMinutes: Math.max(...minutes),
     ingredients,
-    methods: [{ id: 'coach', label: 'Cuisson sans matière grasse', equipment: ['stovetop'], steps }],
+    // Poele, four ou vapeur au choix (les etapes donnent les deux) : aucun appareil impose.
+    methods: [{ id: 'coach', label: 'Cuisson sans matière grasse', equipment: [], steps }],
     tips: [...parsed.extras.map((e) => `À prendre avec : ${e}`), ...plan.rules],
     source: source(plan),
     mealTypes: [meal.slot === 'lunch' || meal.slot === 'dinner' ? meal.slot : 'lunch'],
@@ -716,40 +717,58 @@ export function planCoachWeek(plan, ctx) {
   // Compteurs de rotation par repas, pour varier d'un jour a l'autre.
   /** @type {Map<string, number>} */
   const turn = new Map();
+  /** @type {Map<ProgramSlot, number>} */
+  const kept = new Map();
+  /** @type {Set<ProgramSlot>} */
+  const impossible = new Set();
   let assembledCount = 0;
   let lastProtein = '';
   const sportSnack = plan.meals.find((m) => m.sportDaysOnly);
   if (sportSnack && ctx.slots.includes(sportSnack.slot) && ctx.sportDays.size === 0) {
     notes.push('La collation d’après le sport n’est planifiée que les jours de sport : indiquez-les dans le programme minceur (semaine type de sport).');
   }
+  // Choix compatibles avec le foyer, repas par repas (un aliment refuse n'ecarte que lui).
+  /** @type {Map<ProgramSlot, { proteins: string[], vegs: string[], starches: (string | null)[] } | null>} */
+  const usable = new Map();
+  for (const meal of plan.meals) {
+    const a = parsed.get(meal.slot)?.assembled;
+    if (a) usable.set(meal.slot, usableChoices(meal.slot, a, plan, ctx.allowed));
+  }
   for (const date of ctx.days) {
     for (const meal of plan.meals) {
       if (!ctx.slots.includes(meal.slot)) continue;
       if (meal.sportDaysOnly && !ctx.sportDays.has(weekday(date))) continue;
       const existing = ctx.meals.find((m) => m.date === date && m.slot === meal.slot) ?? null;
-      if (existing && (!ctx.redo || existing.locked)) continue;
+      if (existing && (!ctx.redo || existing.locked)) {
+        if (!existing.recipeId.startsWith('coach-')) kept.set(meal.slot, (kept.get(meal.slot) ?? 0) + 1);
+        continue;
+      }
       const p = /** @type {ParsedMeal} */ (parsed.get(meal.slot));
       /** @type {Recipe | null} */
       let recipe = null;
       if (p.assembled) {
-        const a = p.assembled;
-        const proteins = a.protein.choices.filter((c) => {
-          const r = coachRecipe(assembledId(meal.slot, c, a.vegetables.choices[0], a.starch?.choices[0] ?? null), plan);
-          return r !== null && ctx.allowed(r);
-        });
-        if (!proteins.length) {
-          notes.push(`Aucune protéine du programme ne convient à votre foyer pour le ${meal.slot === 'lunch' ? 'déjeuner' : 'dîner'}.`);
+        const u = usable.get(meal.slot);
+        if (!u) {
+          impossible.add(meal.slot);
           continue;
         }
         const k = assembledCount;
-        let protein = proteins[k % proteins.length];
-        if (protein === lastProtein && proteins.length > 1) protein = proteins[(k + 1) % proteins.length];
-        const vegs = a.vegetables.choices;
-        const starches = a.starch?.choices ?? [];
-        const vegetable = vegs[(k + Math.floor(k / vegs.length)) % vegs.length];
-        const starch = starches.length ? starches[(k * 3 + Math.floor(k / starches.length)) % starches.length] : null;
+        let protein = u.proteins[k % u.proteins.length];
+        if (protein === lastProtein && u.proteins.length > 1) protein = u.proteins[(k + 1) % u.proteins.length];
+        const vegetable = u.vegs[(k + Math.floor(k / u.vegs.length)) % u.vegs.length];
+        const starch = u.starches[(k * 3 + Math.floor(k / u.starches.length)) % u.starches.length];
         recipe = coachRecipe(assembledId(meal.slot, protein, vegetable, starch), plan);
-        if (recipe && !ctx.allowed(recipe)) recipe = coachRecipe(assembledId(meal.slot, protein, vegs[0], starches[0] ?? null), plan);
+        // Combinaison refusee (deux aliments ensemble) : la premiere qui convient avec cette proteine.
+        if (!recipe || !ctx.allowed(recipe)) {
+          recipe = null;
+          for (const v of u.vegs) {
+            for (const st of u.starches) {
+              /** @type {Recipe | null} */
+              const r = recipe ? null : coachRecipe(assembledId(meal.slot, protein, v, st), plan);
+              if (r && ctx.allowed(r)) recipe = r;
+            }
+          }
+        }
         assembledCount += 1;
         lastProtein = protein;
       } else if (p.options.length) {
@@ -759,11 +778,49 @@ export function planCoachWeek(plan, ctx) {
           if (candidate && ctx.allowed(candidate)) recipe = candidate;
         }
         turn.set(meal.slot, start + 1);
+        if (!recipe) impossible.add(meal.slot);
       }
       if (recipe && ctx.allowed(recipe)) picks.push({ date, slot: meal.slot, recipe, mealId: existing?.id ?? null });
     }
   }
+  const slotName = (/** @type {ProgramSlot} */ s) => SLOT_NAMES[s];
+  if (kept.size) {
+    const list = [...kept].map(([slot, n]) => `${n} ${slotName(slot)}${n > 1 ? 's' : ''}`);
+    notes.push(`${joinWords(list)} déjà prévu${[...kept.values()].reduce((a, b) => a + b, 0) > 1 ? 's' : ''} ${[...kept.values()].reduce((a, b) => a + b, 0) > 1 ? 'sont gardés' : 'est gardé'}. Pour les remplacer par les repas du programme, choisissez « Tout refaire ».`);
+  }
+  if (impossible.size) notes.push(`Aucun ${joinWords([...impossible].map(slotName))} du programme ne convient à votre foyer (allergies, régimes ou aliments refusés) : vérifiez « Mon foyer ».`);
   return { picks, notes };
+}
+
+/** Noms des repas dans les messages. */
+const SLOT_NAMES = /** @type {Record<ProgramSlot, string>} */ ({ breakfast: 'petit-déjeuner', morning_snack: 'collation du matin', lunch: 'déjeuner', snack: 'goûter', dinner: 'dîner' });
+
+/**
+ * Proteines, legumes et feculents d'un repas assemble qui conviennent au foyer : on trouve une
+ * combinaison acceptee, puis on garde chaque aliment qui passe avec elle. null si aucune.
+ * @param {ProgramSlot} slot
+ * @param {NonNullable<ParsedMeal['assembled']>} a
+ * @param {CoachPlan} plan
+ * @param {(recipe: Recipe) => boolean} allowed
+ * @returns {{ proteins: string[], vegs: string[], starches: (string | null)[] } | null}
+ */
+function usableChoices(slot, a, plan, allowed) {
+  /** @type {(string | null)[]} */
+  const starches = a.starch?.choices.length ? a.starch.choices : [null];
+  const ok = (/** @type {string} */ p, /** @type {string} */ v, /** @type {string | null} */ st) => {
+    const r = coachRecipe(assembledId(slot, p, v, st), plan);
+    return r !== null && allowed(r);
+  };
+  /** @type {[string, string, string | null] | null} */
+  let base = null;
+  for (const p of a.protein.choices) for (const v of a.vegetables.choices) for (const st of starches) if (!base && ok(p, v, st)) base = [p, v, st];
+  if (!base) return null;
+  const [bp, bv, bs] = base;
+  return {
+    proteins: a.protein.choices.filter((p) => ok(p, bv, bs)),
+    vegs: a.vegetables.choices.filter((v) => ok(bp, v, bs)),
+    starches: starches.filter((st) => ok(bp, bv, st)),
+  };
 }
 
 /**
