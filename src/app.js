@@ -6,6 +6,7 @@ import { startRouter } from './router.js';
 import { requestPersistentStorage } from './services/storage.js';
 import { registerServiceWorker, applyUpdate } from './services/serviceWorker.js';
 import { loadUserRecipes } from './services/userRecipeService.js';
+import { loadCoachRecipes } from './services/coachService.js';
 
 /**
  * Recupere un element obligatoire de la page.
@@ -33,6 +34,7 @@ async function start() {
   // Les recettes personnelles rejoignent le catalogue avant le premier ecran.
   try {
     await loadUserRecipes();
+    await loadCoachRecipes();
   } catch (error) {
     console.error('Recettes personnelles non chargées', error);
   }

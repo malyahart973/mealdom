@@ -43,7 +43,7 @@ export async function renderPlanWeek(el, params) {
       <a class="button" href="#/foyer">Présenter mon foyer</a></section>`;
     return;
   }
-  const [{ choices, weeklyBudgetCents, programActive }, batchPlan] = await Promise.all([guidedDefaults(), getBatchPlan()]);
+  const [{ choices, weeklyBudgetCents, programActive, coachActive }, batchPlan] = await Promise.all([guidedDefaults(), getBatchPlan()]);
   const weeks = [thisMonday, addDays(thisMonday, 7)];
   if (!weeks.includes(monday)) weeks.push(monday);
   const weekLabel = (/** @type {string} */ m) => (m === thisMonday ? 'Cette semaine (à partir d’aujourd’hui)' : `Semaine du ${formatIsoDayMonth(m)}`);
@@ -66,6 +66,11 @@ export async function renderPlanWeek(el, params) {
             <label class="check"><input type="radio" name="keep" value="redo"${choices.keepExisting ? '' : ' checked'} /> <span>Tout refaire (sauf les repas verrouillés)</span></label>
           </div>
           <label class="check"><input type="checkbox" name="leftovers"${choices.leftovers ? ' checked' : ''} /> <span>Les restes du dîner pour le déjeuner du lendemain (on cuisine plus le soir)</span></label>
+          ${
+            coachActive
+              ? `<label class="check check--block"><input type="checkbox" name="followCoach"${choices.followCoach ? ' checked' : ''} /> <span><strong>Suivre le programme de mon coach</strong><span class="hint">Ses repas, ses grammages et ses alternatives ; la collation d’après le sport les jours de sport. <a href="#/programme/coach">Voir le programme</a></span></span></label>`
+              : ''
+          }
         </fieldset>
 
         <fieldset class="guided__step">
@@ -167,6 +172,7 @@ export async function renderPlanWeek(el, params) {
       wishes: [...el.querySelectorAll('[data-wish][aria-pressed="true"]')].map((b) => b.getAttribute('data-wish') ?? ''),
       region: /** @type {HTMLSelectElement} */ (el.querySelector('#g-region')).value || null,
       leftovers: data.get('leftovers') === 'on',
+      followCoach: data.get('followCoach') === 'on',
     };
     const week = String(data.get('week') ?? monday);
     if (picked.wishes.includes('batch')) {

@@ -42,8 +42,11 @@ import { substitutesFor } from '../domain/assistant/substitutes.js';
 import { loadAvailability, autoSubstituter } from './territoryService.js';
 import { seasonNow } from './seasonService.js';
 import { callClaude, responseText, LlmError, DEFAULT_MODEL } from './llmService.js';
-import { recipes, recipesById, ingredientsById, preparationsById, cuisineLabels, familyOf, keepingOf, nutritionContext, nutritionByRecipe as recipeNutritionMap } from './catalog.js';
+import { recipes, recipesById, ingredientsById, preparationsById, cuisineLabels, familyOf, keepingOf, nutritionContext, nutritionByRecipe as recipeNutritionMap, registerPlannedRecipe, filterContext } from './catalog.js';
 import { batchSessions } from './batchService.js';
+import { getCoachPlan } from './coachService.js';
+import { getProgram } from './programService.js';
+import { planCoachWeek, COACH_SLOT_ORDER } from '../domain/nutrition/coach.js';
 import { INGREDIENTS } from '../data/ingredients.js';
 import { CUISINES, REGIONS } from '../data/cuisines.js';
 import { formatIsoDay } from '../utils/format.js';
@@ -440,10 +443,10 @@ function programWishes(p) {
 /**
  * Valeurs de depart du parcours guide : derniers choix, sinon repas affiches,
  * « leger » si un programme minceur est actif et preference de temps retenue.
- * @returns {Promise<{ choices: import('../domain/assistant/guided.js').GuidedChoices, weeklyBudgetCents: number | null, programActive: boolean }>}
+ * @returns {Promise<{ choices: import('../domain/assistant/guided.js').GuidedChoices, weeklyBudgetCents: number | null, programActive: boolean, coachActive: boolean }>}
  */
 export async function guidedDefaults() {
-  const [stored, budget, program, showBreakfast, showSnack, preferences, showMorningSnack] = await Promise.all([
+  const [stored, budget, program, showBreakfast, showSnack, preferences, showMorningSnack, coach] = await Promise.all([
     getSetting('guidedChoices'),
     getBudget(),
     programSummary(),
@@ -451,6 +454,7 @@ export async function guidedDefaults() {
     getShowSnack(),
     getPreferences(),
     getShowMorningSnack(),
+    getCoachPlan(),
   ]);
   const maxPref = preferences.find((p) => p.active && p.kind === 'max_minutes');
   /** @type {import('../domain/assistant/guided.js').GuidedChoices} */
@@ -466,10 +470,13 @@ export async function guidedDefaults() {
   const last = /** @type {Partial<import('../domain/assistant/guided.js').GuidedChoices> | null} */ (stored && typeof stored === 'object' ? stored : null);
   // Programme actif : ses repas (jeune intermittent compris) et sa methode priment.
   const fromProgram = program ? { slots: programMeals(program.program), wishes: [...new Set([...(last?.wishes ?? []), ...programWishes(program.program)])] } : {};
+  // Programme du coach : ses repas, suivis par defaut.
+  const fromCoach = coach ? { slots: COACH_SLOT_ORDER.filter((s) => coach.meals.some((m) => m.slot === s)), followCoach: last?.followCoach ?? true } : { followCoach: false };
   return {
-    choices: { ...fallback, ...(last ?? {}), ...fromProgram, budgetCents: null },
+    choices: { ...fallback, ...(last ?? {}), ...fromProgram, ...fromCoach, budgetCents: null },
     weeklyBudgetCents: budget.weeklyCents,
     programActive: program !== null,
+    coachActive: coach !== null,
   };
 }
 
@@ -484,8 +491,15 @@ export async function planWeek(monday, choices) {
   const conv = await getConversation(monday);
   const env = await loadEnvironment(monday);
   await setSetting('guidedChoices', { ...choices, budgetCents: null });
-  const req = applyPreferences(guidedRequest(choices), env.preferences);
-  const result = proposeChanges(req, env.engine);
+  const coach = choices.followCoach ? await coachOperations(choices, env) : null;
+  // Les repas du programme du coach sont composes d'apres ses grammages ; le moteur fait les autres.
+  const engineChoices = coach ? { ...choices, slots: choices.slots.filter((s) => !coach.slots.includes(s)), leftovers: false } : choices;
+  const req = applyPreferences(guidedRequest(engineChoices), env.preferences);
+  const result = engineChoices.slots.length ? proposeChanges(req, env.engine) : { operations: [], notes: [], needsClarification: false };
+  if (coach) {
+    result.operations.unshift(...coach.operations);
+    result.notes.unshift(...coach.notes);
+  }
   // « Garder les repas deja prevus » : on ne fait que remplir les cases vides.
   const operations = choices.keepExisting ? result.operations.filter((o) => o.type !== 'replace_recipe') : result.operations;
   const summary = describeChoices(choices, slotLabels, regionLabels);
@@ -497,6 +511,37 @@ export async function planWeek(monday, choices) {
   conv.pendingEvents.push(`Le client a utilisé le parcours guidé : « ${summary} ».`);
   await saveConversation(conv);
   return { proposalId: pending?.id ?? null, notes };
+}
+
+/**
+ * Repas de la semaine composes d'apres le programme du coach (grammages, alternatives,
+ * collation les jours de sport), compatibles avec le foyer.
+ * @param {import('../domain/assistant/guided.js').GuidedChoices} choices
+ * @param {Env} env
+ * @returns {Promise<{ operations: Operation[], notes: string[], slots: Slot[] } | null>}
+ */
+async function coachOperations(choices, env) {
+  const [plan, program] = await Promise.all([getCoachPlan(), getProgram()]);
+  if (!plan) return null;
+  const slots = /** @type {Slot[]} */ (plan.meals.map((m) => m.slot).filter((s) => choices.slots.includes(s)));
+  const { picks, notes } = planCoachWeek(plan, {
+    days: env.days.filter((d) => d >= env.today),
+    slots,
+    meals: env.meals,
+    redo: !choices.keepExisting,
+    sportDays: new Set(program.sport.map((s) => s.day)),
+    allowed: (recipe) => evaluateRecipeForHousehold(recipe, env.household, filterContext).status === 'compatible',
+  });
+  /** @type {Operation[]} */
+  const operations = [];
+  for (const pick of picks) {
+    registerPlannedRecipe(pick.recipe);
+    const reason = 'Programme de votre coach : quantités et aliments de son plan.';
+    if (pick.mealId) operations.push({ type: 'replace_recipe', mealId: pick.mealId, recipeId: pick.recipe.id, reason });
+    else operations.push({ type: 'add_meal', date: pick.date, slot: pick.slot, recipeId: pick.recipe.id, guests: 0, reason });
+  }
+  if (choices.leftovers) notes.push('Les restes du dîner ne sont pas utilisés pour les repas du programme : le déjeuner et le dîner du coach n’ont pas les mêmes quantités.');
+  return { operations, notes, slots };
 }
 
 /**

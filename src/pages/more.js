@@ -8,6 +8,7 @@ export function renderMore(el) {
       <h1 class="page-title">Plus</h1>
       <ul class="link-list">
         <li><a href="#/assistant">Assistant<span>Modifier le planning en le demandant simplement</span></a></li>
+        <li><a href="#/programme/coach">Programme de mon coach<span>Importer son plan (PDF, photo, texte) et composer les semaines avec</span></a></li>
         <li><a href="#/programme">Programme minceur<span>Vos besoins, vos portions en grammes, des idées de repas</span></a></li>
         <li><a href="#/poids">Suivi du poids<span>Pesées, courbe et progression</span></a></li>
         <li><a href="#/prix/ajouter">Ajouter un prix<span>Scanner un code-barres, photographier l’étiquette ou saisir</span></a></li>

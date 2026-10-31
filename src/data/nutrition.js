@@ -291,4 +291,13 @@ export const NUTRITION = {
   reblochon: [330, 20, 0, 27, 0, 450],
   paneer: [300, 19, 3, 24, 0],
   soy_milk: [40, 3.5, 1, 2, 0.5, undefined, 1.03],
+
+  // Programmes sportifs et de coach
+  rapeseed_oil: [900, 0, 0, 100, 0, undefined, 0.92],
+  coconut_oil: [890, 0, 0, 99, 0, undefined, 0.92],
+  oat_drink: [45, 0.6, 6.5, 1.5, 0.8, undefined, 1.03],
+  oat_flour: [375, 13, 60, 7, 10, undefined, 0.5],
+  whey_isolate: [370, 88, 3, 1.5, 0, undefined, 0.4],
+  asparagus: [20, 2.2, 1.9, 0.1, 2.1, 20],
+  wholewheat_pasta: [350, 13, 64, 2.5, 9],
 };

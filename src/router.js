@@ -10,6 +10,7 @@ import { renderPlanning } from './pages/planning.js';
 import { renderMeal } from './pages/meal.js';
 import { renderBatch } from './pages/batch.js';
 import { renderCook } from './pages/cook.js';
+import { renderCoach } from './pages/coach.js';
 import { renderShopping } from './pages/shopping.js';
 import { renderPackage } from './pages/package.js';
 import { renderStock } from './pages/stock.js';
@@ -156,6 +157,7 @@ const routes = [
   { pattern: /^\/prix\/ajouter\/(?<ingredientId>[^/]+)$/, title: 'Ajouter un prix', tab: '/courses', render: renderAddPrice, parent: () => '/courses' },
   { pattern: /^\/prix\/(?<ingredientId>[^/]+)$/, title: 'Historique des prix', tab: '/plus', render: renderPriceHistory, parent: () => '/prix' },
   { pattern: /^\/programme$/, title: 'Programme minceur', tab: '/plus', render: renderProgram, parent: () => '/plus' },
+  { pattern: /^\/programme\/coach(?:\/(?<step>importer|verifier))?$/, title: 'Programme de mon coach', tab: '/plus', render: renderCoach, parent: (p) => (p.step ? '/programme/coach' : '/plus') },
   { pattern: /^\/poids$/, title: 'Suivi du poids', tab: '/plus', render: renderWeight, parent: () => '/plus' },
 ];
 

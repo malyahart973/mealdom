@@ -44,6 +44,18 @@ export function nutritionByRecipe() {
 }
 
 /**
+ * Recette lisible par les repas, le planning et les courses, mais pas proposee dans la liste des
+ * recettes (repas composes d'apres le programme du coach).
+ * @param {import('../domain/recipes/recipes.js').Recipe} recipe
+ */
+export function registerPlannedRecipe(recipe) {
+  recipesById.set(recipe.id, recipe);
+  familyOf.set(recipe.id, recipeFamily(recipe, ingredientsById));
+  keepingOf.set(recipe.id, recipeKeeping(recipe, familyOf.get(recipe.id) ?? '', ingredientsById));
+  nutritionCache?.set(recipe.id, recipeNutrition(recipe, nutritionContext).perPortion);
+}
+
+/**
  * Ajoute ou met a jour une recette personnelle dans le catalogue en memoire.
  * Une recette archivee reste lisible (repas deja planifies) mais n'est plus proposee.
  * @param {import('../domain/recipes/recipes.js').Recipe} recipe

@@ -264,6 +264,14 @@ const EXTENDED = [
   ing('reblochon', 'dairy_eggs', 'reblochon', [], ['milk'], ['dairy', 'animal_rennet']),
   ing('paneer', 'dairy_eggs', 'paneer', [], ['milk'], ['dairy']),
   ing('soy_milk', 'grocery', 'boisson au soja', ['lait de soja'], ['soy']),
+  // Programmes sportifs et de coach
+  ing('rapeseed_oil', 'grocery', 'huile de colza', ['colza']),
+  ing('coconut_oil', 'grocery', 'huile de coco', ['huile de noix de coco']),
+  ing('oat_drink', 'grocery', 'boisson à l’avoine', ['lait d’avoine', "lait d'avoine", 'lait végétal', 'boisson végétale'], ['gluten']),
+  ing('oat_flour', 'grocery', 'farine d’avoine', ["farine d'avoine"], ['gluten']),
+  ing('whey_isolate', 'grocery', 'protéine whey isolate', ['whey', 'whey iso', 'protéine en poudre'], ['milk'], ['dairy']),
+  ing('asparagus', 'fruits_vegetables', 'asperges', ['asperge', 'asperges vertes']),
+  ing('wholewheat_pasta', 'grocery', 'pâtes complètes', ['pâtes au blé complet'], ['gluten']),
 ];
 
 /** @type {Ingredient[]} */

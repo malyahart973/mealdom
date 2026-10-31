@@ -3002,3 +3002,41 @@ line.series-3 {
   border-left: 5px solid var(--fleuve);
   background: var(--fleuve-soft);
 }
+
+/* ---------- Programme du coach ---------- */
+
+.coach textarea {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.45;
+}
+
+.coach__meal {
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+}
+
+.coach__understood {
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 4px solid var(--fleuve);
+  border-radius: var(--radius-small);
+  background: var(--fleuve-soft);
+  font-size: 0.9375rem;
+}
+
+.coach__understood p {
+  margin: 0 0 var(--space-1);
+}
+
+.coach__understood ul,
+.coach__understood ol {
+  margin: 0;
+  padding-left: 1.25rem;
+}

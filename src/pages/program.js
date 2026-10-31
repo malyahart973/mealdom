@@ -129,6 +129,7 @@ export async function renderProgram(el) {
   el.innerHTML = `
     <section class="program">
       <h1 class="page-title">Programme minceur</h1>
+      <p class="notice-inline">Votre coach vous a donné un programme alimentaire ? <a href="#/programme/coach">Programme de mon coach</a> : importez-le (PDF, photo ou texte) pour composer vos semaines avec ses repas et ses quantités.</p>
       <p class="hint">Des repères calculés avec des formules de référence (métabolisme de Mifflin-St Jeor, activité, sport). Ce n’est pas un avis médical : en cas de maladie, de traitement, de diabète, de grossesse, d’allaitement ou de troubles du comportement alimentaire, demandez conseil à un médecin ou à une diététicienne${program.fasting ? ', surtout pour le jeûne intermittent' : ''}. Jamais moins de ${MIN_KCAL.female} kcal par jour pour une femme et ${MIN_KCAL.male} kcal pour un homme.</p>
       ${
         base && day && perMeal && perMealToday && trame && currentBmi !== null

@@ -131,6 +131,39 @@ export async function readImage({ apiKey, model, system, schema, imageBase64, me
 }
 
 /**
+ * Lecture d'un document PDF (programme, fiche) : reponse JSON au format demande.
+ * @param {{ apiKey: string, model: string, system: string, schema: Record<string, unknown>, pdfBase64: string, instruction: string, signal?: AbortSignal }} params
+ * @returns {Promise<unknown>}
+ */
+export async function readPdf({ apiKey, model, system, schema, pdfBase64, instruction, signal }) {
+  const data = await post(
+    apiKey,
+    {
+      model,
+      max_tokens: 6000,
+      system,
+      output_config: { effort: 'low', format: { type: 'json_schema', schema } },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+            { type: 'text', text: instruction },
+          ],
+        },
+      ],
+    },
+    signal,
+  );
+  if (data.stop_reason === 'max_tokens') throw new LlmError('unknown', 'La lecture du document a été interrompue. Réessayez.');
+  try {
+    return JSON.parse(responseText(data.content));
+  } catch {
+    throw new LlmError('unknown', 'La réponse du service IA est illisible. Réessayez.');
+  }
+}
+
+/**
  * Lecture d'une recette sur une page web : l'IA ouvre la page avec l'outil web_fetch
  * (execute chez Anthropic, l'application n'appelle pas le site) et renvoie le JSON demande.
  * @param {{ apiKey: string, model: string, system: string, schema: Record<string, unknown>, url: string, signal?: AbortSignal }} params
