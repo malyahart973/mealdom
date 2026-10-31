@@ -109,7 +109,7 @@ export async function renderTrip(el, params) {
   /** @param {Circuit} c */
   const circuitPath = (c) => ['Domicile', ...c.storeIds.map(storeName), 'Domicile'].join(' → ');
   /** @param {number} km */
-  const kmText = (km) => `${String(km).replace('.', ',')}\u00a0km`;
+  const formatKm = (km) => `${String(km).replace('.', ',')}\u00a0km`;
   /**
    * Circuit et reserves sur les distances.
    * @param {Circuit} c
@@ -120,8 +120,8 @@ export async function renderTrip(el, params) {
       ...c.viaHome.map(([a, b]) => `Trajet direct ${storeName(a)} – ${storeName(b)} inconnu : compté comme un retour à la maison. Indiquez la position des deux magasins (en bas de page).`),
       ...(c.estimated ? ['Trajet entre magasins estimé à vol d’oiseau : touchez « Calculer les distances » (en bas de page) pour l’itinéraire réel.'] : []),
     ];
-    return `<p class="trip-circuit"><strong>${escapeHtml(circuitPath(c))}</strong> : ${escapeHtml(kmText(c.km))}${
-      saved >= 0.5 ? `, soit ${escapeHtml(kmText(saved))} de moins que des allers-retours séparés` : ''
+    return `<p class="trip-circuit"><strong>${escapeHtml(circuitPath(c))}</strong> : ${escapeHtml(formatKm(c.km))}${
+      saved >= 0.5 ? `, soit ${escapeHtml(formatKm(saved))} de moins que des allers-retours séparés` : ''
     }.</p>${notes.map((n) => `<p class="hint">${escapeHtml(n)}</p>`).join('')}`;
   };
   /** @param {GroupingPlan} p */
@@ -191,7 +191,7 @@ export async function renderTrip(el, params) {
               <p class="hint">${tripMinutes !== null ? `Environ ${escapeHtml(formatMinutes(tripMinutes))} de route` : 'Temps de route inconnu'}${tripCost !== null ? `, ${escapeHtml(formatCents(tripCost))} de carburant` : ''}.${trip.note ? ` ${escapeHtml(trip.note)}` : ''}</p>
               ${
                 betterOrder
-                  ? `<div class="fit fit--warn"><p><strong>Plus court : ${escapeHtml(betterOrder.storeIds.map(storeName).join(' puis '))}</strong>, ${escapeHtml(kmText(gainKm))} de moins.</p>
+                  ? `<div class="fit fit--warn"><p><strong>Plus court : ${escapeHtml(betterOrder.storeIds.map(storeName).join(' puis '))}</strong>, ${escapeHtml(formatKm(gainKm))} de moins.</p>
                       <button type="button" class="button button--small" data-action="reorder" data-order="${escapeHtml(betterOrder.storeIds.join(','))}">Prendre cet ordre</button></div>`
                   : ''
               }
@@ -279,7 +279,7 @@ export async function renderTrip(el, params) {
                     <ul>${pairs
                       .map(
                         ({ a, b, leg }) =>
-                          `<li>${escapeHtml(a.name)} – ${escapeHtml(b.name)} : ${leg ? `${escapeHtml(kmText(leg.km))}${leg.minutes !== null ? `, ${escapeHtml(formatMinutes(leg.minutes))}` : ''} <span class="hint">(${escapeHtml(leg.source === 'via_home' ? 'via le domicile' : SOURCE_LABELS[leg.source])})</span>` : 'inconnue'}</li>`,
+                          `<li>${escapeHtml(a.name)} – ${escapeHtml(b.name)} : ${leg ? `${escapeHtml(formatKm(leg.km))}${leg.minutes !== null ? `, ${escapeHtml(formatMinutes(leg.minutes))}` : ''} <span class="hint">(${escapeHtml(leg.source === 'via_home' ? 'via le domicile' : SOURCE_LABELS[leg.source])})</span>` : 'inconnue'}</li>`,
                       )
                       .join('')}</ul></details>`
                 : ''
