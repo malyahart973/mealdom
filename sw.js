@@ -1,4 +1,6 @@
-/* Service worker de MealDom : permet d'utiliser l'application sans Internet. */
+/* Service worker de MealDom : permet d'utiliser l'application sans Internet.
+ * Il est enregistre sous l'adresse sw.js?v=<version> (voir src/services/serviceWorker.js) :
+ * chaque nouvelle version est ainsi reconnue par tous les navigateurs, Safari compris. */
 importScripts('./src/version.js');
 
 const CACHE_NAME = `mealdom-${self.MEALDOM_VERSION}`;
@@ -177,7 +179,8 @@ const APP_FILES = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_FILES)));
+  // Fichiers relus sur Internet (jamais le cache du navigateur) : la nouvelle version est complete.
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_FILES.map((url) => new Request(url, { cache: 'reload' })))));
 });
 
 self.addEventListener('activate', (event) => {
@@ -208,6 +211,9 @@ self.addEventListener('fetch', (event) => {
     }
     return;
   }
+
+  // Verification de la version publiee : toujours sur Internet.
+  if (new URL(request.url).searchParams.has('check')) return;
 
   // Autres fichiers : d'abord le cache, sinon Internet.
   event.respondWith(caches.match(request).then((cached) => cached || fetch(request)));
