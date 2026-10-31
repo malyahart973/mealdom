@@ -111,8 +111,13 @@ test('Chaque ingrédient acheté a un rayon connu', () => {
 test('Stock : quantité négative refusée', () => {
   if (validateInventoryItem({ ...stock('rice_white', -1, 'g') }, ingredients).length === 0) throw new Error('acceptée');
 });
-test('Stock : ingrédient inconnu refusé', () => {
+test('Stock : ingrédient inconnu et sans nom refusé', () => {
   if (validateInventoryItem({ ...stock('licorne', 1, 'g') }, ingredients).length === 0) throw new Error('accepté');
+});
+test('Stock : produit hors recettes accepté avec son nom, jamais déduit des courses', () => {
+  const coffee = { ...stock('', 250, 'g'), label: 'café' };
+  const lines = buildShoppingLines([{ key: 'rice_white|g', ingredientId: 'rice_white', quantity: 100, unit: 'g' }], [coffee], [], ingredients);
+  assertEqual([validateInventoryItem(coffee, ingredients), lines[0].inStock, validateInventoryItem({ ...coffee, label: '   ' }, ingredients).length], [[], 0, 1]);
 });
 test('Conditionnement : contenu nul refusé', () => {
   if (validatePackage({ ...riceBag, quantity: 0 }, ingredients).length === 0) throw new Error('accepté');

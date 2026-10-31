@@ -20,7 +20,8 @@ import { applySubstitutions } from '../recipes/recipes.js';
  * Article en stock.
  * @typedef {Object} InventoryItem
  * @property {string} id
- * @property {string} ingredientId
+ * @property {string} ingredientId       Ingredient des recettes ; vide pour un produit qui ne sert dans aucune recette (cafe...)
+ * @property {string} [label]            Nom du produit tel que saisi (marque, format), s'il differe de l'ingredient
  * @property {number} quantity
  * @property {string} unit
  * @property {'pantry' | 'fridge' | 'freezer'} location
@@ -255,7 +256,9 @@ export function buildShoppingLines(needs, inventory, packages, ingredients) {
 export function validateInventoryItem(item, ingredients) {
   /** @type {string[]} */
   const errors = [];
-  if (!ingredients.has(item.ingredientId)) errors.push('Choisissez un ingrédient de la liste.');
+  const label = (item.label ?? '').trim();
+  if (!ingredients.has(item.ingredientId) && !label) errors.push('Indiquez le nom du produit.');
+  if (label.length > 60) errors.push('Le nom du produit est trop long (60 caractères au plus).');
   const unit = getUnit(item.unit);
   if (!unit || unit.kind === 'qualitative') errors.push('Choisissez une unité.');
   if (!Number.isFinite(item.quantity) || item.quantity < 0) errors.push('Indiquez une quantité positive.');

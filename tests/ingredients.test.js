@@ -1,6 +1,6 @@
 import { test, assertEqual } from './runner.js';
 import { ALLERGENS, isKnownAllergen } from '../src/domain/ingredients/allergens.js';
-import { buildNameIndex, findIngredientId, checkAllergens, normalizeText } from '../src/domain/ingredients/ingredients.js';
+import { buildNameIndex, findIngredientId, checkAllergens, normalizeText, suggestIngredients } from '../src/domain/ingredients/ingredients.js';
 import { convertUnit } from '../src/domain/ingredients/conversion.js';
 import { INGREDIENTS } from '../src/data/ingredients.js';
 
@@ -87,4 +87,9 @@ test('Chaque conversion spécifique a une source et un niveau de confiance', () 
 test('Au moins 5 ingrédients ont une conversion spécifique', () => {
   const count = INGREDIENTS.filter((i) => i.conversions.length > 0).length;
   if (count < 5) throw new Error(`Seulement ${count}`);
+});
+
+test('Noms proches : faute de frappe et pluriel proposés, mot sans rapport ignoré', () => {
+  const names = (/** @type {string} */ t) => suggestIngredients(t, INGREDIENTS, 3).map((i) => i.id);
+  assertEqual([names('sucr')[0], names('poulets')[0], names('yaourts nature')[0], names('café')], ['sugar_white', 'chicken', 'yogurt', []]);
 });

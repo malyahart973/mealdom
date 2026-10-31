@@ -96,6 +96,37 @@ export function findIngredientId(text, nameIndex) {
 }
 
 /**
+ * Ingredients aux noms proches d'un texte (fautes de frappe, pluriel, mot en trop), du plus
+ * proche au moins proche : pour proposer « Vouliez-vous dire… ? », jamais pour choisir a la place.
+ * @param {string} text
+ * @param {Ingredient[]} ingredients
+ * @param {number} limit
+ * @returns {Ingredient[]}
+ */
+export function suggestIngredients(text, ingredients, limit) {
+  const query = normalizeText(text).replace(/[^a-z0-9' ]/g, ' ').split(' ').filter((w) => w.length >= 3);
+  if (!query.length) return [];
+  /** @param {string} a @param {string} b */
+  const close = (a, b) => a === b || (a.length >= 4 && b.length >= 4 && (a.startsWith(b.slice(0, 4)) || b.startsWith(a.slice(0, 4))));
+  /** @type {{ ingredient: Ingredient, score: number }[]} */
+  const scored = [];
+  for (const ingredient of ingredients) {
+    if (ingredient.notPurchased) continue;
+    let best = 0;
+    for (const [i, name] of [ingredient.name, ...ingredient.aliases].entries()) {
+      const words = normalizeText(name).split(' ').filter((w) => w.length >= 3);
+      const own = i === 0 ? 0.1 : 0;
+      // Le premier mot porte le sens (« café moulu », « tomate cerise ») : il doit ressembler.
+      if (!words.some((w) => close(query[0], w))) continue;
+      const hits = query.filter((q) => words.some((w) => close(q, w))).length;
+      best = Math.max(best, hits / Math.max(query.length, words.length) + (close(query[0], words[0] ?? '') ? 0.5 : 0) + own);
+    }
+    if (best > 0) scored.push({ ingredient, score: best });
+  }
+  return scored.sort((a, b) => b.score - a.score || a.ingredient.name.length - b.ingredient.name.length).slice(0, limit).map((s) => s.ingredient);
+}
+
+/**
  * Resultat de la verification des allergenes d'une liste d'ingredients.
  * - compatible : aucun allergene interdit
  * - incompatible : au moins un allergene interdit (liste dans "found")
