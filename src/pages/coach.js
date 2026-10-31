@@ -4,6 +4,8 @@ import { SLOTS } from '../domain/planning/planning.js';
 import { parseCoachMeal, coachFoodLabel, COACH_SLOT_ORDER } from '../domain/nutrition/coach.js';
 import { getCoachPlan, saveCoachPlan, deleteCoachPlan, planFromText, planFromFile, coachEstimates } from '../services/coachService.js';
 import { getProgram } from '../services/programService.js';
+import { guidedDefaults, planWeek } from '../services/assistantService.js';
+import { toIsoDate, weekStart, addDays } from '../domain/planning/dates.js';
 
 /** @typedef {import('../domain/nutrition/coach.js').CoachPlan} CoachPlan */
 /** @typedef {import('../domain/nutrition/coach.js').CoachMeal} CoachMeal */
@@ -59,7 +61,8 @@ async function renderPlan(el, plan) {
     <section class="coach">
       <h1 class="page-title">Programme de mon coach</h1>
       <p class="hint">Importé le ${escapeHtml(formatIsoDay(plan.importedAt))}.${plan.notes ? ` ${escapeHtml(plan.notes)}` : ''}</p>
-      <p><a class="button" href="#/assistant/planifier">Planifier ma semaine avec ce programme</a></p>
+      <p><button type="button" class="button" data-action="adapt">Adapter ma semaine à ce programme</button></p>
+      <p class="hint" data-adapt-status aria-live="polite">Les repas aux heures du programme sont composés avec ses quantités ; les repas verrouillés restent. Vous vérifiez avant de valider. Pour choisir les repas ou la semaine : <a href="#/assistant/planifier">Planifier ma semaine</a>.</p>
       <dl class="facts">
         <div><dt>Journée type</dt><dd>environ ${formatNumber(est.rest.kcal)} kcal, ${formatNumber(est.rest.protein)} g de protéines</dd></div>
         ${est.sport ? `<div><dt>Jour de sport</dt><dd>environ ${formatNumber(est.sport.kcal)} kcal, ${formatNumber(est.sport.protein)} g de protéines</dd></div>` : ''}
@@ -87,6 +90,25 @@ async function renderPlan(el, plan) {
         <button type="button" class="button button--danger" data-action="stop">Ne plus suivre</button>
       </div>
     </section>`;
+  el.querySelector('[data-action="adapt"]')?.addEventListener('click', async (event) => {
+    const button = /** @type {HTMLButtonElement} */ (event.currentTarget);
+    const status = /** @type {HTMLElement} */ (el.querySelector('[data-adapt-status]'));
+    button.disabled = true;
+    status.textContent = 'Je compose votre semaine…';
+    // Le week-end, on prepare la semaine suivante (comme « Planifier ma semaine »).
+    const now = new Date();
+    const monday = weekStart(toIsoDate(now));
+    const week = now.getDay() === 0 || now.getDay() === 6 ? addDays(monday, 7) : monday;
+    const { choices } = await guidedDefaults();
+    const result = await planWeek(week, { ...choices, slots: plan.meals.map((m) => m.slot), followCoach: true, leftovers: false });
+    if (result.proposalId) {
+      window.location.hash = `#/assistant/apercu/${week}/${result.proposalId}`;
+      return;
+    }
+    button.disabled = false;
+    status.textContent = result.notes.join(' ');
+  });
+
   el.querySelector('[data-action="stop"]')?.addEventListener('click', async () => {
     if (!window.confirm('Ne plus suivre ce programme ? Les repas déjà planifiés restent dans le planning.')) return;
     await deleteCoachPlan();

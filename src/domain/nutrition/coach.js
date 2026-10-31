@@ -681,7 +681,8 @@ function optionRecipe(id, meal, option, extras, plan) {
  * @property {string[]} days               Jours a planifier (deja limites a partir d'aujourd'hui)
  * @property {ProgramSlot[]} slots         Repas demandes
  * @property {Meal[]} meals                Repas deja prevus
- * @property {boolean} redo                Remplacer les repas non verrouilles
+ * @property {boolean} redo                Recomposer aussi les repas deja tires du programme
+ *   (les autres repas aux heures du programme sont toujours remplaces, sauf s'ils sont verrouilles)
  * @property {Set<number>} sportDays       0 = lundi ... 6 = dimanche
  * @property {(recipe: Recipe) => boolean} allowed   Compatible avec le foyer (allergies, regimes, aliments refuses)
  */
@@ -739,8 +740,10 @@ export function planCoachWeek(plan, ctx) {
       if (!ctx.slots.includes(meal.slot)) continue;
       if (meal.sportDaysOnly && !ctx.sportDays.has(weekday(date))) continue;
       const existing = ctx.meals.find((m) => m.date === date && m.slot === meal.slot) ?? null;
-      if (existing && (!ctx.redo || existing.locked)) {
-        if (!existing.recipeId.startsWith('coach-')) kept.set(meal.slot, (kept.get(meal.slot) ?? 0) + 1);
+      // Suivre le programme : un repas qui n'en vient pas est remplace ; un repas verrouille reste.
+      const fromPlan = existing?.recipeId.startsWith('coach-') ?? false;
+      if (existing && (existing.locked || (fromPlan && !ctx.redo))) {
+        if (existing.locked && !fromPlan) kept.set(meal.slot, (kept.get(meal.slot) ?? 0) + 1);
         continue;
       }
       const p = /** @type {ParsedMeal} */ (parsed.get(meal.slot));
@@ -785,8 +788,9 @@ export function planCoachWeek(plan, ctx) {
   }
   const slotName = (/** @type {ProgramSlot} */ s) => SLOT_NAMES[s];
   if (kept.size) {
+    const total = [...kept.values()].reduce((a, b) => a + b, 0);
     const list = [...kept].map(([slot, n]) => `${n} ${slotName(slot)}${n > 1 ? 's' : ''}`);
-    notes.push(`${joinWords(list)} déjà prévu${[...kept.values()].reduce((a, b) => a + b, 0) > 1 ? 's' : ''} ${[...kept.values()].reduce((a, b) => a + b, 0) > 1 ? 'sont gardés' : 'est gardé'}. Pour les remplacer par les repas du programme, choisissez « Tout refaire ».`);
+    notes.push(`${joinWords(list)} verrouillé${total > 1 ? 's' : ''} ${total > 1 ? 'sont gardés' : 'est gardé'} tel${total > 1 ? 's' : ''} quel${total > 1 ? 's' : ''} : déverrouillez-${total > 1 ? 'les' : 'le'} dans le planning pour suivre le programme.`);
   }
   if (impossible.size) notes.push(`Aucun ${joinWords([...impossible].map(slotName))} du programme ne convient à votre foyer (allergies, régimes ou aliments refusés) : vérifiez « Mon foyer ».`);
   return { picks, notes };

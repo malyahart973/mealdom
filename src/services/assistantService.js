@@ -404,6 +404,24 @@ export async function sendMessage(monday, text, opts = {}) {
     await savePreferences(learnFromRequest(env.preferences, parsed, env.now.toISOString(), cuisineLabels));
   }
 
+  // « Adapte mes repas au programme de mon coach » : repas composes d'apres son programme.
+  const coachPlan = await getCoachPlan();
+  const said = normalizeText(clean);
+  if (coachPlan && /\b(coach|programme|plan alimentaire)\b/.test(said) && /\b(adapt|suiv|respect|cal|selon|fonction|compos|planifi|refai|fais|mets)/.test(said)) {
+    const coach = /** @type {NonNullable<Awaited<ReturnType<typeof coachOperations>>>} */ (
+      await coachOperations({ slots: coachPlan.meals.map((m) => m.slot), keepExisting: true, budgetCents: null, maxMinutes: null, wishes: [], region: null, followCoach: true }, env)
+    );
+    const proposal = coach.operations.length ? await createProposal(conv, coach.operations, 'Repas selon le programme du coach', coach.notes, 'engine', null, env) : null;
+    const pending = proposal?.status === 'pending' ? proposal : null;
+    const reply = pending
+      ? `Voici ${pending.operations.length} repas composés d’après le programme de votre coach (ses quantités et ses alternatives). Les repas verrouillés restent. Vérifiez puis acceptez.`
+      : ['Vos repas suivent déjà le programme de votre coach.', ...coach.notes].join(' ');
+    conv.messages.push(message('assistant', reply, 'engine', pending?.id ?? null));
+    conv.pendingEvents.push(`Le client a demandé d'adapter ses repas au programme de son coach : « ${clean} ».`);
+    await saveConversation(conv);
+    return conv;
+  }
+
   const settings = await getAssistantSettings();
   let handled = false;
   if (settings.useAi && settings.hasKey) {
@@ -499,12 +517,11 @@ export async function planWeek(monday, choices) {
   const engineChoices = coach ? { ...choices, slots: choices.slots.filter((s) => !coach.slots.includes(s)), leftovers: false } : choices;
   const req = applyPreferences(guidedRequest(engineChoices), env.preferences);
   const result = engineChoices.slots.length ? proposeChanges(req, env.engine) : { operations: [], notes: [], needsClarification: false };
-  if (coach) {
-    result.operations.unshift(...coach.operations);
-    result.notes.unshift(...coach.notes);
-  }
-  // « Garder les repas deja prevus » : on ne fait que remplir les cases vides.
-  const operations = choices.keepExisting ? result.operations.filter((o) => o.type !== 'replace_recipe') : result.operations;
+  // « Garder les repas deja prevus » : le moteur ne fait que remplir les cases vides. Les repas du
+  // programme du coach, eux, remplacent toujours les autres repas a ses heures (sauf verrouilles).
+  const engineOps = choices.keepExisting ? result.operations.filter((o) => o.type !== 'replace_recipe') : result.operations;
+  const operations = coach ? [...coach.operations, ...engineOps] : engineOps;
+  if (coach) result.notes.unshift(...coach.notes);
   const summary = describeChoices(choices, slotLabels, regionLabels);
   conv.messages.push(message('user', summary, null, null));
   const proposal = operations.length ? await createProposal(conv, operations, 'Planifier ma semaine', result.notes, 'engine', req, env) : null;

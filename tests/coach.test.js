@@ -110,11 +110,11 @@ test('Semaine du programme : collation seulement les jours de sport, protéines 
   assertEqual([snacks, picks.length, mains.every((id, i) => i === 0 || id !== mains[i - 1]), new Set(mains).size >= 5, notes], [['2026-11-03', '2026-11-05'], 30, true, true, []]);
 });
 
-test('Semaine du programme : repas incompatibles avec le foyer écartés, repas existants gardés', () => {
+test('Semaine du programme : repas incompatibles avec le foyer écartés, repas verrouillé gardé', () => {
   const noFish = (/** @type {import('../src/domain/recipes/recipes.js').Recipe} */ r) => !r.ingredients.some((l) => ['white_fish', 'salmon'].includes(l.ingredientId));
-  const kept = { id: 'k', date: '2026-11-02', slot: /** @type {const} */ ('lunch'), recipeId: 'x', recipeName: 'X', attendees: [], guests: 0, nextLunch: null, locked: false };
-  const { picks } = planCoachWeek(plan, { days, slots: ['lunch', 'dinner'], meals: [kept], redo: false, sportDays: new Set(), allowed: noFish });
-  assertEqual([picks.every((p) => noFish(p.recipe)), picks.some((p) => p.date === '2026-11-02' && p.slot === 'lunch'), picks.length], [true, false, 13]);
+  const locked = { id: 'k', date: '2026-11-02', slot: /** @type {const} */ ('lunch'), recipeId: 'x', recipeName: 'X', attendees: [], guests: 0, nextLunch: null, locked: true };
+  const { picks, notes } = planCoachWeek(plan, { days, slots: ['lunch', 'dinner'], meals: [locked], redo: false, sportDays: new Set(), allowed: noFish });
+  assertEqual([picks.every((p) => noFish(p.recipe)), picks.some((p) => p.date === '2026-11-02' && p.slot === 'lunch'), picks.length, notes.length], [true, false, 13, 1]);
 });
 
 test('Sans jours de sport déclarés : la collation d’après sport est signalée', () => {
@@ -143,12 +143,26 @@ test('Aliment refusé par le foyer : seul cet aliment est écarté, les déjeune
   assertEqual([picks.length, picks.every((p) => noBeans(p.recipe))], [14, true]);
 });
 
-test('Repas déjà prévus gardés : signalé, avec la marche à suivre', () => {
-  /** @type {import('../src/domain/planning/planning.js').Meal[]} */
-  const kept = days.flatMap((date) => /** @type {const} */ (['lunch', 'dinner']).map((slot) => ({ id: `${date}${slot}`, date, slot, recipeId: 'x', recipeName: 'X', attendees: [], guests: 0, nextLunch: null, locked: false })));
-  const r = planCoachWeek(plan, { days, slots: ['lunch', 'dinner'], meals: kept, redo: false, sportDays: new Set(), allowed: () => true });
-  assertEqual([r.picks.length, r.notes], [0, ['7 déjeuners et 7 dîners déjà prévus sont gardés. Pour les remplacer par les repas du programme, choisissez « Tout refaire ».']]);
-  assertEqual(planCoachWeek(plan, { days, slots: ['lunch', 'dinner'], meals: kept, redo: true, sportDays: new Set(), allowed: () => true }).picks.length, 14);
+/**
+ * Semaine deja planifiee (dejeuners et diners).
+ * @param {string} recipeId
+ * @param {boolean} locked
+ * @returns {import('../src/domain/planning/planning.js').Meal[]}
+ */
+const plannedWeek = (recipeId, locked) => days.flatMap((date) => /** @type {const} */ (['lunch', 'dinner']).map((slot) => ({ id: `${date}${slot}`, date, slot, recipeId, recipeName: 'X', attendees: [], guests: 0, nextLunch: null, locked })));
+
+test('Suivre le programme : les autres repas à ses heures sont remplacés, les repas verrouillés gardés et signalés', () => {
+  const replaced = planCoachWeek(plan, { days, slots: ['lunch', 'dinner'], meals: plannedWeek('chicken_colombo', false), redo: false, sportDays: new Set(), allowed: () => true });
+  assertEqual([replaced.picks.length, replaced.picks.every((p) => p.mealId !== null), replaced.notes], [14, true, []]);
+  const locked = planCoachWeek(plan, { days, slots: ['lunch', 'dinner'], meals: plannedWeek('chicken_colombo', true), redo: true, sportDays: new Set(), allowed: () => true });
+  assertEqual([locked.picks.length, locked.notes], [0, ['7 déjeuners et 7 dîners verrouillés sont gardés tels quels : déverrouillez-les dans le planning pour suivre le programme.']]);
+});
+
+test('Repas déjà tirés du programme : gardés, sauf « Tout refaire »', () => {
+  const id = assembledId('lunch', 'chicken', 'broccoli', 'quinoa');
+  const keep = planCoachWeek(plan, { days, slots: ['lunch', 'dinner'], meals: plannedWeek(id, false), redo: false, sportDays: new Set(), allowed: () => true });
+  const redo = planCoachWeek(plan, { days, slots: ['lunch', 'dinner'], meals: plannedWeek(id, false), redo: true, sportDays: new Set(), allowed: () => true });
+  assertEqual([keep.picks.length, keep.notes, redo.picks.length], [0, [], 14]);
 });
 
 test('Rien ne convient au foyer : signalé au lieu de laisser les repas vides sans explication', () => {

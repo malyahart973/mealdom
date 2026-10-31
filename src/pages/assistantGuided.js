@@ -53,6 +53,8 @@ export async function renderPlanWeek(el, params) {
     const end = addDays(week, 7);
     return allMeals.filter((m) => m.date >= week && m.date < end && m.date >= today && slots.includes(m.slot) && !m.locked && !m.recipeId.startsWith('coach-')).length;
   };
+  /** Repas du programme du coach (ses heures). */
+  const coachSlots = /** @type {string[]} */ (choices.followCoach ? choices.slots : []);
   const weeks = [thisMonday, addDays(thisMonday, 7)];
   if (!weeks.includes(monday)) weeks.push(monday);
   const weekLabel = (/** @type {string} */ m) => (m === thisMonday ? 'Cette semaine (à partir d’aujourd’hui)' : `Semaine du ${formatIsoDayMonth(m)}`);
@@ -148,10 +150,19 @@ export async function renderPlanWeek(el, params) {
   const plannedBox = /** @type {HTMLElement} */ (el.querySelector('[data-planned]'));
   const syncPlanned = () => {
     const data = new FormData(form);
-    const n = plannedCount(String(data.get('week') ?? monday), data.getAll('slot').map(String));
+    const week = String(data.get('week') ?? monday);
+    const slots = data.getAll('slot').map(String);
     const coach = data.get('followCoach') === 'on';
+    if (coach) {
+      // Suivre le programme : ses repas remplacent toujours les autres a ses heures.
+      const n = plannedCount(week, slots.filter((s) => coachSlots.includes(s)));
+      plannedBox.hidden = n === 0;
+      plannedBox.textContent = `${n} repas déjà prévu${n > 1 ? 's' : ''} aux heures de votre programme ${n > 1 ? 'seront remplacés' : 'sera remplacé'} par ceux de votre coach (les repas verrouillés restent).`;
+      return;
+    }
+    const n = plannedCount(week, slots);
     plannedBox.hidden = n === 0 || data.get('keep') === 'redo';
-    plannedBox.textContent = `${n} repas ${n > 1 ? 'sont' : 'est'} déjà prévu${n > 1 ? 's' : ''} cette semaine${coach ? ' aux heures du programme de votre coach' : ''} : « Garder » ${n > 1 ? 'les laisse' : 'le laisse'} tel${n > 1 ? 's' : ''} quel${n > 1 ? 's' : ''}, « Tout refaire » ${n > 1 ? 'les remplace' : 'le remplace'}${coach ? ' par les repas du programme' : ''}.`;
+    plannedBox.textContent = `${n} repas ${n > 1 ? 'sont' : 'est'} déjà prévu${n > 1 ? 's' : ''} cette semaine : « Garder » ${n > 1 ? 'les laisse' : 'le laisse'} tel${n > 1 ? 's' : ''} quel${n > 1 ? 's' : ''}, « Tout refaire » ${n > 1 ? 'les remplace' : 'le remplace'}.`;
   };
   form.addEventListener('change', syncPlanned);
   syncPlanned();
