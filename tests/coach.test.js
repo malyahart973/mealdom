@@ -131,3 +131,8 @@ test('Vérifications avant d’enregistrer, prochain bilan et journée type', ()
   assertEqual(validateCoachPlan({ ...plan, meals: [plan.meals[2], plan.meals[2]] }).length, 1);
   assertEqual([validateCoachPlan(plan), nextCheckIn(plan, '2026-11-10'), typicalDay(plan, false).length, typicalDay(plan, true).length], [[], '2026-11-22', 4, 5]);
 });
+
+test('Consigne « Pas d’huile… » reconnue seule sur sa phrase', () => {
+  const p = parseCoachText('DÉJEUNER 13H\n170 g de poulet\n200 g de haricots verts\nDÎNER 20H\n170 g de poisson\n200 g de brocolis\nPas de soda. Pas d’huile pour faire cuire les aliments.', '2026-11-01');
+  assertEqual(p.rules, ['Pas de soda.', 'Pas d’huile pour faire cuire les aliments.']);
+});

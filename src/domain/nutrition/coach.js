@@ -301,7 +301,7 @@ function hourOf(time) {
 }
 
 /** Regles du programme (apres les repas). */
-const RULE_LINE = /\bpas de\b|\bautorise|\binterdit|\beviter?\b|\ba volonte\b|\bsans\b.*\b(sucre|sauce|friture)/;
+const RULE_LINE = /\bpas d(e\b|')|\bautorise|\binterdit|\beviter?\b|\ba volonte\b|\bsans\b.*\b(sucre|sauce|friture)/;
 
 /**
  * Lecture d'un programme colle en texte (copie depuis un PDF ou un message).
