@@ -9,6 +9,8 @@ import { getHousehold } from './householdService.js';
 import { validateWeightEntry, sortEntries, weightProgress } from '../domain/nutrition/weight.js';
 import { getProgramRecord, getWeights, programStore, weightStore } from '../db/repositories/programRepository.js';
 import { toIsoDate } from '../domain/planning/dates.js';
+import { validateMeasurement, sortMeasurements } from '../domain/nutrition/measurements.js';
+import { getSetting, setSetting } from '../db/repositories/settingsRepository.js';
 
 /** @typedef {import('../domain/nutrition/program.js').Program} Program */
 /** @typedef {import('../domain/nutrition/weight.js').WeightEntry} WeightEntry */
@@ -55,6 +57,36 @@ export async function saveWeight(entry) {
  */
 export function deleteWeight(date) {
   return weightStore.delete(date);
+}
+
+/** @typedef {import('../domain/nutrition/measurements.js').Measurement} Measurement */
+
+/** @returns {Promise<Measurement[]>} */
+export async function getMeasurements() {
+  const value = await getSetting('measurements');
+  return Array.isArray(value) ? sortMeasurements(/** @type {Measurement[]} */ (value)) : [];
+}
+
+/**
+ * Une serie de mesures par jour : une nouvelle saisie a la meme date remplace la precedente.
+ * @param {Measurement} m
+ * @returns {Promise<string[]>}
+ */
+export async function saveMeasurement(m) {
+  const errors = validateMeasurement(m, toIsoDate(new Date()));
+  if (errors.length === 0) {
+    const list = (await getMeasurements()).filter((x) => x.date !== m.date);
+    await setSetting('measurements', sortMeasurements([...list, { ...m, note: m.note.trim() }]));
+  }
+  return errors;
+}
+
+/**
+ * @param {string} date
+ * @returns {Promise<void>}
+ */
+export async function deleteMeasurement(date) {
+  await setSetting('measurements', (await getMeasurements()).filter((x) => x.date !== date));
 }
 
 /**

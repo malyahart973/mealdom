@@ -3040,3 +3040,28 @@ line.series-3 {
   margin: 0;
   padding-left: 1.25rem;
 }
+
+/* ---------- Mensurations et bilan ---------- */
+
+.measures-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0 var(--space-3);
+}
+
+.measures-grid .hint {
+  display: block;
+  font-size: 0.8125rem;
+}
+
+.report {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-small);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

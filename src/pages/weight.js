@@ -3,7 +3,10 @@ import { formatNumber, formatIsoDay } from '../utils/format.js';
 import { toIsoDate } from '../domain/planning/dates.js';
 import { validateProgram } from '../domain/nutrition/program.js';
 import { parseKg, sortEntries, smoothedTrend, weightProgress } from '../domain/nutrition/weight.js';
-import { getProgram, getWeights, saveWeight, deleteWeight } from '../services/programService.js';
+import { getProgram, getWeights, saveWeight, deleteWeight, getMeasurements, saveMeasurement, deleteMeasurement } from '../services/programService.js';
+import { MEASURES, parseCm, measurementChanges, checkInReport } from '../domain/nutrition/measurements.js';
+import { nextCheckIn } from '../domain/nutrition/coach.js';
+import { getCoachPlan } from '../services/coachService.js';
 import { drawWeightChart } from './weightChart.js';
 
 /** @typedef {import('../domain/nutrition/weight.js').WeightProgress} WeightProgress */
@@ -37,15 +40,21 @@ function statusText(p) {
  */
 export async function renderWeight(el) {
   const today = toIsoDate(new Date());
-  const [program, entries] = await Promise.all([getProgram(), getWeights()]);
+  const [program, entries, measurements, coach] = await Promise.all([getProgram(), getWeights(), getMeasurements(), getCoachPlan()]);
   const hasProgram = validateProgram(program, today).length === 0;
   const sorted = sortEntries(entries);
   const progress = hasProgram ? weightProgress(program, entries, today) : null;
   const latest = sorted.length ? sorted[sorted.length - 1] : null;
+  const changes = measurementChanges(measurements);
+  const lastValues = new Map(changes.map((c) => [c.id, c.latest]));
+  const checkIn = coach ? nextCheckIn(coach, today) : null;
+  const report = checkInReport(sorted, measurements, today, formatIsoDay);
+  /** @param {number | null} n */
+  const evo = (n) => (n === null ? '—' : n === 0 ? 'stable' : `${n < 0 ? '−' : '+'}${formatNumber(Math.abs(n))} cm`);
 
   el.innerHTML = `
     <section>
-      <h1 class="page-title">Suivi du poids</h1>
+      <h1 class="page-title">Suivi du poids et mensurations</h1>
       ${
         progress
           ? `<dl class="budget-card">
@@ -61,7 +70,7 @@ export async function renderWeight(el) {
       }
 
       <h2>Nouvelle pesée</h2>
-      <div class="alert" role="alert" hidden></div>
+      <div class="alert" role="alert" data-alert="weight" hidden></div>
       <form class="stock-form" data-form="weight" novalidate>
         <div class="field"><label for="w-kg">Poids (kg)</label><input id="w-kg" type="text" inputmode="decimal" autocomplete="off" placeholder="ex. ${latest ? escapeHtml(formatNumber(latest.kg)) : '71,4'}" /></div>
         <div class="field"><label for="w-date">Date</label><input id="w-date" type="date" value="${today}" max="${today}" /></div>
@@ -80,7 +89,7 @@ export async function renderWeight(el) {
       ${
         sorted.length
           ? `<h2>Mes pesées</h2>
-            <table class="table">
+            <table class="table" data-table="weights">
               <thead><tr><th scope="col">Date</th><th scope="col">Poids</th><th scope="col">Moyenne 7 j</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
               <tbody>${[...smoothedTrend(sorted)]
                 .reverse()
@@ -94,6 +103,49 @@ export async function renderWeight(el) {
             </table>`
           : ''
       }
+
+      <h2>Mensurations</h2>
+      <p class="hint">Avec un mètre ruban souple, sans serrer, au même moment de la journée. Le tour de taille baisse souvent même quand la balance bouge peu.</p>
+      <div class="alert" role="alert" data-alert="measures" hidden></div>
+      <form class="stock-form" data-form="measures" novalidate>
+        <div class="field"><label for="m-date">Date</label><input id="m-date" type="date" value="${today}" max="${today}" /></div>
+        <div class="measures-grid">${MEASURES.map(
+          (m) => `<div class="field"><label for="m-${m.id}">${escapeHtml(m.label)} (cm)</label>
+            <input id="m-${m.id}" type="text" inputmode="decimal" autocomplete="off" placeholder="${lastValues.has(m.id) ? escapeHtml(formatNumber(/** @type {number} */ (lastValues.get(m.id)))) : 'ex. 85'}" />
+            <span class="hint">${escapeHtml(m.hint)}</span></div>`,
+        ).join('')}</div>
+        <div class="field"><label for="m-note">Note (facultatif)</label><input id="m-note" type="text" maxlength="80" autocomplete="off" /></div>
+        <div class="form-actions"><button type="submit" class="button">Enregistrer les mesures</button></div>
+        <p class="hint">Remplissez seulement les mesures prises. Une nouvelle saisie à la même date remplace la précédente.</p>
+      </form>
+      ${
+        changes.length
+          ? `<table class="table">
+              <thead><tr><th scope="col">Mesure</th><th scope="col">Dernière</th><th scope="col">Depuis la précédente</th><th scope="col">Depuis le début</th></tr></thead>
+              <tbody>${changes.map((c) => `<tr><td>${escapeHtml(c.label)}</td><td>${escapeHtml(formatNumber(c.latest))} cm</td><td>${escapeHtml(evo(c.sincePrevious))}</td><td>${escapeHtml(evo(c.sinceStart))}</td></tr>`).join('')}</tbody>
+            </table>
+            <details class="proposal__ingredients"><summary>Toutes mes mesures (${measurements.length})</summary>
+              <ul class="local-list">${[...measurements]
+                .reverse()
+                .map(
+                  (m) => `<li><span><strong>${escapeHtml(formatIsoDay(m.date))}</strong> : ${escapeHtml(
+                    MEASURES.filter((x) => m.values[x.id] !== undefined).map((x) => `${x.label.toLowerCase()} ${formatNumber(/** @type {number} */ (m.values[x.id]))} cm`).join(', '),
+                  )}${m.note ? ` <span class="hint">${escapeHtml(m.note)}</span>` : ''}</span>
+                  <button type="button" class="icon-button" data-remove-measure="${m.date}" aria-label="Supprimer les mesures du ${escapeHtml(formatIsoDay(m.date))}">×</button></li>`,
+                )
+                .join('')}</ul></details>`
+          : ''
+      }
+
+      <h2>Bilan pour mon coach</h2>
+      ${
+        checkIn
+          ? `<p>Prochain bilan : <strong>${escapeHtml(formatIsoDay(checkIn))}</strong> (toutes les ${coach?.checkInWeeks} semaines, comme demandé par votre coach). Pesez-vous et prenez vos mesures ce jour-là.</p>`
+          : '<p>Envoyez vos résultats à votre coach en un geste.</p>'
+      }
+      <pre class="report" data-report>${escapeHtml(report)}</pre>
+      <p><button type="button" class="button" data-action="share-report">Envoyer mon bilan</button></p>
+      <p class="hint" data-share-status role="status"></p>
     </section>`;
 
   const chart = /** @type {HTMLElement | null} */ (el.querySelector('[data-chart]'));
@@ -119,7 +171,7 @@ export async function renderWeight(el) {
     const val = (id) => /** @type {HTMLInputElement} */ (el.querySelector(id)).value.trim();
     const errors = await saveWeight({ date: val('#w-date'), kg: parseKg(val('#w-kg')), note: val('#w-note') });
     if (errors.length) {
-      const alert = /** @type {HTMLElement} */ (el.querySelector('.alert'));
+      const alert = /** @type {HTMLElement} */ (el.querySelector('[data-alert="weight"]'));
       alert.hidden = false;
       alert.innerHTML = errors.map((e) => `<p>${escapeHtml(e)}</p>`).join('');
       return;
@@ -127,7 +179,53 @@ export async function renderWeight(el) {
     await renderWeight(el);
   });
 
-  el.querySelector('table')?.addEventListener('click', async (event) => {
+  el.querySelector('[data-form="measures"]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    /** @type {import('../domain/nutrition/measurements.js').Measurement['values']} */
+    const values = {};
+    for (const m of MEASURES) {
+      const cm = parseCm(/** @type {HTMLInputElement} */ (el.querySelector(`#m-${m.id}`)).value);
+      if (cm !== null) values[m.id] = cm;
+    }
+    const errors = await saveMeasurement({
+      date: /** @type {HTMLInputElement} */ (el.querySelector('#m-date')).value,
+      values,
+      note: /** @type {HTMLInputElement} */ (el.querySelector('#m-note')).value,
+    });
+    if (errors.length) {
+      const alert = /** @type {HTMLElement} */ (el.querySelector('[data-alert="measures"]'));
+      alert.hidden = false;
+      alert.innerHTML = errors.map((e) => `<p>${escapeHtml(e)}</p>`).join('');
+      alert.scrollIntoView({ block: 'center' });
+      return;
+    }
+    await renderWeight(el);
+    el.querySelector('[data-form="measures"]')?.scrollIntoView({ block: 'start' });
+  });
+
+  el.querySelector('[data-remove-measure]')?.closest('ul')?.addEventListener('click', async (event) => {
+    const date = /** @type {HTMLElement} */ (event.target).getAttribute('data-remove-measure');
+    if (!date || !window.confirm('Supprimer ces mesures ?')) return;
+    await deleteMeasurement(date);
+    await renderWeight(el);
+  });
+
+  el.querySelector('[data-action="share-report"]')?.addEventListener('click', async () => {
+    const status = /** @type {HTMLElement} */ (el.querySelector('[data-share-status]'));
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Mon bilan', text: report });
+        status.textContent = '';
+      } else {
+        await navigator.clipboard.writeText(report);
+        status.textContent = 'Bilan copié : collez-le dans votre message au coach.';
+      }
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) status.textContent = 'Partage impossible : sélectionnez le texte du bilan et copiez-le.';
+    }
+  });
+
+  el.querySelector('[data-table="weights"]')?.addEventListener('click', async (event) => {
     const date = /** @type {HTMLElement} */ (event.target).getAttribute('data-remove');
     if (!date || !window.confirm('Supprimer cette pesée ?')) return;
     await deleteWeight(date);

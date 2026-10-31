@@ -59,6 +59,7 @@ const APP_FILES = [
   './src/domain/recipes/equipment.js',
   './src/domain/recipes/cooking.js',
   './src/domain/nutrition/coach.js',
+  './src/domain/nutrition/measurements.js',
   './src/domain/recipes/recipes.js',
   './src/domain/recipes/families.js',
   './src/domain/recipes/recipeImport.js',

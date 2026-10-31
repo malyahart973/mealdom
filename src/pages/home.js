@@ -4,7 +4,7 @@ import { exportData, isReminderDue } from '../services/backupService.js';
 import { getHousehold } from '../services/householdService.js';
 import { getMeals } from '../services/planningService.js';
 import { SLOTS, plannedEntries, slotKey, mealPortionsFor } from '../domain/planning/planning.js';
-import { toIsoDate } from '../domain/planning/dates.js';
+import { toIsoDate, addDays } from '../domain/planning/dates.js';
 import { programSummary } from '../services/programService.js';
 import { plannedKcalForDay, hourText } from '../domain/nutrition/program.js';
 import { calorieRingSvg } from './calorieRing.js';
@@ -16,6 +16,8 @@ import { getInventory } from '../services/shoppingService.js';
 import { itemsToUseFirst, expiryStatus } from '../domain/shopping/shopping.js';
 import { ingredientsById, recipesById, nutritionByRecipe } from '../services/catalog.js';
 import { getStores } from '../services/budgetService.js';
+import { getCoachPlan } from '../services/coachService.js';
+import { nextCheckIn } from '../domain/nutrition/coach.js';
 
 /**
  * Ecran Accueil.
@@ -23,7 +25,7 @@ import { getStores } from '../services/budgetService.js';
  */
 export async function renderHome(el) {
   const today = formatDayLong(new Date());
-  const [reminder, household, meals, program, trip, stores, inventory, season] = await Promise.all([isReminderDue(), getHousehold(), getMeals(), programSummary(), nextTrip(), getStores(), getInventory(), seasonNow()]);
+  const [reminder, household, meals, program, trip, stores, inventory, season, coach] = await Promise.all([isReminderDue(), getHousehold(), getMeals(), programSummary(), nextTrip(), getStores(), getInventory(), seasonNow(), getCoachPlan()]);
   const storeNames = new Map(stores.map((s) => [s.id, s.name]));
   const todayIso = toIsoDate(new Date());
   const entries = plannedEntries(meals);
@@ -121,6 +123,16 @@ export async function renderHome(el) {
           <h2 id="expiry-title">À consommer vite</h2>
           <p>${escapeHtml(names.join(', '))}${first.length > 4 ? '…' : ''}${expired ? ` (dont ${expired} date dépassée)` : ''}.</p>
           <p><a class="button" href="#/stock">Voir le stock</a></p>
+        </section>`;
+    })()}
+    ${(() => {
+      // Bilan du coach (poids, mensurations) aujourd'hui ou dans les 2 jours.
+      const check = coach ? nextCheckIn(coach, addDays(todayIso, -1)) : null;
+      if (!check || check > addDays(todayIso, 2)) return '';
+      return `<section class="notice" aria-labelledby="checkin-title">
+          <h2 id="checkin-title">Bilan pour votre coach ${check === todayIso ? 'aujourd’hui' : escapeHtml(formatIsoDay(check))}</h2>
+          <p>Pesez-vous le matin à jeun et prenez vos mensurations, puis envoyez le bilan.</p>
+          <p><a class="button" href="#/poids">Pesée et mensurations</a></p>
         </section>`;
     })()}
     ${
