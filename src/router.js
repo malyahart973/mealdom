@@ -9,6 +9,7 @@ import { renderMember } from './pages/member.js';
 import { renderPlanning } from './pages/planning.js';
 import { renderMeal } from './pages/meal.js';
 import { renderBatch } from './pages/batch.js';
+import { renderCook } from './pages/cook.js';
 import { renderShopping } from './pages/shopping.js';
 import { renderPackage } from './pages/package.js';
 import { renderStock } from './pages/stock.js';
@@ -50,6 +51,7 @@ const routes = [
     parent: (p) => `/planning/semaine/${p.date}`,
   },
   { pattern: /^\/planning\/repas\/(?<id>[^/]+)$/, title: 'Repas', tab: '/planning', render: renderMeal, parent: () => '/planning' },
+  { pattern: /^\/planning\/repas\/(?<mealId>[^/]+)\/cuisiner$/, title: 'Cuisiner', tab: '/planning', render: renderCook, parent: (p) => `/planning/repas/${p.mealId}` },
   { pattern: /^\/batch$/, title: 'Batch cooking', tab: '/planning', render: renderBatch, parent: () => '/planning' },
   {
     pattern: /^\/batch\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/,
@@ -68,6 +70,7 @@ const routes = [
     render: renderRecipeEditor,
     parent: (p) => `/recettes/${p.id}`,
   },
+  { pattern: /^\/recettes\/(?<id>[^/]+)\/cuisiner(?:\/(?<portions>\d+(?:[.,]\d)?))?$/, title: 'Cuisiner', tab: '/recettes', render: renderCook, parent: (p) => `/recettes/${p.id}` },
   { pattern: /^\/recettes\/(?<id>[^/]+)$/, title: 'Recette', tab: '/recettes', render: renderRecipe, parent: () => '/recettes' },
   { pattern: /^\/courses$/, title: 'Courses', tab: '/courses', render: renderShopping },
   { pattern: /^\/courses\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/, title: 'Courses', tab: '/courses', render: renderShopping },

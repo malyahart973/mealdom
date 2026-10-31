@@ -74,7 +74,9 @@ export async function renderBatch(el, params) {
         <h3 class="task__title">${escapeHtml(task.name)} <span class="task__qty">${task.quantity} portion${task.quantity > 1 ? 's' : ''}</span></h3>
         ${dish.servings.length > 1 ? `<span class="tag">Cuisiné une fois pour ${dish.servings.length} repas</span>` : ''}
         ${storageHtml(dish)}
-        ${methodHtml}${details}
+        ${methodHtml}
+        <p><a class="button button--small button--secondary" href="#/recettes/${encodeURIComponent(dish.recipe.id)}/cuisiner/${dish.portions}">Cuisiner pas à pas</a></p>
+        ${details}
       </li>`;
     }
     const req = s.requirements.find((r) => r.preparationId === task.preparationId);

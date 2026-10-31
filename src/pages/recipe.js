@@ -230,6 +230,7 @@ export async function renderRecipe(el, params) {
   el.innerHTML = `
     <article class="recipe">
       <h1 class="page-title">${escapeHtml(recipe.name)}</h1>
+      <p><a class="button" href="#/recettes/${encodeURIComponent(recipe.id)}/cuisiner">Cuisiner pas à pas</a></p>
       ${recipe.status === 'archived' ? '<p class="notice-inline">Recette supprimée : elle reste visible pour les repas déjà planifiés, mais n’est plus proposée.</p>' : ''}
       ${
         recipe.source.type === 'personal' && recipe.status !== 'archived'

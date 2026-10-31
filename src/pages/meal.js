@@ -91,6 +91,7 @@ export async function renderMeal(el, params) {
   el.innerHTML = `
     <section>
       <h1 class="page-title">${existing ? 'Modifier le repas' : 'Ajouter un repas'}</h1>
+      ${existing ? `<p><a class="button" href="#/planning/repas/${encodeURIComponent(meal.id)}/cuisiner">Cuisiner pas à pas</a></p>` : ''}
       ${locked ? '<p class="notice-inline">Ce repas est verrouillé. Décochez « Verrouiller ce repas » et enregistrez pour pouvoir le modifier.</p>' : ''}
       <div class="alert" role="alert" hidden></div>
       <form data-form="meal" novalidate>

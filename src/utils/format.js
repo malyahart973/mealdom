@@ -83,3 +83,16 @@ export function formatTime(time) {
 export function formatPortions(portions) {
   return `${formatNumber(portions)} ${portions >= 2 ? 'portions' : 'portion'}`;
 }
+
+/**
+ * Temps restant d'un minuteur : "4:05", "1:02:03".
+ * @param {number} ms
+ * @returns {string}
+ */
+export function formatClock(ms) {
+  const total = Math.ceil(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+}
