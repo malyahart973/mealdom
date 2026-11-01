@@ -41,6 +41,24 @@ export const SLOTS = [
  */
 
 /**
+ * Plats planifies recemment (le plus recent d'abord, sans doublon ni repas libre), pour les
+ * reprendre en un geste.
+ * @param {Meal[]} meals
+ * @param {string} today
+ * @param {number} limit
+ * @returns {string[]}
+ */
+export function recentRecipeIds(meals, today, limit) {
+  /** @type {string[]} */
+  const out = [];
+  for (const m of [...meals].filter((x) => x.date <= today && x.recipeId !== 'free').sort((a, b) => b.date.localeCompare(a.date))) {
+    if (!out.includes(m.recipeId)) out.push(m.recipeId);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+/**
  * Case du planning occupee : un repas, ou les restes d'un diner.
  * @typedef {{ kind: 'meal', meal: Meal } | { kind: 'leftover', meal: Meal }} PlannedEntry
  */

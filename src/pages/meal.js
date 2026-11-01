@@ -3,7 +3,7 @@ import { formatIsoDay, formatMinutes, formatPortions, formatNumber } from '../ut
 import { addDays, parseIsoDate } from '../domain/planning/dates.js';
 import { SLOTS, mealPortionsFor } from '../domain/planning/planning.js';
 import { filterRecipes } from '../domain/recipes/recipeFiltering.js';
-import { totalMinutes, fitsSlot } from '../domain/recipes/recipes.js';
+import { totalMinutes, fitsSlot, FREE_RECIPE_ID } from '../domain/recipes/recipes.js';
 import { personalPortion } from '../domain/nutrition/program.js';
 import { recipes, recipesById, filterContext, ingredientsById, preparationsById, nutritionByRecipe, keepingOf } from '../services/catalog.js';
 import { programSummary } from '../services/programService.js';
@@ -91,7 +91,12 @@ export async function renderMeal(el, params) {
   el.innerHTML = `
     <section>
       <h1 class="page-title">${existing ? 'Modifier le repas' : 'Ajouter un repas'}</h1>
-      ${existing ? `<p><a class="button" href="#/planning/repas/${encodeURIComponent(meal.id)}/cuisiner">Cuisiner pas à pas</a></p>` : ''}
+      ${
+        existing
+          ? `<p class="form-actions">${locked ? '' : `<a class="button" href="#/planning/repas/${encodeURIComponent(meal.id)}/changer">Changer de plat</a>`}
+              ${meal.recipeId === FREE_RECIPE_ID ? '' : `<a class="button button--secondary" href="#/planning/repas/${encodeURIComponent(meal.id)}/cuisiner">Cuisiner pas à pas</a>`}</p>`
+          : ''
+      }
       ${locked ? '<p class="notice-inline">Ce repas est verrouillé. Décochez « Verrouiller ce repas » et enregistrez pour pouvoir le modifier.</p>' : ''}
       <div class="alert" role="alert" hidden></div>
       <form data-form="meal" novalidate>
@@ -105,7 +110,13 @@ export async function renderMeal(el, params) {
           </div>
         </fieldset>
 
-        <fieldset class="field"${disabled}>
+        ${
+          meal.recipeId === FREE_RECIPE_ID
+            ? `<div class="field"><label for="free-name">Repas</label><input id="free-name" name="freeName" type="text" maxlength="60" value="${escapeHtml(meal.recipeName)}"${disabled} />
+                <p class="hint">Repas libre : sans recette, rien n’est ajouté aux courses.</p></div>`
+            : ''
+        }
+        <fieldset class="field"${disabled}${meal.recipeId === FREE_RECIPE_ID ? ' hidden' : ''}>
           <legend>Recette</legend>
           <p class="hint">Seules les recettes adaptées à votre foyer sont proposées.</p>
           <input type="search" data-input="recipe-search" placeholder="Rechercher une recette" aria-label="Rechercher une recette" autocomplete="off" />
@@ -133,14 +144,14 @@ export async function renderMeal(el, params) {
           </div>
         </fieldset>
 
-        <fieldset class="field" data-group="batch"${disabled}>
+        <fieldset class="field" data-group="batch"${disabled}${meal.recipeId === FREE_RECIPE_ID ? ' hidden' : ''}>
           <legend>Batch cooking</legend>
           <label class="check" data-batch-choice><input type="checkbox" name="batch"${meal.cookSameDay ? '' : ' checked'} />
             <span>Préparer ce repas pendant la séance de batch cooking</span></label>
           <p class="hint" data-output="keeping"></p>
         </fieldset>
 
-        <fieldset class="field" data-block="subs"${disabled}></fieldset>
+        <fieldset class="field" data-block="subs"${disabled}${meal.recipeId === FREE_RECIPE_ID ? ' hidden' : ''}></fieldset>
 
         <p class="portions" data-output="portions" aria-live="polite"></p>
         <p class="hint" data-output="personal" aria-live="polite"></p>
@@ -152,7 +163,7 @@ export async function renderMeal(el, params) {
           <button type="submit" class="button">Enregistrer</button>
           ${existing && !locked ? '<button type="button" class="button button--danger" data-action="delete">Retirer du planning</button>' : ''}
         </div>
-        ${existing ? `<p><a href="#/recettes/${encodeURIComponent(meal.recipeId)}">Voir la recette</a></p>` : ''}
+        ${existing && meal.recipeId !== FREE_RECIPE_ID ? `<p><a href="#/recettes/${encodeURIComponent(meal.recipeId)}">Voir la recette</a></p>` : ''}
       </form>
     </section>
   `;
@@ -219,7 +230,7 @@ export async function renderMeal(el, params) {
       date: field('date')?.value ?? meal.date,
       slot,
       recipeId,
-      recipeName: recipesById.get(recipeId)?.name ?? meal.recipeName,
+      recipeName: recipeId === FREE_RECIPE_ID ? (field('freeName')?.value.trim() || meal.recipeName) : recipesById.get(recipeId)?.name ?? meal.recipeName,
       attendees: checked('attendees'),
       guests: readCount(field('guests')),
       nextLunch: wantsLunch ? { attendees: checked('lunchAttendees'), guests: readCount(field('lunchGuests')) } : null,

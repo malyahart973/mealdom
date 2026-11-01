@@ -91,6 +91,7 @@ const APP_FILES = [
   './src/domain/planning/calendar.js',
   './src/pages/batch.js',
   './src/pages/batchLabels.js',
+  './src/pages/mealPicker.js',
   './src/pages/receipt.js',
   './src/pages/cook.js',
   './src/pages/coach.js',

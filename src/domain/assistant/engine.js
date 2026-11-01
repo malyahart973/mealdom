@@ -8,7 +8,7 @@
 import { addDays } from '../planning/dates.js';
 import { SLOTS, mealPortionsFor } from '../planning/planning.js';
 import { evaluateRecipeForHousehold } from '../household/compatibility.js';
-import { applySubstitutions, hasTag, fitsSlot } from '../recipes/recipes.js';
+import { applySubstitutions, hasTag, fitsSlot, FREE_RECIPE_ID } from '../recipes/recipes.js';
 import { activePromotions } from '../drive/drive.js';
 import { isEligible, scoreRecipe, recipeCost, recipeContains, matchesTarget, tieBreak } from './scoring.js';
 import { substitutesFor } from './substitutes.js';
@@ -522,7 +522,8 @@ export function proposeChanges(req, ctx) {
   const generic = !req.keepMeals && (req.generate || req.redo || req.modes.length > 0 || req.cuisine || req.region || req.include.length || req.avoid.length || req.budgetPercent !== null || req.budgetCap);
   const alreadyHandled = new Set(operations.flatMap((o) => ('mealId' in o ? [o.mealId] : [])));
   if (generic && !req.replace && !req.leftovers && !(req.addMeal && req.days.length)) {
-    const targets = targetMeals(req, ctx).filter((m) => !m.locked && !alreadyHandled.has(m.id));
+    // Un repas libre (restaurant, plat ecrit a la main) est un choix de la personne : jamais remplace.
+    const targets = targetMeals(req, ctx).filter((m) => !m.locked && m.recipeId !== FREE_RECIPE_ID && !alreadyHandled.has(m.id));
     const weekCostIndex = weekMeals.reduce((s, m) => {
       const r = ctx.recipesById.get(m.recipeId);
       return s + (r ? recipeCost(r, ctx.scoring).index * mealPortionsFor(m, ctx.scoring.household).total : 0);

@@ -268,3 +268,15 @@ test('Plats aimés proposés plus souvent, plats pas aimés jamais proposés', (
   const constraints = { slot: null, maxMinutes: null, avoid: [], include: [], cuisine: null, cuisines: null, excludeRecipeIds: new Set(), maxCostIndex: null };
   assertEqual([liked.score - plain.score, liked.reasons.includes('un plat que vous aimez'), isEligible(recipe('chicken_colombo'), constraints, scoring), isEligible(recipe('chili_con_carne'), constraints, scoring)], [6, true, false, true]);
 });
+
+test('Repas libre : rien à cuisiner pendant la séance ni le jour même', () => {
+  const w = planBatchWeek([{ ...meal('l', '2026-11-03', 'chicken_colombo'), recipeId: 'free', recipeName: 'Restaurant' }], ['2026-11-01'], household, ctx);
+  assertEqual([w.sessions.length, w.sameDay.length, w.problems], [0, 0, []]);
+});
+
+test('« Tout refaire » : un repas libre n’est jamais remplacé par le moteur', () => {
+  const free = { ...meal('rl', '2026-11-02', 'chicken_colombo'), slot: /** @type {const} */ ('lunch'), recipeId: 'free', recipeName: 'Restaurant' };
+  const req = { ...guidedRequest({ slots: ['lunch', 'dinner'], keepExisting: false, budgetCents: null, maxMinutes: null, wishes: [], region: null }), generate: true };
+  const ops = proposeChanges(req, engineFor([free], [])).operations;
+  assertEqual([ops.some((o) => 'mealId' in o && o.mealId === 'rl'), ops.some((o) => o.type === 'add_meal' && o.date === '2026-11-02' && o.slot === 'lunch')], [false, false]);
+});

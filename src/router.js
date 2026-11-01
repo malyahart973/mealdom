@@ -8,6 +8,7 @@ import { renderHousehold } from './pages/household.js';
 import { renderMember } from './pages/member.js';
 import { renderPlanning } from './pages/planning.js';
 import { renderMeal } from './pages/meal.js';
+import { renderMealPicker } from './pages/mealPicker.js';
 import { renderBatch } from './pages/batch.js';
 import { renderCook } from './pages/cook.js';
 import { renderCoach } from './pages/coach.js';
@@ -50,9 +51,17 @@ const routes = [
     pattern: /^\/planning\/ajouter\/(?<date>\d{4}-\d{2}-\d{2})\/(?<slot>[a-z_]+)$/,
     title: 'Ajouter un repas',
     tab: '/planning',
-    render: renderMeal,
+    render: renderMealPicker,
     parent: (p) => `/planning/semaine/${p.date}`,
   },
+  {
+    pattern: /^\/planning\/ajouter\/(?<date>\d{4}-\d{2}-\d{2})\/(?<slot>[a-z_]+)\/details$/,
+    title: 'Ajouter un repas',
+    tab: '/planning',
+    render: renderMeal,
+    parent: (p) => `/planning/ajouter/${p.date}/${p.slot}`,
+  },
+  { pattern: /^\/planning\/repas\/(?<id>[^/]+)\/changer$/, title: 'Changer de plat', tab: '/planning', render: renderMealPicker, parent: (p) => `/planning/repas/${p.id}` },
   { pattern: /^\/planning\/repas\/(?<id>[^/]+)$/, title: 'Repas', tab: '/planning', render: renderMeal, parent: () => '/planning' },
   { pattern: /^\/planning\/repas\/(?<mealId>[^/]+)\/cuisiner$/, title: 'Cuisiner', tab: '/planning', render: renderCook, parent: (p) => `/planning/repas/${p.mealId}` },
   { pattern: /^\/batch$/, title: 'Batch cooking', tab: '/planning', render: renderBatch, parent: () => '/planning' },

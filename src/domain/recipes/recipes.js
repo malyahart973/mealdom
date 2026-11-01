@@ -67,6 +67,35 @@ export const RECIPE_TAGS = [
   { id: 'kids', label: 'Apprécié des enfants' },
 ];
 
+/** Repas libre : un nom ecrit par la personne (restaurant, plat improvise...), sans recette ni courses. */
+export const FREE_RECIPE_ID = 'free';
+
+/**
+ * Recette support des repas libres : le nom affiche est celui du repas (meal.recipeName).
+ * @returns {Recipe}
+ */
+export function freeRecipe() {
+  return {
+    id: FREE_RECIPE_ID,
+    name: 'Repas libre',
+    description: 'Repas écrit à la main, sans recette : rien n’est ajouté aux courses.',
+    cuisine: 'french',
+    servings: 1,
+    prepMinutes: 0,
+    cookMinutes: 0,
+    difficulty: 'easy',
+    vessel: null,
+    ingredients: [],
+    preparations: [],
+    methods: [{ id: 'free', label: 'Repas libre', equipment: [], steps: ['Repas libre : pas de recette.'] }],
+    tips: [],
+    source: { type: 'personal', author: 'Vous', license: 'Repas libre', addedAt: '2026-11-01' },
+    status: 'validated',
+    mealTypes: ['breakfast', 'lunch', 'snack', 'dinner'],
+    keeping: { fridgeDays: 0, freezes: false },
+  };
+}
+
 /** Recette rapide : 30 minutes au plus, preparation et cuisson comprises. */
 export const QUICK_MINUTES = 30;
 

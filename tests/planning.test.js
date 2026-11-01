@@ -127,3 +127,10 @@ test('Déplacer un repas libère l’ancien créneau', () => {
   const grid = planningGrid(r.meals, ['2026-10-05', '2026-10-07'], ['dinner']);
   assertEqual([grid[0].slots[0].entry, grid[1].slots[0].entry?.meal.id], [null, 'm1']);
 });
+
+test('Plats récents : le plus récent d’abord, sans doublon, sans repas libre ni repas à venir', async () => {
+  const { recentRecipeIds } = await import('../src/domain/planning/planning.js');
+  const m = (/** @type {string} */ id, /** @type {string} */ date, /** @type {string} */ recipeId) => ({ id, date, slot: /** @type {const} */ ('dinner'), recipeId, recipeName: recipeId, attendees: [], guests: 0, nextLunch: null, locked: false });
+  const meals = [m('a', '2026-10-01', 'chili'), m('b', '2026-10-05', 'colombo'), m('c', '2026-10-06', 'free'), m('d', '2026-10-07', 'chili'), m('e', '2026-12-01', 'futur')];
+  assertEqual(recentRecipeIds(meals, '2026-10-31', 5), ['chili', 'colombo']);
+});

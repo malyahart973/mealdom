@@ -742,7 +742,8 @@ export function planCoachWeek(plan, ctx) {
       const existing = ctx.meals.find((m) => m.date === date && m.slot === meal.slot) ?? null;
       // Suivre le programme : un repas qui n'en vient pas est remplace ; un repas verrouille reste.
       const fromPlan = existing?.recipeId.startsWith('coach-') ?? false;
-      if (existing && (existing.locked || (fromPlan && !ctx.redo))) {
+      // Un repas libre (restaurant...) est un choix de la personne : il reste.
+      if (existing && (existing.locked || existing.recipeId === 'free' || (fromPlan && !ctx.redo))) {
         if (existing.locked && !fromPlan) kept.set(meal.slot, (kept.get(meal.slot) ?? 0) + 1);
         continue;
       }

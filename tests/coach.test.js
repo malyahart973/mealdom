@@ -173,3 +173,9 @@ test('Rien ne convient au foyer : signalé au lieu de laisser les repas vides sa
 test('Repas composé : aucun appareil imposé (poêle, four ou vapeur au choix)', () => {
   assertEqual(coachRecipe(assembledId('lunch', 'chicken', 'broccoli', 'quinoa'), plan)?.methods[0].equipment, []);
 });
+
+test('Repas libre (restaurant…) : jamais remplacé par le programme', () => {
+  const free = days.map((date) => ({ id: `f${date}`, date, slot: /** @type {const} */ ('lunch'), recipeId: 'free', recipeName: 'Restaurant', attendees: [], guests: 0, nextLunch: null, locked: false }));
+  const r = planCoachWeek(plan, { days, slots: ['lunch'], meals: free, redo: true, sportDays: new Set(), allowed: () => true });
+  assertEqual([r.picks.length, r.notes], [0, []]);
+});

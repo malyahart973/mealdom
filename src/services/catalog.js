@@ -10,6 +10,7 @@ import { NUTRITION } from '../data/nutrition.js';
 import { buildNutritionIndex, recipeNutrition } from '../domain/nutrition/nutrition.js';
 import { recipeFamily } from '../domain/recipes/families.js';
 import { recipeKeeping } from '../domain/batchCooking/keeping.js';
+import { freeRecipe } from '../domain/recipes/recipes.js';
 
 export const ingredientsById = new Map(INGREDIENTS.map((i) => [i.id, i]));
 export const preparationsById = new Map(PREPARATIONS.map((p) => [p.id, p]));
@@ -71,3 +72,6 @@ export function registerRecipe(recipe) {
   } else if (index >= 0) recipes[index] = recipe;
   else recipes.push(recipe);
 }
+
+// Repas libres (nom ecrit a la main) : lisibles partout, jamais proposes.
+registerPlannedRecipe(freeRecipe());

@@ -269,7 +269,8 @@ export function planBatchWeek(meals, sessions, household, ctx) {
   const sorted = [...meals].sort((a, b) => (a.date + a.slot).localeCompare(b.date + b.slot));
   for (const meal of sorted) {
     const session = sessionFor(meal.date, sessions);
-    if (session === null) continue;
+    // Repas libre (restaurant...) : rien a cuisiner.
+    if (session === null || meal.recipeId === 'free') continue;
     const bucket = /** @type {{ dishes: BatchDish[], meals: Meal[] }} */ (bySession.get(session));
     bucket.meals.push(meal);
     const recipe = ctx.recipes.get(meal.recipeId);
