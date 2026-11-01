@@ -81,7 +81,7 @@ export async function renderHome(el) {
     }
     ${
       program && kcalToday
-        ? `<section class="duo" aria-label="Programme minceur">
+        ? `<section class="duo" aria-label="Mon programme">
             <a class="card ring-card" href="#/programme">
               ${
                 program.program.method === 'count'
@@ -101,6 +101,13 @@ export async function renderHome(el) {
               <span class="hint">${program.entries.length ? `${escapeHtml(formatNumber(Math.max(0, program.progress.lostKg)))} kg perdus` : 'Noter mon poids'}</span>
             </a>
           </section>`
+        : coach
+        ? `<a class="card ring-card ring-card--row" href="#/programme">
+            <span class="plate-icon" aria-hidden="true"></span>
+            <span class="ring-card__text"><strong>Mon programme</strong>
+              <span class="hint">Les repas de votre coach${coach.waterLiters ? `, ${escapeHtml(formatNumber(coach.waterLiters))} L d’eau par jour` : ''}</span>
+              <span class="hint">Pesée et mensurations</span></span>
+          </a>`
         : ''
     }
     <p><a class="assistant-link" href="#/assistant">Demander à l’assistant…

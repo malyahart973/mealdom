@@ -1,5 +1,5 @@
 import { escapeHtml } from '../utils/html.js';
-import { formatNumber, formatIsoDayMonth } from '../utils/format.js';
+import { formatNumber, formatIsoDayMonth, formatIsoDay } from '../utils/format.js';
 import { toIsoDate } from '../domain/planning/dates.js';
 import {
   ACTIVITY_LEVELS,
@@ -33,7 +33,11 @@ import {
   plannedKcalForDay,
 } from '../domain/nutrition/program.js';
 import { parseKg, sortEntries } from '../domain/nutrition/weight.js';
-import { getProgram, saveProgram, setProgramActive, getWeights, programSuggestions } from '../services/programService.js';
+import { getProgram, saveProgram, setProgramActive, getWeights, getMeasurements, programSuggestions } from '../services/programService.js';
+import { measurementChanges } from '../domain/nutrition/measurements.js';
+import { nextCheckIn } from '../domain/nutrition/coach.js';
+import { getCoachPlan } from '../services/coachService.js';
+import { coachBlockHtml, bindCoachBlock } from './coach.js';
 import { getHousehold } from '../services/householdService.js';
 import { getMeals } from '../services/planningService.js';
 import { plannedEntries } from '../domain/planning/planning.js';
@@ -75,12 +79,13 @@ function sportRowHtml(index, s) {
 }
 
 /**
- * Ecran Programme minceur : methode, repas, rythme, sport, trame et idees de repas.
+ * Ecran unique « Mon programme » : mon suivi (poids, mensurations, bilan), mes repas (programme
+ * du coach, ou reperes calcules avec trame et idees de repas), puis mes reglages, replies.
  * @param {HTMLElement} el
  */
 export async function renderProgram(el) {
   const today = toIsoDate(new Date());
-  const [program, entries, household, meals] = await Promise.all([getProgram(), getWeights(), getHousehold(), getMeals()]);
+  const [program, entries, household, meals, coach, measurements] = await Promise.all([getProgram(), getWeights(), getHousehold(), getMeals(), getCoachPlan(), getMeasurements()]);
   const valid = validateProgram(program, today).length === 0;
   const sorted = sortEntries(entries);
   const currentKg = sorted.length ? sorted[sorted.length - 1].kg : program.startWeightKg;
@@ -126,14 +131,44 @@ export async function renderProgram(el) {
     ? `Jour de sport : ${day.sessions.map((s) => `${SPORT_KINDS.find((k) => k.id === s.kind)?.label.toLowerCase()} ${s.minutes} min`).join(', ')}${counting ? ` (+${day.kcal - (base?.kcal ?? 0)} kcal à manger aujourd’hui)` : ''}.`
     : '';
 
+  // --- Mon suivi : poids, mensurations, prochain bilan ---
+  const waist = measurementChanges(measurements).find((m) => m.id === 'waist') ?? null;
+  const checkIn = coach ? nextCheckIn(coach, today) : null;
+  const lostKg = sorted.length && program.startWeightKg > 0 ? Math.round((program.startWeightKg - currentKg) * 10) / 10 : null;
+  /** @type {[string, string][]} */
+  const facts = [];
+  if (currentKg > 0) facts.push(['Poids', kgText(currentKg)]);
+  if (lostKg !== null && lostKg !== 0) facts.push([lostKg > 0 ? 'Perdus' : 'Repris', kgText(Math.abs(lostKg))]);
+  if (program.goalWeightKg > 0) facts.push(['Objectif', kgText(program.goalWeightKg)]);
+  if (waist) facts.push(['Tour de taille', `${formatNumber(waist.latest)} cm`]);
+  const followHtml = `
+    <section class="card-block follow">
+      <h2>Mon suivi</h2>
+      ${facts.length ? `<dl class="budget-card">${facts.map(([dt, dd]) => `<div><dt>${escapeHtml(dt)}</dt><dd>${escapeHtml(dd)}</dd></div>`).join('')}</dl>` : '<p class="hint">Notez votre poids (et si vous voulez vos mensurations) : votre progression s’affiche ici.</p>'}
+      ${checkIn ? `<p>Prochain bilan avec votre coach : <strong>${escapeHtml(formatIsoDay(checkIn))}</strong>.</p>` : ''}
+      <p><a class="button button--secondary" href="#/poids">Pesée et mensurations</a></p>
+    </section>`;
+
+  /** Rien de configure : deux portes d'entree. */
+  const startHtml = `
+    <h2>Mes repas</h2>
+    <div class="choice-cards">
+      <a class="card choice-card" href="#/programme/coach/importer"><strong>J’ai un programme de mon coach</strong><span class="hint">Importez-le (PDF, photo ou texte) : vos semaines sont composées avec ses repas et ses quantités.</span></a>
+      <button type="button" class="card choice-card" data-open-settings><strong>Calculer mes repères</strong><span class="hint">Vos besoins, une trame pour chaque repas et des idées de repas, en comptant ou sans compter.</span></button>
+    </div>`;
+
   el.innerHTML = `
     <section class="program">
-      <h1 class="page-title">Programme minceur</h1>
-      <p class="notice-inline">Votre coach vous a donné un programme alimentaire ? <a href="#/programme/coach">Programme de mon coach</a> : importez-le (PDF, photo ou texte) pour composer vos semaines avec ses repas et ses quantités.</p>
-      <p class="hint">Des repères calculés avec des formules de référence (métabolisme de Mifflin-St Jeor, activité, sport). Ce n’est pas un avis médical : en cas de maladie, de traitement, de diabète, de grossesse, d’allaitement ou de troubles du comportement alimentaire, demandez conseil à un médecin ou à une diététicienne${program.fasting ? ', surtout pour le jeûne intermittent' : ''}. Jamais moins de ${MIN_KCAL.female} kcal par jour pour une femme et ${MIN_KCAL.male} kcal pour un homme.</p>
+      <h1 class="page-title">Mon programme</h1>
+      ${followHtml}
       ${
-        base && day && perMeal && perMealToday && trame && currentBmi !== null
-          ? `<div class="batch-summary">
+        coach
+          ? coachBlockHtml(coach, program)
+          : !valid
+          ? startHtml
+          : base && day && perMeal && perMealToday && trame && currentBmi !== null
+          ? `<h2>Mes repas : repères calculés</h2>
+            <div class="batch-summary">
               <p><strong>${program.active ? 'Programme actif' : 'Programme en pause'}</strong> : ${
                 program.active ? 'le planning, l’assistant et les fiches recettes en tiennent compte.' : 'activez-le pour que le planning, l’assistant et les fiches recettes en tiennent compte.'
               }</p>
@@ -201,7 +236,7 @@ export async function renderProgram(el) {
                   <p class="hint">Sur chaque fiche recette, « Votre portion » donne les quantités en grammes. Les légumes non féculents peuvent être ajoutés à volonté.</p>`
                 : '<p class="hint">Sans compter : servez-vous selon l’assiette équilibrée, mangez lentement et arrêtez-vous à la satiété. Eau : 1,5 à 2 litres par jour.</p>'
             }
-            <p class="form-actions"><a class="button" href="#/assistant/planifier">Planifier ma semaine</a> <a class="button button--secondary" href="#/poids">Suivi du poids</a></p>
+            <p class="form-actions"><a class="button" href="#/assistant/planifier">Planifier ma semaine</a></p>
 
             ${
               program.active
@@ -213,11 +248,21 @@ export async function renderProgram(el) {
                     )
                     .join('')}`
                 : ''
-            }`
-          : '<p>Renseignez vos réglages : MealDom calcule vos repères, propose une trame pour chaque repas et des idées de repas adaptées. Vous choisissez de compter les calories ou de vous rééquilibrer sans compter.</p>'
+            }
+            <p class="notice-inline">Votre coach vous a donné un programme alimentaire ? <a href="#/programme/coach/importer">Importez-le</a> : il remplacera ces repères.</p>`
+          : ''
       }
 
-      <h2>${valid ? 'Mes réglages' : 'Mes réglages'}</h2>
+      <details class="settings-block" id="reglages"${valid || coach ? '' : ' open'}>
+      <summary><h2>Mes réglages</h2><span class="hint">${coach ? 'Taille, poids visé, jours de sport…' : 'Taille, poids visé, méthode, repas, rythme, sport…'}</span></summary>
+      ${
+        coach
+          ? `<p class="hint">Avec le programme de votre coach, ces réglages servent à votre objectif de poids et à vos jours de sport (rubrique 5).${
+              valid && program.active ? ' Les repères calculés restent actifs : portions sur les fiches recettes et anneau de calories de l’accueil.' : ''
+            }</p>${valid ? `<p><button type="button" class="button button--small button--secondary" data-action="toggle">${program.active ? 'Mettre en pause les repères calculés' : 'Activer aussi les repères calculés'}</button></p>` : ''}`
+          : ''
+      }
+      <p class="hint">Des repères calculés avec des formules de référence (métabolisme de Mifflin-St Jeor, activité, sport). Ce n’est pas un avis médical : en cas de maladie, de traitement, de diabète, de grossesse, d’allaitement ou de troubles du comportement alimentaire, demandez conseil à un médecin ou à une diététicienne${program.fasting ? ', surtout pour le jeûne intermittent' : ''}. Jamais moins de ${MIN_KCAL.female} kcal par jour pour une femme et ${MIN_KCAL.male} kcal pour un homme.</p>
       <div class="alert" role="alert" hidden></div>
       <form class="stock-form program-form" data-form="program" novalidate>
         <fieldset class="guided__step"><legend><span class="guided__num" aria-hidden="true">1</span> Mes informations</legend>
@@ -311,7 +356,16 @@ export async function renderProgram(el) {
 
         <div class="form-actions"><button type="submit" class="button">Calculer et enregistrer</button></div>
       </form>
+      </details>
     </section>`;
+
+  if (coach) bindCoachBlock(el, coach, () => renderProgram(el));
+  el.querySelector('[data-open-settings]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    const details = /** @type {HTMLDetailsElement} */ (el.querySelector('#reglages'));
+    details.open = true;
+    details.scrollIntoView({ block: 'start' });
+  });
 
   const form = /** @type {HTMLFormElement} */ (el.querySelector('[data-form="program"]'));
   /** @param {string} sel */
@@ -441,7 +495,8 @@ export async function renderProgram(el) {
       sport: readSport(),
       trame: trameText,
       sportNote: val('#pg-sport-note'),
-      active: valid ? program.active : true,
+      // Premier enregistrement : actif, sauf si le programme du coach est suivi.
+      active: valid ? program.active : !coach,
     };
     // Stabilisation : le poids vise est le poids actuel.
     if (next.weeklyLossKg === 0 && !(next.goalWeightKg > 0)) next.goalWeightKg = startKg;

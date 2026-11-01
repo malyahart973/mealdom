@@ -54,7 +54,7 @@ export async function renderWeight(el) {
 
   el.innerHTML = `
     <section>
-      <h1 class="page-title">Suivi du poids et mensurations</h1>
+      <h1 class="page-title">Pesée et mensurations</h1>
       ${
         progress
           ? `<dl class="budget-card">

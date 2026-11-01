@@ -157,7 +157,7 @@ const routes = [
     parent: (p) => `/courses/semaine/${p.date}`,
   },
   { pattern: /^\/saison$/, title: 'Produits de saison', tab: '/plus', render: renderSeasons, parent: () => '/plus' },
-  { pattern: /^\/prix$/, title: 'Historique des prix', tab: '/plus', render: renderPriceOverview, parent: () => '/plus' },
+  { pattern: /^\/prix$/, title: 'Prix', tab: '/plus', render: renderPriceOverview, parent: () => '/plus' },
   { pattern: /^\/prix\/ajouter$/, title: 'Ajouter un prix', tab: '/courses', render: renderAddPrice, parent: () => '/courses' },
   { pattern: /^\/prix\/ticket$/, title: 'Ticket de caisse', tab: '/courses', render: renderReceipt, parent: () => '/prix/ajouter' },
   {
@@ -169,9 +169,9 @@ const routes = [
   },
   { pattern: /^\/prix\/ajouter\/(?<ingredientId>[^/]+)$/, title: 'Ajouter un prix', tab: '/courses', render: renderAddPrice, parent: () => '/courses' },
   { pattern: /^\/prix\/(?<ingredientId>[^/]+)$/, title: 'Historique des prix', tab: '/plus', render: renderPriceHistory, parent: () => '/prix' },
-  { pattern: /^\/programme$/, title: 'Programme minceur', tab: '/plus', render: renderProgram, parent: () => '/plus' },
-  { pattern: /^\/programme\/coach(?:\/(?<step>importer|verifier))?$/, title: 'Programme de mon coach', tab: '/plus', render: renderCoach, parent: (p) => (p.step ? '/programme/coach' : '/plus') },
-  { pattern: /^\/poids$/, title: 'Suivi du poids', tab: '/plus', render: renderWeight, parent: () => '/plus' },
+  { pattern: /^\/programme$/, title: 'Mon programme', tab: '/plus', render: renderProgram, parent: () => '/plus' },
+  { pattern: /^\/programme\/coach(?:\/(?<step>importer|verifier))?$/, title: 'Programme de mon coach', tab: '/plus', render: renderCoach, parent: () => '/programme' },
+  { pattern: /^\/poids$/, title: 'Pesée et mensurations', tab: '/plus', render: renderWeight, parent: () => '/programme' },
 ];
 
 /**

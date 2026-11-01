@@ -29,8 +29,9 @@ export async function renderPriceOverview(el) {
 
   el.innerHTML = `
     <section>
-      <h1 class="page-title">Historique des prix</h1>
-      <p class="actions"><a class="button" href="#/prix/ajouter">Ajouter un prix ou scanner</a></p>
+      <h1 class="page-title">Prix</h1>
+      <p class="actions"><a class="button" href="#/prix/ajouter">Ajouter un prix ou scanner</a> <a class="button button--secondary" href="#/prix/ticket">Photographier un ticket</a></p>
+      <h2>Historique des prix</h2>
       <p class="hint">Chaque prix relevé (magasins, Drive, import) est conservé ici, ramené au kilo, au litre ou à la pièce pour comparer les formats. ${count} relevé(s) sur ${tracked.size} produit(s).</p>
       ${
         count === 0

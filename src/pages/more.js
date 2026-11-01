@@ -1,27 +1,50 @@
+/** Rubriques de l'ecran "Plus" : peu d'entrees, rangees par usage. */
+const SECTIONS = [
+  {
+    title: 'Ma santé',
+    links: [
+      ['#/programme', 'Mon programme', 'Repas de votre coach ou repères calculés, objectif, réglages'],
+      ['#/poids', 'Pesée et mensurations', 'Courbe, mensurations, bilan à envoyer au coach'],
+    ],
+  },
+  {
+    title: 'Ma maison',
+    links: [
+      ['#/foyer', 'Mon foyer', 'Personnes, allergies, régimes, équipement'],
+      ['#/stock', 'Stock', 'Ce que vous avez déjà à la maison'],
+    ],
+  },
+  {
+    title: 'Courses et prix',
+    links: [
+      ['#/prix', 'Prix', 'Scanner ou saisir un prix, photo du ticket, historique'],
+      ['#/budget', 'Budget', 'Budget prévu, dépenses réelles, reste'],
+      ['#/magasins', 'Magasins', 'Vos magasins, distances et prix relevés'],
+      ['#/drive', 'Drive Hyper U Cayenne', 'Promotions, panier et commande'],
+      ['#/saison', 'Produits de saison', 'Péyi, prix au plus bas, votre calendrier'],
+    ],
+  },
+  {
+    title: 'Assistant et réglages',
+    links: [
+      ['#/assistant', 'Assistant', 'Modifier le planning en le demandant simplement'],
+      ['#/parametres', 'Paramètres', 'Sauvegarde, assistant IA, préférences retenues, version'],
+    ],
+  },
+];
+
 /**
- * Ecran "Plus" : acces aux sections secondaires.
+ * Ecran "Plus" : acces aux sections secondaires, en quatre rubriques.
  * @param {HTMLElement} el
  */
 export function renderMore(el) {
   el.innerHTML = `
     <section>
       <h1 class="page-title">Plus</h1>
-      <ul class="link-list">
-        <li><a href="#/assistant">Assistant<span>Modifier le planning en le demandant simplement</span></a></li>
-        <li><a href="#/programme/coach">Programme de mon coach<span>Importer son plan (PDF, photo, texte) et composer les semaines avec</span></a></li>
-        <li><a href="#/programme">Programme minceur<span>Vos besoins, vos portions en grammes, des idées de repas</span></a></li>
-        <li><a href="#/poids">Suivi du poids et mensurations<span>Pesées, mensurations, bilan à envoyer au coach</span></a></li>
-        <li><a href="#/prix/ajouter">Ajouter un prix<span>Scanner un code-barres, photographier l’étiquette ou saisir</span></a></li>
-        <li><a href="#/drive">Drive Hyper U Cayenne<span>Prix relevés, promotions, panier et commande</span></a></li>
-        <li><a href="#/foyer">Mon foyer<span>Personnes, allergies, régimes, équipement</span></a></li>
-        <li><a href="#/stock">Stock<span>Ce que vous avez déjà à la maison</span></a></li>
-        <li><a href="#/budget">Budget<span>Budget prévu, dépenses réelles, reste</span></a></li>
-        <li><a href="#/magasins">Magasins<span>Vos magasins et les prix relevés</span></a></li>
-        <li><a href="#/prix">Historique des prix<span>Hausses, baisses et courbe de chaque produit</span></a></li>
-        <li><a href="#/saison">Produits de saison<span>Péyi, prix au plus bas, votre calendrier</span></a></li>
-        <li><a href="#/assistant/preferences">Préférences de l’assistant<span>Ce qu’il a retenu de vos demandes</span></a></li>
-        <li><a href="#/parametres">Paramètres<span>Sauvegarde, assistant IA et version</span></a></li>
-      </ul>
+      ${SECTIONS.map(
+        (s) => `<h2 class="more__title">${s.title}</h2>
+          <ul class="link-list">${s.links.map(([href, label, hint]) => `<li><a href="${href}">${label}<span>${hint}</span></a></li>`).join('')}</ul>`,
+      ).join('')}
     </section>
   `;
 }

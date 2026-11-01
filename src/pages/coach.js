@@ -1,9 +1,8 @@
 import { escapeHtml } from '../utils/html.js';
-import { formatIsoDay, formatNumber } from '../utils/format.js';
+import { formatNumber } from '../utils/format.js';
 import { SLOTS } from '../domain/planning/planning.js';
 import { parseCoachMeal, coachFoodLabel, COACH_SLOT_ORDER } from '../domain/nutrition/coach.js';
 import { getCoachPlan, saveCoachPlan, deleteCoachPlan, planFromText, planFromFile, coachEstimates } from '../services/coachService.js';
-import { getProgram } from '../services/programService.js';
 import { guidedDefaults, planWeek } from '../services/assistantService.js';
 import { toIsoDate, weekStart, addDays } from '../domain/planning/dates.js';
 
@@ -36,8 +35,8 @@ function understoodHtml(text) {
 }
 
 /**
- * Ecran « Programme de mon coach » : le programme suivi, ou l'import.
- * Adresses : #/programme/coach, #/programme/coach/importer, #/programme/coach/verifier
+ * Import et verification du programme du coach (le programme suivi s'affiche dans « Mon programme »).
+ * Adresses : #/programme/coach (redirige), #/programme/coach/importer, #/programme/coach/verifier
  * @param {HTMLElement} el
  * @param {Record<string, string>} params
  */
@@ -45,51 +44,58 @@ export async function renderCoach(el, params) {
   const plan = await getCoachPlan();
   if (params.step === 'verifier') return renderReview(el, draft ?? plan);
   if (params.step === 'importer' || !plan) return renderImport(el, plan !== null);
-  return renderPlan(el, plan);
+  // Le programme suivi s'affiche dans l'ecran unique « Mon programme ».
+  window.location.replace('#/programme');
 }
 
 /**
- * Programme suivi.
- * @param {HTMLElement} el
+ * Bloc « Programme de mon coach » de l'ecran Mon programme : repas, consignes, actions.
  * @param {CoachPlan} plan
+ * @param {import('../domain/nutrition/program.js').Program} program
+ * @returns {string}
  */
-async function renderPlan(el, plan) {
-  const program = await getProgram();
+export function coachBlockHtml(plan, program) {
   const est = coachEstimates(plan);
   const sportMeal = plan.meals.find((m) => m.sportDaysOnly);
-  el.innerHTML = `
-    <section class="coach">
-      <h1 class="page-title">Programme de mon coach</h1>
-      <p class="hint">Importé le ${escapeHtml(formatIsoDay(plan.importedAt))}.${plan.notes ? ` ${escapeHtml(plan.notes)}` : ''}</p>
+  return `
+    <section class="coach card-block">
+      <h2>Mes repas : programme de mon coach</h2>
       <p><button type="button" class="button" data-action="adapt">Adapter ma semaine à ce programme</button></p>
-      <p class="hint" data-adapt-status aria-live="polite">Les repas aux heures du programme sont composés avec ses quantités ; les repas verrouillés restent. Vous vérifiez avant de valider. Pour choisir les repas ou la semaine : <a href="#/assistant/planifier">Planifier ma semaine</a>.</p>
+      <p class="hint" data-adapt-status aria-live="polite">Les repas aux heures du programme sont composés avec ses quantités ; les repas verrouillés et les repas libres restent. Vous vérifiez avant de valider.</p>
+      ${
+        sportMeal && program.sport.length === 0
+          ? `<p class="notice-inline">La ${escapeHtml((slotLabels.get(sportMeal.slot) ?? '').toLowerCase())} ne se prend que les jours de sport : indiquez-les dans « Mes réglages », rubrique « Mon sport », pour qu’elle soit planifiée.</p>`
+          : ''
+      }
+      <ul class="coach-meals">${plan.meals
+        .map(
+          (m) => `<li><details class="coach-meal">
+            <summary><strong>${escapeHtml(slotLabels.get(m.slot) ?? m.slot)}</strong>${m.time ? ` <span class="hint">${escapeHtml(m.time)}</span>` : ''}${m.sportDaysOnly ? ' <span class="badge">Jours de sport</span>' : ''}</summary>
+            <div class="coach__understood">${understoodHtml(m.text)}</div>
+            ${parseCoachMeal(m.text).extras.map((x) => `<p class="hint">+ ${escapeHtml(x)}</p>`).join('')}</details></li>`,
+        )
+        .join('')}</ul>
       <dl class="facts">
         <div><dt>Journée type</dt><dd>environ ${formatNumber(est.rest.kcal)} kcal, ${formatNumber(est.rest.protein)} g de protéines</dd></div>
         ${est.sport ? `<div><dt>Jour de sport</dt><dd>environ ${formatNumber(est.sport.kcal)} kcal, ${formatNumber(est.sport.protein)} g de protéines</dd></div>` : ''}
         ${plan.waterLiters ? `<div><dt>Eau</dt><dd>${formatNumber(plan.waterLiters)} L par jour, sans compter l’eau du sport</dd></div>` : ''}
-        ${est.nextCheckIn ? `<div><dt>Prochain bilan</dt><dd>${escapeHtml(formatIsoDay(est.nextCheckIn))} : poids et mensurations (<a href="#/poids">Suivi du poids</a>)</dd></div>` : ''}
       </dl>
-      <p class="hint">Estimation d’après les tables de composition, avec le premier choix de chaque repas : ce sont les quantités de votre coach qui comptent.</p>
-      ${
-        sportMeal && program.sport.length === 0
-          ? `<p class="notice-inline">La ${escapeHtml((slotLabels.get(sportMeal.slot) ?? '').toLowerCase())} ne se prend que les jours de sport : indiquez vos jours de sport dans le <a href="#/programme">Programme minceur</a> (semaine type de sport) pour qu’elle soit planifiée.</p>`
-          : ''
-      }
-      <h2>Mes repas</h2>
-      <ul class="trame">${plan.meals
-        .map(
-          (m) => `<li class="trame__meal"><strong>${escapeHtml(slotLabels.get(m.slot) ?? m.slot)}${m.time ? ` · ${escapeHtml(m.time)}` : ''}</strong>${m.sportDaysOnly ? ' <span class="badge">Jours de sport</span>' : ''}
-            <div class="coach__understood">${understoodHtml(m.text)}</div>
-            ${parseCoachMeal(m.text).extras.map((x) => `<p class="hint">+ ${escapeHtml(x)}</p>`).join('')}</li>`,
-        )
-        .join('')}</ul>
-      ${plan.rules.length ? `<h2>Consignes</h2><ul>${plan.rules.map((r) => `<li>${escapeHtml(r)}</li>`).join('')}</ul>` : ''}
-      <div class="form-actions">
-        <a class="button button--secondary" href="#/programme/coach/verifier">Modifier</a>
-        <a class="button button--secondary" href="#/programme/coach/importer">Importer un nouveau programme</a>
-        <button type="button" class="button button--danger" data-action="stop">Ne plus suivre</button>
-      </div>
+      ${plan.rules.length ? `<details class="proposal__ingredients"><summary>Consignes du coach (${plan.rules.length})</summary><ul>${plan.rules.map((r) => `<li>${escapeHtml(r)}</li>`).join('')}</ul></details>` : ''}
+      <p class="form-actions">
+        <a class="button button--small button--secondary" href="#/programme/coach/verifier">Modifier</a>
+        <a class="button button--small button--secondary" href="#/programme/coach/importer">Nouveau programme</a>
+        <button type="button" class="button button--small button--danger" data-action="stop-coach">Ne plus suivre</button>
+      </p>
     </section>`;
+}
+
+/**
+ * Actions du bloc : adapter la semaine, ne plus suivre le programme.
+ * @param {HTMLElement} el
+ * @param {CoachPlan} plan
+ * @param {() => Promise<void>} rerender
+ */
+export function bindCoachBlock(el, plan, rerender) {
   el.querySelector('[data-action="adapt"]')?.addEventListener('click', async (event) => {
     const button = /** @type {HTMLButtonElement} */ (event.currentTarget);
     const status = /** @type {HTMLElement} */ (el.querySelector('[data-adapt-status]'));
@@ -108,11 +114,10 @@ async function renderPlan(el, plan) {
     button.disabled = false;
     status.textContent = result.notes.join(' ');
   });
-
-  el.querySelector('[data-action="stop"]')?.addEventListener('click', async () => {
+  el.querySelector('[data-action="stop-coach"]')?.addEventListener('click', async () => {
     if (!window.confirm('Ne plus suivre ce programme ? Les repas déjà planifiés restent dans le planning.')) return;
     await deleteCoachPlan();
-    await renderCoach(el, {});
+    await rerender();
   });
 }
 
@@ -137,7 +142,7 @@ function renderImport(el, replacing) {
         <textarea id="coach-text" rows="8" placeholder="PETIT DÉJEUNER 7H&#10;60 g de flocons d’avoine…&#10;Ou&#10;3 œufs + 2 tranches de pain complet&#10;DÉJEUNER 13H&#10;170 g de protéines (poulet, dinde, poisson…)"></textarea></div>
       <p><button type="button" class="button button--secondary" data-action="text">Lire le texte</button></p>
       <p class="alert" role="alert" hidden></p>
-      ${replacing ? '<p><a href="#/programme/coach">Garder le programme actuel</a></p>' : ''}
+      <p><a href="#/programme">${replacing ? 'Garder le programme actuel' : 'Retour à mon programme'}</a></p>
     </section>`;
   const alert = /** @type {HTMLElement} */ (el.querySelector('.alert'));
   /** @param {string} text */
@@ -265,6 +270,6 @@ function renderReview(el, plan) {
       return;
     }
     draft = null;
-    window.location.hash = '#/programme/coach';
+    window.location.hash = '#/programme';
   });
 }

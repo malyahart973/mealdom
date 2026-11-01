@@ -80,7 +80,7 @@ export async function renderPlanWeek(el, params) {
           <label class="check"><input type="checkbox" name="leftovers"${choices.leftovers ? ' checked' : ''} /> <span>Les restes du dîner pour le déjeuner du lendemain (on cuisine plus le soir)</span></label>
           ${
             coachActive
-              ? `<label class="check check--block"><input type="checkbox" name="followCoach"${choices.followCoach ? ' checked' : ''} /> <span><strong>Suivre le programme de mon coach</strong><span class="hint">Ses repas, ses grammages et ses alternatives ; la collation d’après le sport les jours de sport. <a href="#/programme/coach">Voir le programme</a></span></span></label>`
+              ? `<label class="check check--block"><input type="checkbox" name="followCoach"${choices.followCoach ? ' checked' : ''} /> <span><strong>Suivre le programme de mon coach</strong><span class="hint">Ses repas, ses grammages et ses alternatives ; la collation d’après le sport les jours de sport. <a href="#/programme">Voir le programme</a></span></span></label>`
               : ''
           }
         </fieldset>

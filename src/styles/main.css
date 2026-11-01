@@ -3255,3 +3255,128 @@ line.series-3 {
 .pick__more {
   margin-top: var(--space-6);
 }
+
+/* ---------- Mon programme : suivi, choix de depart, reglages replies ---------- */
+
+.card-block {
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.card-block > h2:first-child {
+  margin-top: 0;
+}
+
+.follow .budget-card {
+  margin-bottom: var(--space-3);
+}
+
+.choice-cards {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+@media (min-width: 40rem) {
+  .choice-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.choice-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  margin: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.choice-card strong {
+  color: var(--leaf);
+}
+
+.settings-block {
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.settings-block > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-3);
+  min-height: 2.75rem;
+  padding: var(--space-3) 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings-block > summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-block > summary h2 {
+  display: inline;
+  margin: 0;
+}
+
+.settings-block > summary h2::before {
+  content: '▸ ';
+  color: var(--leaf);
+}
+
+.settings-block[open] > summary h2::before {
+  content: '▾ ';
+}
+
+.more__title {
+  margin: var(--space-6) 0 var(--space-2);
+  color: var(--muted);
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.more__title:first-of-type {
+  margin-top: var(--space-4);
+}
+
+/* Repas du programme du coach : un repas par ligne, detail au toucher. */
+.coach-meals {
+  list-style: none;
+  margin: var(--space-3) 0 var(--space-4);
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.coach-meal {
+  border-bottom: 1px solid var(--line);
+}
+
+.coach-meal > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  min-height: 2.75rem;
+  padding: var(--space-3) 0;
+  cursor: pointer;
+}
+
+.coach-meal > summary .hint {
+  margin: 0;
+}
+
+.coach-meal[open] > summary {
+  padding-bottom: var(--space-2);
+}
+
+.coach-meal > .coach__understood {
+  margin-bottom: var(--space-3);
+}
