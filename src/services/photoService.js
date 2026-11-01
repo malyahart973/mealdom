@@ -35,14 +35,6 @@ export async function prepareImage(file) {
 }
 
 /**
- * @returns {Promise<boolean>}
- */
-export async function canReadPhotos() {
-  const [key, useAi] = await Promise.all([getSetting('assistantApiKey'), getSetting('assistantUseAi')]);
-  return typeof key === 'string' && key.length > 0 && useAi !== false;
-}
-
-/**
  * Lit la photo d'un produit ou d'une etiquette.
  * @param {File} file
  * @returns {Promise<{ reading: PhotoReading | null, error: string | null }>}

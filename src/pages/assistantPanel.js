@@ -3,7 +3,7 @@ import { isSpeechAvailable, startDictation } from '../utils/speech.js';
 import { formatIsoDay, formatNumber } from '../utils/format.js';
 import { formatQuantity } from '../utils/quantity.js';
 import { formatCents } from '../domain/budget/money.js';
-import { SLOTS } from '../domain/planning/planning.js';
+import { SLOT_NAMES } from '../domain/planning/planning.js';
 import { roundUpQuantity } from '../domain/units/units.js';
 import { ingredientsById } from '../services/catalog.js';
 import {
@@ -21,7 +21,6 @@ import {
 /** @typedef {import('../domain/assistant/conversation.js').StoredProposal} StoredProposal */
 /** @typedef {import('../domain/assistant/conversation.js').ProposalReview} ProposalReview */
 
-const slotLabels = new Map(SLOTS.map((s) => [s.id, s.label.toLowerCase()]));
 
 /** Exemples de demandes proposes au client. */
 export const SUGGESTIONS = [
@@ -102,7 +101,7 @@ function reviewHtml(proposal, monday) {
       <ul class="proposal__changes">
         ${review.diff.meals
           .map(
-            (m) => `<li><strong>${escapeHtml(formatIsoDay(m.date))}, ${escapeHtml(slotLabels.get(m.slot) ?? m.slot)}</strong> :
+            (m) => `<li><strong>${escapeHtml(formatIsoDay(m.date))}, ${escapeHtml(SLOT_NAMES.get(m.slot) ?? m.slot)}</strong> :
               ${m.before && m.after && m.before !== m.after ? `${escapeHtml(m.before)} → <strong>${escapeHtml(m.after)}</strong>` : ''}
               ${!m.before && m.after ? `ajout de <strong>${escapeHtml(m.after)}</strong>` : ''}
               ${m.before && !m.after ? `<strong>${escapeHtml(m.before)}</strong> retiré` : ''}

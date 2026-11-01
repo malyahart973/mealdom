@@ -18,6 +18,12 @@ export const SLOTS = [
   { id: 'dinner', label: 'Dîner' },
 ];
 
+/** Nom de chaque repas, avec majuscule (titres : « Déjeuner »). */
+export const SLOT_LABELS = new Map(SLOTS.map((s) => [s.id, s.label]));
+
+/** Nom de chaque repas, en minuscules (dans une phrase : « déjeuner »). */
+export const SLOT_NAMES = new Map(SLOTS.map((s) => [s.id, s.label.toLowerCase()]));
+
 /**
  * Remplacement d'un ingredient dans la recette d'un repas (ex. creme -> yaourt).
  * La recette du catalogue n'est jamais modifiee.

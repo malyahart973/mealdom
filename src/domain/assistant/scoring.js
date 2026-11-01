@@ -3,7 +3,7 @@
  * Les couts servent UNIQUEMENT a classer les recettes : un prix n'est jamais
  * affiche a partir de ces estimations (voir quote.js pour les prix verifies).
  */
-import { getUnit, convertUniversal } from '../units/units.js';
+import { convertUniversal } from '../units/units.js';
 import { convertUnit } from '../ingredients/conversion.js';
 import { allIngredientIds, totalMinutes, hasTag, fitsSlot } from '../recipes/recipes.js';
 import { evaluateRecipeForHousehold } from '../household/compatibility.js';

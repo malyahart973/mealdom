@@ -11,6 +11,7 @@ import {
   validateCoachPlan,
   nextCheckIn,
   typicalDay,
+  nextCoachVariant,
 } from '../src/domain/nutrition/coach.js';
 
 // Programme type (anonyme), tel qu'on le copie depuis un PDF : quantites seules sur leur ligne.
@@ -178,4 +179,36 @@ test('Repas libre (restaurant…) : jamais remplacé par le programme', () => {
   const free = days.map((date) => ({ id: `f${date}`, date, slot: /** @type {const} */ ('lunch'), recipeId: 'free', recipeName: 'Restaurant', attendees: [], guests: 0, nextLunch: null, locked: false }));
   const r = planCoachWeek(plan, { days, slots: ['lunch'], meals: free, redo: true, sportDays: new Set(), allowed: () => true });
   assertEqual([r.picks.length, r.notes], [0, []]);
+});
+
+test('« Changer » un repas composé : une autre protéine d’abord, jamais deux fois la même variante', () => {
+  const all = () => true;
+  const current = assembledId('lunch', 'chicken', 'green_beans', 'rice_jasmine');
+  const first = nextCoachVariant(plan, 'lunch', current, new Set(), all);
+  const id = first?.id ?? '';
+  assertEqual([id.startsWith('coach-lunch-a-'), id.includes('-chicken-'), id.includes('-green_beans-')], [true, false, false]);
+  // Les variantes deja vues sont sautees.
+  const second = nextCoachVariant(plan, 'lunch', id, new Set([current, id]), all);
+  assertEqual([second !== null, second?.id !== id, second?.id !== current], [true, true, true]);
+});
+
+test('« Changer » respecte le foyer : un aliment refusé n’est jamais proposé', () => {
+  const noFish = (/** @type {import('../src/domain/recipes/recipes.js').Recipe} */ r) => !/saumon|poisson/i.test(r.name);
+  const seen = new Set();
+  let id = assembledId('lunch', 'chicken', 'green_beans', 'rice_jasmine');
+  for (let i = 0; i < 6; i += 1) {
+    const r = nextCoachVariant(plan, 'lunch', id, seen, noFish);
+    if (!r) break;
+    seen.add(id);
+    id = r.id;
+    assertEqual(noFish(r), true);
+  }
+});
+
+test('« Changer » un menu fixe : le menu suivant, puis plus rien quand tout a été vu', () => {
+  const all = () => true;
+  const next = nextCoachVariant(plan, 'breakfast', optionId('breakfast', 0), new Set(), all);
+  assertEqual(next?.id, optionId('breakfast', 1));
+  assertEqual(nextCoachVariant(plan, 'breakfast', optionId('breakfast', 1), new Set([optionId('breakfast', 0)]), all), null);
+  assertEqual(nextCoachVariant(plan, 'breakfast', 'coach-breakfast-o1', new Set(), () => false), null);
 });

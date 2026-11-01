@@ -1,7 +1,7 @@
 import { escapeHtml } from '../utils/html.js';
 import { formatIsoDay, formatMinutes } from '../utils/format.js';
 import { parseIsoDate, toIsoDate } from '../domain/planning/dates.js';
-import { SLOTS, recentRecipeIds } from '../domain/planning/planning.js';
+import { SLOTS, recentRecipeIds, SLOT_LABELS } from '../domain/planning/planning.js';
 import { filterRecipes } from '../domain/recipes/recipeFiltering.js';
 import { fitsSlot, totalMinutes, FREE_RECIPE_ID } from '../domain/recipes/recipes.js';
 import { familyLabel } from '../domain/recipes/families.js';
@@ -18,7 +18,6 @@ import { loadAvailability, autoSubstituter } from '../services/territoryService.
 /** @typedef {import('../domain/planning/planning.js').Meal} Meal */
 /** @typedef {import('../domain/planning/planning.js').Slot} Slot */
 
-const slotLabels = new Map(SLOTS.map((s) => [s.id, s.label]));
 
 /** Resultats de recherche affiches. */
 const MAX_RESULTS = 15;
@@ -105,8 +104,8 @@ export async function renderMealPicker(el, params) {
 
   el.innerHTML = `
     <section class="pick">
-      <h1 class="page-title">${existing ? 'Changer de plat' : escapeHtml(slotLabels.get(slot) ?? slot)}</h1>
-      <p class="hint">${escapeHtml(formatIsoDay(date))}${existing ? ` · ${escapeHtml(slotLabels.get(slot) ?? slot)}, à la place de « ${escapeHtml(existing.recipeName)} »` : ''}</p>
+      <h1 class="page-title">${existing ? 'Changer de plat' : escapeHtml(SLOT_LABELS.get(slot) ?? slot)}</h1>
+      <p class="hint">${escapeHtml(formatIsoDay(date))}${existing ? ` · ${escapeHtml(SLOT_LABELS.get(slot) ?? slot)}, à la place de « ${escapeHtml(existing.recipeName)} »` : ''}</p>
       <div class="pick__search">
         <label for="pick-q" class="visually-hidden">Chercher un plat ou écrire votre repas</label>
         <input id="pick-q" type="search" autocomplete="off" placeholder="Chercher un plat, ou écrire votre repas" />

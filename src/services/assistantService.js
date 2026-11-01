@@ -24,7 +24,7 @@ import { programFitScore, programMeals } from '../domain/nutrition/program.js';
 import { evaluateRecipeForHousehold } from '../domain/household/compatibility.js';
 import { allIngredientIds, totalMinutes, recipeMealTypes, hasTag, fitsSlot } from '../domain/recipes/recipes.js';
 import { buildNameIndex, normalizeText } from '../domain/ingredients/ingredients.js';
-import { SLOTS, mealPortionsFor } from '../domain/planning/planning.js';
+import { SLOTS, mealPortionsFor, SLOT_LABELS } from '../domain/planning/planning.js';
 import { expiryStatus, itemsToUseFirst } from '../domain/shopping/shopping.js';
 import { weekDays, toIsoDate, addDays } from '../domain/planning/dates.js';
 import { formatCents } from '../domain/budget/money.js';
@@ -47,7 +47,7 @@ import { batchSessions } from './batchService.js';
 import { getCoachPlan } from './coachService.js';
 import { getRatings } from './ratingService.js';
 import { getProgram } from './programService.js';
-import { planCoachWeek, COACH_SLOT_ORDER } from '../domain/nutrition/coach.js';
+import { planCoachWeek, nextCoachVariant, COACH_SLOT_ORDER } from '../domain/nutrition/coach.js';
 import { INGREDIENTS } from '../data/ingredients.js';
 import { CUISINES, REGIONS } from '../data/cuisines.js';
 import { formatIsoDay } from '../utils/format.js';
@@ -63,12 +63,12 @@ import { formatIsoDay } from '../utils/format.js';
 /** @typedef {import('../domain/assistant/preferences.js').Preference} Preference */
 /** @typedef {import('../domain/planning/planning.js').Meal} Meal */
 /** @typedef {import('../domain/planning/planning.js').Slot} Slot */
+/** @typedef {import('../domain/recipes/recipes.js').Recipe} Recipe */
 /** @typedef {import('./llmService.js').ApiMessage} ApiMessage */
 /** @typedef {import('./llmService.js').ContentBlock} ContentBlock */
 
 const finder = makeIngredientFinder(buildNameIndex(INGREDIENTS), ingredientsById);
 const cuisineRegion = new Map(CUISINES.map((c) => [c.id, c.region]));
-const slotLabels = new Map(SLOTS.map((s) => [s.id, s.label]));
 /** Noms des cuisines et des regions, pour resumer la demande. */
 /** @type {Map<string, string>} */
 const placeLabels = new Map();
@@ -358,7 +358,7 @@ async function createProposal(conv, operations, summary, notes, author, request,
  * @returns {string}
  */
 function engineReply(req, proposal, notes) {
-  const lines = [describeRequest(req, (d) => formatIsoDay(d), slotLabels, placeLabels)];
+  const lines = [describeRequest(req, (d) => formatIsoDay(d), SLOT_LABELS, placeLabels)];
   if (proposal && proposal.status === 'pending' && proposal.review) {
     const n = proposal.review.applied.length;
     lines.push(`Voici ma proposition (${n} modification${n > 1 ? 's' : ''}). Vérifiez l’aperçu ci-dessous puis acceptez, modifiez ou annulez.`);
@@ -436,7 +436,7 @@ export async function sendMessage(monday, text, opts = {}) {
   if (!handled) {
     const result = proposeChanges(merged, { ...env.engine });
     let proposal = null;
-    if (result.operations.length) proposal = await createProposal(conv, result.operations, describeRequest(merged, (d) => formatIsoDay(d), slotLabels, placeLabels), result.notes, 'engine', merged, env);
+    if (result.operations.length) proposal = await createProposal(conv, result.operations, describeRequest(merged, (d) => formatIsoDay(d), SLOT_LABELS, placeLabels), result.notes, 'engine', merged, env);
     conv.messages.push(message('assistant', engineReply(merged, proposal, result.notes), 'engine', proposal?.status === 'pending' ? proposal.id : null));
     // Le modele IA sera informe de ce qui s'est passe hors ligne.
     conv.pendingEvents.push(`Hors connexion IA, le client a demandé : « ${clean} ». Le moteur local a répondu${proposal ? ` avec une proposition (${proposal.summary})` : ''}.`);
@@ -522,7 +522,7 @@ export async function planWeek(monday, choices) {
   const engineOps = choices.keepExisting ? result.operations.filter((o) => o.type !== 'replace_recipe') : result.operations;
   const operations = coach ? [...coach.operations, ...engineOps] : engineOps;
   if (coach) result.notes.unshift(...coach.notes);
-  const summary = describeChoices(choices, slotLabels, regionLabels);
+  const summary = describeChoices(choices, SLOT_LABELS, regionLabels);
   conv.messages.push(message('user', summary, null, null));
   const proposal = operations.length ? await createProposal(conv, operations, 'Planifier ma semaine', result.notes, 'engine', req, env) : null;
   const pending = proposal?.status === 'pending' ? proposal : null;
@@ -645,21 +645,55 @@ export async function swapProposalMeal(monday, proposalId, date, slot) {
   if (existing?.locked) return { ok: false, message: 'Ce repas est verrouillé dans le planning.' };
   const seen = proposal.seen?.[key] ?? [];
   const exclude = new Set([...seen, ...(current ? [current.recipeId] : [])]);
-  const request = proposal.request ?? guidedRequest({ slots: [slot], keepExisting: true, budgetCents: null, maxMinutes: null, wishes: [], region: null });
-  const [pick] = suggestRecipes(request, { date, slot }, { ...env.engine, meals: state.meals }, exclude, 1);
-  if (!pick) return { ok: false, message: 'Je n’ai plus d’autre idée pour ce repas avec vos critères.' };
-  const reason = pick.reasons.length ? `${pick.reasons.join(', ')}.` : 'Autre idée demandée.';
+  const pick = current?.recipeId.startsWith('coach-') ? await coachVariant(slot, current.recipeId, exclude, env) : engineIdea(proposal, date, slot, state, exclude, env);
+  if (!pick) return { ok: false, message: current?.recipeId.startsWith('coach-') ? 'Je n’ai plus d’autre variante de ce repas dans le programme de votre coach.' : 'Je n’ai plus d’autre idée pour ce repas avec vos critères.' };
   const index = operationIndexFor(proposal.operations, { date, slot }, existing?.id ?? null);
   /** @type {Operation} */
   const operation = existing
-    ? { type: 'replace_recipe', mealId: existing.id, recipeId: pick.recipe.id, reason }
-    : { type: 'add_meal', date, slot, recipeId: pick.recipe.id, guests: index >= 0 && proposal.operations[index].type === 'add_meal' ? /** @type {{ guests: number }} */ (proposal.operations[index]).guests : 0, reason };
+    ? { type: 'replace_recipe', mealId: existing.id, recipeId: pick.recipe.id, reason: pick.reason }
+    : { type: 'add_meal', date, slot, recipeId: pick.recipe.id, guests: index >= 0 && proposal.operations[index].type === 'add_meal' ? /** @type {{ guests: number }} */ (proposal.operations[index]).guests : 0, reason: pick.reason };
   if (index >= 0) proposal.operations[index] = operation;
   else proposal.operations.push(operation);
   proposal.seen = { ...(proposal.seen ?? {}), [key]: [...exclude] };
   proposal.review = (await reviewOperations(proposal.operations, env)).review;
   await saveConversation(conv);
   return { ok: true, message: `${pick.recipe.name} à la place.` };
+}
+
+/**
+ * Autre idee du moteur pour un creneau de la proposition.
+ * @param {StoredProposal} proposal
+ * @param {string} date
+ * @param {Slot} slot
+ * @param {{ meals: Meal[] }} state
+ * @param {Set<string>} exclude
+ * @param {Env} env
+ * @returns {{ recipe: Recipe, reason: string } | null}
+ */
+function engineIdea(proposal, date, slot, state, exclude, env) {
+  const request = proposal.request ?? guidedRequest({ slots: [slot], keepExisting: true, budgetCents: null, maxMinutes: null, wishes: [], region: null });
+  const [pick] = suggestRecipes(request, { date, slot }, { ...env.engine, meals: state.meals }, exclude, 1);
+  return pick ? { recipe: pick.recipe, reason: pick.reasons.length ? `${pick.reasons.join(', ')}.` : 'Autre idée demandée.' } : null;
+}
+
+/**
+ * Autre variante du meme repas du programme du coach (autre proteine, autres legumes, autre menu).
+ * @param {Slot} slot
+ * @param {string} currentId
+ * @param {Set<string>} exclude
+ * @param {Env} env
+ * @returns {Promise<{ recipe: Recipe, reason: string } | null>}
+ */
+async function coachVariant(slot, currentId, exclude, env) {
+  const plan = await getCoachPlan();
+  if (!plan) return null;
+  /** @param {Recipe} r */
+  const allowed = (r) => evaluateRecipeForHousehold(r, env.household, filterContext).status === 'compatible';
+  // Toutes les variantes vues : on repart de la suivante (le programme n'a qu'un nombre fini de menus).
+  const recipe = nextCoachVariant(plan, slot, currentId, exclude, allowed) ?? nextCoachVariant(plan, slot, currentId, new Set(), allowed);
+  if (!recipe) return null;
+  registerPlannedRecipe(recipe);
+  return { recipe, reason: 'Programme de votre coach : autre variante du repas, mêmes quantités.' };
 }
 
 /**
@@ -855,7 +889,7 @@ async function executeTool(name, input, conv, env, merged) {
         const req = applyPreferences(mergeRequests(merged, parseRequest(request, { today: env.today, monday: env.monday, ...finder })), env.preferences);
         const result = proposeChanges(req, env.engine);
         if (!result.operations.length) return { result: { operations: [], notes: result.notes, needsClarification: result.needsClarification } };
-        const proposal = await createProposal(conv, result.operations, describeRequest(req, (d) => formatIsoDay(d), slotLabels, placeLabels), result.notes, 'engine', req, env);
+        const proposal = await createProposal(conv, result.operations, describeRequest(req, (d) => formatIsoDay(d), SLOT_LABELS, placeLabels), result.notes, 'engine', req, env);
         return { proposal, result: { proposalId: proposal.id, operations: describeOperations(proposal.operations, env), notes: proposal.notes, review: proposal.review ? reviewForModel(proposal.review) : null } };
       }
       case 'propose_changes': {

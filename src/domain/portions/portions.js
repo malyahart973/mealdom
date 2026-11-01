@@ -45,16 +45,3 @@ export function mealPortions(memberCategories, rules) {
   return roundUpToHalf(sumPortions(memberCategories, rules));
 }
 
-/**
- * Diner qui sert aussi au dejeuner du lendemain : chaque repas est calcule
- * separement (personnes presentes differentes), puis les deux sont additionnes.
- * @param {string[]} dinnerCategories
- * @param {string[]} nextLunchCategories
- * @param {PortionRule[]} rules
- * @returns {{ dinner: number, lunch: number, total: number }}
- */
-export function dinnerWithNextLunch(dinnerCategories, nextLunchCategories, rules) {
-  const dinner = mealPortions(dinnerCategories, rules);
-  const lunch = mealPortions(nextLunchCategories, rules);
-  return { dinner, lunch, total: dinner + lunch };
-}

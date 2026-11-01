@@ -1,7 +1,7 @@
 import { escapeHtml } from '../utils/html.js';
 import { formatPortions, formatClock, formatIsoDay } from '../utils/format.js';
 import { formatQuantity } from '../utils/quantity.js';
-import { SLOTS, mealPortionsFor } from '../domain/planning/planning.js';
+import { mealPortionsFor, SLOT_NAMES } from '../domain/planning/planning.js';
 import { applySubstitutions } from '../domain/recipes/recipes.js';
 import { equipmentLabel } from '../domain/recipes/equipment.js';
 import { scaledLines, cookingMethods, stepTimers, clampPortions } from '../domain/recipes/cooking.js';
@@ -13,7 +13,6 @@ import { getTimers, remaining, onTimersChange, startTimer, togglePause, addTime,
 
 /** @typedef {import('../domain/recipes/recipes.js').Recipe} Recipe */
 
-const slotLabels = new Map(SLOTS.map((s) => [s.id, s.label.toLowerCase()]));
 
 /**
  * Mode cuisine pas a pas.
@@ -35,7 +34,7 @@ export async function renderCook(el, params) {
       recipe = applySubstitutions(base, meal.substitutions ?? []);
       portions = mealPortionsFor(meal, household).total;
       backHref = `#/planning/repas/${encodeURIComponent(meal.id)}`;
-      context = `${formatIsoDay(meal.date)}, ${slotLabels.get(meal.slot) ?? meal.slot}${meal.nextLunch ? ' (avec le déjeuner du lendemain)' : ''}`;
+      context = `${formatIsoDay(meal.date)}, ${SLOT_NAMES.get(meal.slot) ?? meal.slot}${meal.nextLunch ? ' (avec le déjeuner du lendemain)' : ''}`;
     }
   } else {
     recipe = recipesById.get(params.id ?? '');

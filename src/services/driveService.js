@@ -9,7 +9,6 @@ import {
   parseDriveCsv,
   checkOrder,
   isFresh,
-  activePromotions,
 } from '../domain/drive/drive.js';
 import { quoteShoppingLines } from '../domain/drive/quote.js';
 import { aggregateNeeds, buildShoppingLines, mealNeedLines } from '../domain/shopping/shopping.js';
@@ -343,11 +342,3 @@ export async function markOrderSent(orderId) {
   return check;
 }
 
-/**
- * Promotions actives du Drive (verifiees ou non, avec leur fraicheur).
- * @returns {Promise<{ product: DriveProduct, fresh: boolean }[]>}
- */
-export async function currentPromotions() {
-  const now = new Date();
-  return activePromotions(await getStoreProducts(), toIsoDate(now)).map((product) => ({ product, fresh: isFresh(product, now) }));
-}

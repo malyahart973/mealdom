@@ -3,7 +3,7 @@ import { formatIsoDay, formatIsoDayMonth, formatMinutes, formatTime } from '../u
 import { formatQuantity } from '../utils/quantity.js';
 import { downloadText, calendarStamp } from '../utils/download.js';
 import { addDays, parseIsoDate, toIsoDate, weekDays, weekStart } from '../domain/planning/dates.js';
-import { SLOTS } from '../domain/planning/planning.js';
+import { SLOT_NAMES } from '../domain/planning/planning.js';
 import { planBatchWeek, batchCalendarEvents, sessionStart } from '../domain/batchCooking/batchCooking.js';
 import { BATCH_DAYS, FREEZER_MONTHS, preparationKeeping, storagePlan } from '../domain/batchCooking/keeping.js';
 import { calendarFile } from '../domain/planning/calendar.js';
@@ -18,10 +18,9 @@ import { getBatchPlan, saveBatchPlan, batchSessions } from '../services/batchSer
 /** @typedef {import('../domain/batchCooking/batchCooking.js').BatchSessionPlan} BatchSessionPlan */
 /** @typedef {import('../domain/planning/planning.js').Meal} Meal */
 
-const slotLabels = new Map(SLOTS.map((s) => [s.id, s.label.toLowerCase()]));
 
 /** @param {{ date: string, slot: import('../domain/planning/planning.js').Slot }} m */
-const mealWhen = (m) => `${formatIsoDay(m.date)}, ${slotLabels.get(m.slot) ?? m.slot}`;
+const mealWhen = (m) => `${formatIsoDay(m.date)}, ${SLOT_NAMES.get(m.slot) ?? m.slot}`;
 
 /**
  * Ecran Batch cooking : les seances de la semaine (plats entiers et preparations de base),

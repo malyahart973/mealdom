@@ -2,7 +2,7 @@ import { escapeHtml } from '../utils/html.js';
 import { formatIsoDay, formatIsoDayMonth } from '../utils/format.js';
 import { formatCents, parseAmountToCents, centsToInput } from '../domain/budget/money.js';
 import { SLOTS } from '../domain/planning/planning.js';
-import { toIsoDate, weekStart, addDays, parseIsoDate } from '../domain/planning/dates.js';
+import { toIsoDate, weekStart, weekToPlan, addDays, parseIsoDate } from '../domain/planning/dates.js';
 import { WISHES, TIME_CHOICES } from '../domain/assistant/guided.js';
 import { REGIONS } from '../data/cuisines.js';
 import { BATCH_DAYS } from '../domain/batchCooking/keeping.js';
@@ -34,8 +34,7 @@ export async function renderPlanWeek(el, params) {
   const today = toIsoDate(new Date());
   const thisMonday = weekStart(today);
   // Le week-end, on prepare plutot la semaine suivante.
-  const weekend = new Date().getDay() === 0 || new Date().getDay() === 6;
-  const monday = params.date && parseIsoDate(params.date) ? weekStart(params.date) : weekend ? addDays(thisMonday, 7) : thisMonday;
+  const monday = params.date && parseIsoDate(params.date) ? weekStart(params.date) : weekToPlan(today);
   const household = await getHousehold();
   if (household.members.length === 0) {
     el.innerHTML = `<section><h1 class="page-title">Planifier ma semaine</h1>

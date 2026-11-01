@@ -4,7 +4,7 @@ import { SLOTS } from '../domain/planning/planning.js';
 import { parseCoachMeal, coachFoodLabel, COACH_SLOT_ORDER } from '../domain/nutrition/coach.js';
 import { getCoachPlan, saveCoachPlan, deleteCoachPlan, planFromText, planFromFile, coachEstimates } from '../services/coachService.js';
 import { guidedDefaults, planWeek } from '../services/assistantService.js';
-import { toIsoDate, weekStart, addDays } from '../domain/planning/dates.js';
+import { toIsoDate, weekToPlan } from '../domain/planning/dates.js';
 
 /** @typedef {import('../domain/nutrition/coach.js').CoachPlan} CoachPlan */
 /** @typedef {import('../domain/nutrition/coach.js').CoachMeal} CoachMeal */
@@ -102,9 +102,7 @@ export function bindCoachBlock(el, plan, rerender) {
     button.disabled = true;
     status.textContent = 'Je compose votre semaine…';
     // Le week-end, on prepare la semaine suivante (comme « Planifier ma semaine »).
-    const now = new Date();
-    const monday = weekStart(toIsoDate(now));
-    const week = now.getDay() === 0 || now.getDay() === 6 ? addDays(monday, 7) : monday;
+    const week = weekToPlan(toIsoDate(new Date()));
     const { choices } = await guidedDefaults();
     const result = await planWeek(week, { ...choices, slots: plan.meals.map((m) => m.slot), followCoach: true, leftovers: false });
     if (result.proposalId) {

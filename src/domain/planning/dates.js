@@ -50,6 +50,17 @@ export function weekStart(iso) {
 }
 
 /**
+ * Semaine a planifier : celle en cours, ou la suivante le week-end (samedi, dimanche).
+ * @param {string} today   AAAA-MM-JJ
+ * @returns {string} lundi de la semaine
+ */
+export function weekToPlan(today) {
+  const day = parseIsoDate(today)?.getDay();
+  const monday = weekStart(today);
+  return day === 0 || day === 6 ? addDays(monday, 7) : monday;
+}
+
+/**
  * Les 7 jours de la semaine commencant au lundi donne.
  * @param {string} monday
  * @returns {string[]}

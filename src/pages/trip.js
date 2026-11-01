@@ -4,10 +4,10 @@ import { parseDecimal } from '../utils/units-select.js';
 import { addDays, parseIsoDate, toIsoDate, weekStart } from '../domain/planning/dates.js';
 import { formatCents } from '../domain/budget/money.js';
 import { circuitFor, bestCircuit, fuelCostCents, legKey, MAX_STORES_PER_TRIP } from '../domain/trips/trips.js';
-import { SLOTS } from '../domain/planning/planning.js';
+import { SLOT_NAMES } from '../domain/planning/planning.js';
 import { ingredientsById } from '../services/catalog.js';
 import { saveStore } from '../services/budgetService.js';
-import { getCarSettings, saveCarSettings, weekGrouping, getTrip, saveTrip, deleteTrip, mealsBefore, downloadTripCalendar } from '../services/tripService.js';
+import { saveCarSettings, weekGrouping, getTrip, saveTrip, deleteTrip, mealsBefore, downloadTripCalendar } from '../services/tripService.js';
 import { getHome, saveHome, searchAddress, currentPlace, computeStoreDistances } from '../services/geoService.js';
 import { SOURCE_LABELS, isInGuyane } from '../domain/trips/geo.js';
 
@@ -79,7 +79,6 @@ function mountPlaceSearch(root, key, onPick) {
 /** @typedef {import('../domain/trips/trips.js').ShoppingTrip} ShoppingTrip */
 /** @typedef {import('../domain/stores/stores.js').Store} Store */
 
-const slotLabels = new Map(SLOTS.map((s) => [s.id, s.label.toLowerCase()]));
 
 /** Plans affiches dans le tableau de comparaison. */
 const MAX_PLANS_SHOWN = 6;
@@ -198,7 +197,7 @@ export async function renderTrip(el, params) {
               ${
                 before.length
                   ? `<div class="fit fit--ko"><p><strong>${before.length} repas avant les courses</strong> : vérifiez que vous avez déjà leurs ingrédients.</p>
-                      <ul>${before.map((m) => `<li>${escapeHtml(formatIsoDay(m.date))}, ${escapeHtml(slotLabels.get(m.slot) ?? m.slot)} : ${escapeHtml(m.recipeName)}</li>`).join('')}</ul></div>`
+                      <ul>${before.map((m) => `<li>${escapeHtml(formatIsoDay(m.date))}, ${escapeHtml(SLOT_NAMES.get(m.slot) ?? m.slot)} : ${escapeHtml(m.recipeName)}</li>`).join('')}</ul></div>`
                   : ''
               }
               <div class="form-actions">

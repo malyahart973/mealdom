@@ -1,14 +1,13 @@
 import { escapeHtml } from '../utils/html.js';
 import { formatIsoDay, formatIsoDayMonth, formatPortions } from '../utils/format.js';
 import { parseIsoDate, toIsoDate, weekDays, weekStart } from '../domain/planning/dates.js';
-import { SLOTS } from '../domain/planning/planning.js';
+import { SLOT_NAMES } from '../domain/planning/planning.js';
 import { planBatchWeek, batchLabels } from '../domain/batchCooking/batchCooking.js';
 import { recipesById, preparationsById, keepingOf } from '../services/catalog.js';
 import { getHousehold } from '../services/householdService.js';
 import { getMeals } from '../services/planningService.js';
 import { batchSessions } from '../services/batchService.js';
 
-const slotLabels = new Map(SLOTS.map((s) => [s.id, s.label.toLowerCase()]));
 
 /**
  * Etiquettes des boites du batch cooking, a recopier ou a imprimer.
@@ -34,7 +33,7 @@ export async function renderBatchLabels(el, params) {
                .map(
                  (l) => `<div class="label label--${l.storage}">
                    <strong class="label__name">${escapeHtml(l.name)}</strong>
-                   <span>${escapeHtml(formatPortions(l.portions))} · pour ${escapeHtml(formatIsoDay(l.meal.date))}, ${escapeHtml(slotLabels.get(l.meal.slot) ?? l.meal.slot)}</span>
+                   <span>${escapeHtml(formatPortions(l.portions))} · pour ${escapeHtml(formatIsoDay(l.meal.date))}, ${escapeHtml(SLOT_NAMES.get(l.meal.slot) ?? l.meal.slot)}</span>
                    <span>Cuisiné le ${escapeHtml(formatIsoDay(l.cookedOn))}</span>
                    ${
                      l.storage === 'freezer'

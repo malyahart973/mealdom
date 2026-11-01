@@ -10,6 +10,7 @@
  */
 import { normalizeText } from '../ingredients/ingredients.js';
 import { addDays, parseIsoDate } from '../planning/dates.js';
+import { SLOT_NAMES } from '../planning/planning.js';
 
 /** @typedef {import('./program.js').ProgramSlot} ProgramSlot */
 /** @typedef {import('../recipes/recipes.js').Recipe} Recipe */
@@ -787,7 +788,7 @@ export function planCoachWeek(plan, ctx) {
       if (recipe && ctx.allowed(recipe)) picks.push({ date, slot: meal.slot, recipe, mealId: existing?.id ?? null });
     }
   }
-  const slotName = (/** @type {ProgramSlot} */ s) => SLOT_NAMES[s];
+  const slotName = (/** @type {ProgramSlot} */ s) => SLOT_NAMES.get(s) ?? s;
   if (kept.size) {
     const total = [...kept.values()].reduce((a, b) => a + b, 0);
     const list = [...kept].map(([slot, n]) => `${n} ${slotName(slot)}${n > 1 ? 's' : ''}`);
@@ -797,8 +798,61 @@ export function planCoachWeek(plan, ctx) {
   return { picks, notes };
 }
 
-/** Noms des repas dans les messages. */
-const SLOT_NAMES = /** @type {Record<ProgramSlot, string>} */ ({ breakfast: 'petit-déjeuner', morning_snack: 'collation du matin', lunch: 'déjeuner', snack: 'goûter', dinner: 'dîner' });
+/**
+ * « Changer » un repas du programme : la variante suivante du meme repas, compatible avec le
+ * foyer et pas encore vue. Repas compose : une autre proteine d'abord, puis d'autres legumes et
+ * feculents (dans l'ordre du coach, a partir du repas actuel). Menus fixes : le menu suivant.
+ * @param {CoachPlan} plan
+ * @param {ProgramSlot} slot
+ * @param {string} currentId      Repas actuel (coach-...)
+ * @param {Set<string>} exclude   Variantes deja vues
+ * @param {(recipe: Recipe) => boolean} allowed
+ * @returns {Recipe | null}
+ */
+export function nextCoachVariant(plan, slot, currentId, exclude, allowed) {
+  const meal = plan.meals.find((m) => m.slot === slot);
+  if (!meal) return null;
+  const parsed = parseCoachMeal(meal.text);
+  /** @param {string} id */
+  const usableRecipe = (id) => {
+    if (id === currentId || exclude.has(id)) return null;
+    const r = coachRecipe(id, plan);
+    return r && allowed(r) ? r : null;
+  };
+  if (!parsed.assembled) {
+    const n = parsed.options.length;
+    const current = Number(/-o(\d+)$/.exec(currentId)?.[1] ?? -1);
+    for (let i = 1; i <= n; i += 1) {
+      const r = usableRecipe(optionId(slot, (current + i + n) % n));
+      if (r) return r;
+    }
+    return null;
+  }
+  const u = usableChoices(slot, parsed.assembled, plan, allowed);
+  if (!u) return null;
+  const [p0, v0, s0] = /-a-([^-]+)-([^-]+)-([^-]+)$/.exec(currentId)?.slice(1) ?? [];
+  /** Rang d'un aliment apres l'actuel, dans l'ordre du coach (0 = le suivant). */
+  const after = (/** @type {(string | null)[]} */ list, /** @type {string | undefined} */ now, /** @type {string | null} */ x) => {
+    const i = list.indexOf(now === 'none' ? null : now ?? null);
+    return (list.indexOf(x) - i - 1 + list.length) % list.length;
+  };
+  const combos = [];
+  for (const p of u.proteins) {
+    for (const v of u.vegs) {
+      for (const st of u.starches) {
+        // Changer de proteine compte le plus, puis de legumes, puis de feculent.
+        const same = (p === p0 ? 4 : 0) + (v === v0 ? 2 : 0) + ((st ?? 'none') === s0 ? 1 : 0);
+        combos.push({ id: assembledId(slot, p, v, st), rank: [same, after(u.proteins, p0, p), after(u.vegs, v0, v), after(u.starches, s0, st)] });
+      }
+    }
+  }
+  combos.sort((a, b) => a.rank.reduce((d, x, i) => d || x - b.rank[i], 0));
+  for (const c of combos) {
+    const r = usableRecipe(c.id);
+    if (r) return r;
+  }
+  return null;
+}
 
 /**
  * Proteines, legumes et feculents d'un repas assemble qui conviennent au foyer : on trouve une

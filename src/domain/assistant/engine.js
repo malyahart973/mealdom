@@ -6,7 +6,7 @@
  * - chaque operation porte sa raison ; les limites sont expliquees dans les notes.
  */
 import { addDays } from '../planning/dates.js';
-import { SLOTS, mealPortionsFor } from '../planning/planning.js';
+import { SLOTS, mealPortionsFor, SLOT_NAMES } from '../planning/planning.js';
 import { evaluateRecipeForHousehold } from '../household/compatibility.js';
 import { applySubstitutions, hasTag, fitsSlot, FREE_RECIPE_ID } from '../recipes/recipes.js';
 import { activePromotions } from '../drive/drive.js';
@@ -55,15 +55,12 @@ import { sessionFor, daysBetween } from '../batchCooking/keeping.js';
 /** Ecart minimal de note pour remplacer un repas existant (evite de tout chambouler). */
 const IMPROVEMENT = 2;
 
-/** @type {Map<string, string>} */
-const slotLabels = new Map(SLOTS.map((s) => [s.id, s.label.toLowerCase()]));
-
 /**
  * @param {Meal} meal
  * @returns {string}
  */
 function mealLabel(meal) {
-  return `${meal.recipeName} (${meal.date}, ${slotLabels.get(meal.slot) ?? meal.slot})`;
+  return `${meal.recipeName} (${meal.date}, ${SLOT_NAMES.get(meal.slot) ?? meal.slot})`;
 }
 
 /**
@@ -401,7 +398,7 @@ export function proposeChanges(req, ctx) {
       const guests = req.guests.mode === 'add' ? meal.guests + req.guests.count : Math.max(0, req.guests.count - meal.attendees.length);
       operations.push({ type: 'set_guests', mealId: meal.id, guests, reason: req.guests.mode === 'add' ? `${req.guests.count} personne(s) en plus.` : `${req.guests.count} personnes à table.` });
     }
-    if (!req.slots.length && chosen.length) notes.push(`J’ai ajouté les invités au ${slotLabels.get(chosen[0].slot)} ; dites « le soir » si c’est pour le dîner.`);
+    if (!req.slots.length && chosen.length) notes.push(`J’ai ajouté les invités au ${SLOT_NAMES.get(chosen[0].slot)} ; dites « le soir » si c’est pour le dîner.`);
     for (const date of req.days) {
       if (chosen.some((m) => m.date === date) || date < ctx.today) continue;
       const slot = req.slots[0] ?? 'lunch';
@@ -616,16 +613,6 @@ export function preferredCuisines(preferences, cuisineRegion) {
     if (p.kind === 'region') for (const [c, r] of cuisineRegion) if (r === p.value) set.add(c);
   }
   return set;
-}
-
-/**
- * Cible « aliment » correspondant a un ingredient, pour les preferences a eviter.
- * @param {string} ingredientId
- * @param {string} name
- * @returns {FoodTarget}
- */
-export function ingredientTarget(ingredientId, name) {
-  return { ingredientId, category: null, label: name };
 }
 
 export { matchesTarget };

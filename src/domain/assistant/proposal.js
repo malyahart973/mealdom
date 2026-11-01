@@ -6,7 +6,7 @@
  */
 import { validateMeal, plannedEntries, slotKey, mealPortionsFor, SLOTS } from '../planning/planning.js';
 import { addDays } from '../planning/dates.js';
-import { applySubstitutions, fitsSlot } from '../recipes/recipes.js';
+import { applySubstitutions } from '../recipes/recipes.js';
 import { evaluateRecipeForHousehold } from '../household/compatibility.js';
 import { aggregateNeeds, mealNeedLines } from '../shopping/shopping.js';
 
@@ -314,19 +314,6 @@ export function planDiff(before, after, days, ctx) {
   for (const [key, n] of nb) if (!na.has(key)) removed.push({ ingredientId: n.ingredientId, unit: n.unit, before: n.quantity, after: null });
   const portions = (/** @type {Meal[]} */ list) => list.reduce((s, m) => s + mealPortionsFor(m, ctx.household).total, 0);
   return { meals, added, removed, changed, portions: { before: portions(b), after: portions(a) } };
-}
-
-/**
- * Repas du planning qui ne correspondent plus a leur creneau (ex. une recette de gouter au diner).
- * @param {Meal[]} meals
- * @param {Map<string, Recipe>} recipes
- * @returns {Meal[]}
- */
-export function mismatchedSlots(meals, recipes) {
-  return meals.filter((m) => {
-    const r = recipes.get(m.recipeId);
-    return r ? !fitsSlot(r, m.slot) : false;
-  });
 }
 
 /**

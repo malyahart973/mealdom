@@ -38,11 +38,6 @@ export async function loadUserRecipes() {
   for (const recipe of await getUserRecipes()) registerRecipe(recipe);
 }
 
-/** @returns {Promise<Recipe[]>} */
-export async function listUserRecipes() {
-  return (await getUserRecipes()).filter((r) => r.status !== 'archived').sort((a, b) => a.name.localeCompare(b.name));
-}
-
 /**
  * @param {Recipe} recipe
  * @returns {Promise<{ ok: true } | { ok: false, errors: string[] }>}

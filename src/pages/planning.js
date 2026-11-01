@@ -1,7 +1,7 @@
 import { escapeHtml } from '../utils/html.js';
 import { formatIsoDay, formatIsoDayMonth, formatPortions } from '../utils/format.js';
 import { addDays, toIsoDate, weekDays, weekStart, parseIsoDate } from '../domain/planning/dates.js';
-import { SLOTS, mealPortionsFor, planningGrid } from '../domain/planning/planning.js';
+import { SLOTS, mealPortionsFor, planningGrid, SLOT_LABELS } from '../domain/planning/planning.js';
 import { getMeals, getShowBreakfast, setShowBreakfast, getShowSnack, getShowMorningSnack, setShowMorningSnack, setShowSnack } from '../services/planningService.js';
 import { mountAssistant } from './assistantPanel.js';
 import { getHousehold } from '../services/householdService.js';
@@ -9,7 +9,6 @@ import { getHousehold } from '../services/householdService.js';
 /** @typedef {import('../domain/planning/planning.js').PlannedEntry} PlannedEntry */
 /** @typedef {import('../domain/household/household.js').Household} Household */
 
-const slotLabels = new Map(SLOTS.map((s) => [s.id, s.label]));
 
 /** L'assistant reste ouvert pendant la navigation dans le planning. */
 let assistantOpen = false;
@@ -84,7 +83,7 @@ export async function renderPlanning(el, params) {
                 .map(
                   ({ slot, entry }) => `
                 <div class="slot">
-                  <dt>${escapeHtml(slotLabels.get(slot) ?? slot)}</dt>
+                  <dt>${escapeHtml(SLOT_LABELS.get(slot) ?? slot)}</dt>
                   <dd>${
                     entry
                       ? entryHtml(entry, household)

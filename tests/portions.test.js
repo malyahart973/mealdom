@@ -1,5 +1,5 @@
 import { test, assertEqual } from './runner.js';
-import { sumPortions, roundUpToHalf, mealPortions, dinnerWithNextLunch } from '../src/domain/portions/portions.js';
+import { sumPortions, roundUpToHalf, mealPortions } from '../src/domain/portions/portions.js';
 import { DEFAULT_PORTION_RULES } from '../src/data/portionRules.js';
 
 const rules = DEFAULT_PORTION_RULES;
@@ -25,5 +25,3 @@ test('Catégorie inconnue refusée', () => {
   }
   assertEqual(refused, true);
 });
-test('Dîner (2 adultes + 1 enfant) + déjeuner du lendemain (1 adulte + 1 enfant)', () =>
-  assertEqual(dinnerWithNextLunch(['adult', 'adult', 'child'], ['adult', 'child'], rules), { dinner: 2.5, lunch: 1.5, total: 4 }));

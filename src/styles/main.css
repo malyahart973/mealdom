@@ -256,36 +256,6 @@ a {
   font-weight: 600;
 }
 
-/* La date du jour : l'element fort de l'accueil */
-.today__date {
-  font-family: var(--font-display);
-  font-size: clamp(2.25rem, 9vw, 3.25rem);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
-  margin-bottom: var(--space-4);
-}
-
-.today__date::first-letter {
-  text-transform: uppercase;
-}
-
-.today__date::after {
-  content: "";
-  display: block;
-  width: 3.5rem;
-  height: 6px;
-  margin-top: var(--space-3);
-  border-radius: 3px;
-  background: var(--maracuja);
-}
-
-.today__empty {
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin-bottom: var(--space-1);
-}
-
 .notice {
   margin-top: var(--space-8);
   padding: var(--space-4);
