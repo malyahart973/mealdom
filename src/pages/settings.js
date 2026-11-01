@@ -1,7 +1,7 @@
 import { APP_VERSION } from '../config.js';
 import { escapeHtml } from '../utils/html.js';
 import { formatIsoDate } from '../utils/format.js';
-import { exportData, getLastExportDate } from '../services/backupService.js';
+import { exportData, getLastExportDate, readBackup, applyBackup } from '../services/backupService.js';
 import { getPersistenceStatus } from '../services/storage.js';
 import { getAssistantSettings, saveAssistantSettings } from '../services/assistantService.js';
 import { DEFAULT_MODEL } from '../services/llmService.js';
@@ -30,8 +30,14 @@ export async function renderSettings(el) {
         <div><dt>Données protégées contre l'effacement</dt><dd>${escapeHtml(PERSISTENCE_LABELS[persistence])}</dd></div>
         <div><dt>Version</dt><dd>${escapeHtml(APP_VERSION)}</dd></div>
       </dl>
-      <button type="button" class="button" data-action="export">Exporter mes données</button>
-      <p class="hint">Le fichier exporté se trouve ensuite dans vos téléchargements. Gardez-le en lieu sûr. La clé de l’assistant IA n’y figure jamais.</p>
+      <p class="form-actions">
+        <button type="button" class="button" data-action="export">Exporter mes données</button>
+        <label for="restore-file" class="button button--secondary">Restaurer une sauvegarde</label>
+      </p>
+      <input id="restore-file" type="file" accept=".json,application/json" class="visually-hidden" />
+      <p class="hint">Le fichier exporté se trouve ensuite dans vos téléchargements. Gardez-le en lieu sûr. La clé de l’assistant IA n’y figure jamais. « Restaurer » remet les données d’un fichier exporté (nouveau téléphone, autre navigateur…) à la place de celles de cet appareil.</p>
+      <p class="alert" role="alert" data-restore-alert hidden></p>
+      <p class="status" role="status" data-restore-status></p>
 
       <h2>Assistant IA</h2>
       <p>Sans clé, l’assistant fonctionne avec le moteur de l’application, même hors ligne : il comprend les demandes courantes et prépare des propositions. Avec une clé API Anthropic (Claude), il comprend les demandes plus libres et explique davantage ses choix.</p>
@@ -61,6 +67,37 @@ export async function renderSettings(el) {
   el.querySelector('[data-action="export"]')?.addEventListener('click', async () => {
     await exportData();
     await renderSettings(el);
+  });
+  el.querySelector('#restore-file')?.addEventListener('change', async (event) => {
+    const input = /** @type {HTMLInputElement} */ (event.target);
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    const alertBox = /** @type {HTMLElement} */ (el.querySelector('[data-restore-alert]'));
+    const status = /** @type {HTMLElement} */ (el.querySelector('[data-restore-status]'));
+    alertBox.hidden = true;
+    const read = await readBackup(file);
+    if (!read.ok) {
+      alertBox.textContent = read.error;
+      alertBox.hidden = false;
+      return;
+    }
+    const { counts, exportDate, applicationVersion } = read.plan;
+    const content = [`${counts.meals} repas`, `${counts.weights} pesée(s)`, `${counts.recipes} recette(s) personnelle(s)`, `${counts.prices} prix relevé(s)`].join(', ');
+    const ok = window.confirm(
+      `Restaurer la sauvegarde du ${formatIsoDate(exportDate) ?? exportDate} (MealDom ${applicationVersion}) : ${content} ?\n\nLes données actuelles de cet appareil seront remplacées. Pour les garder, annulez et exportez-les d’abord.`,
+    );
+    if (!ok) return;
+    try {
+      await applyBackup(read.plan);
+    } catch {
+      alertBox.textContent = 'La restauration a échoué : rien n’a été modifié.';
+      alertBox.hidden = false;
+      return;
+    }
+    status.textContent = 'Sauvegarde restaurée. L’application redémarre…';
+    // Recharger : les recettes personnelles et les reglages sont relus au demarrage.
+    setTimeout(() => window.location.reload(), 800);
   });
   const form = /** @type {HTMLFormElement} */ (el.querySelector('[data-form="ai"]'));
   form.addEventListener('submit', async (event) => {

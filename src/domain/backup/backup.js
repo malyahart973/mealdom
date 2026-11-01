@@ -51,6 +51,89 @@ export function validateExport(value) {
 }
 
 /**
+ * Contenu d'une sauvegarde : chaque cle de « data » est un magasin de la base, avec la cle de
+ * ses enregistrements ; « single » : un seul enregistrement (ou null) au lieu d'une liste.
+ * @type {{ store: string, id: string, single?: boolean }[]}
+ */
+export const BACKUP_STORES = [
+  { store: 'settings', id: 'key' },
+  { store: 'household', id: 'id', single: true },
+  { store: 'meals', id: 'id' },
+  { store: 'inventory', id: 'id' },
+  { store: 'packages', id: 'ingredientId' },
+  { store: 'shoppingLists', id: 'week' },
+  { store: 'stores', id: 'id' },
+  { store: 'prices', id: 'id' },
+  { store: 'budget', id: 'id', single: true },
+  { store: 'expenses', id: 'id' },
+  { store: 'conversations', id: 'week' },
+  { store: 'changeHistory', id: 'id' },
+  { store: 'preferences', id: 'id' },
+  { store: 'driveProducts', id: 'key' },
+  { store: 'driveOrders', id: 'id' },
+  { store: 'program', id: 'id', single: true },
+  { store: 'weights', id: 'date' },
+  { store: 'shoppingTrips', id: 'week' },
+  { store: 'priceHistory', id: 'id' },
+  { store: 'userRecipes', id: 'id' },
+  { store: 'barcodes', id: 'code' },
+];
+
+/**
+ * @typedef {Object} RestorePlan
+ * @property {{ store: string, records: Record<string, unknown>[] }[]} writes   Magasins remplaces
+ * @property {string} exportDate
+ * @property {string} applicationVersion
+ * @property {{ meals: number, weights: number, recipes: number, prices: number }} counts
+ */
+
+/**
+ * Prepare la restauration d'une sauvegarde : verifie le fichier, sa version et chaque
+ * enregistrement, sans rien ecrire. Les magasins absents du fichier (sauvegarde ancienne) ne
+ * sont pas touches ; les reglages prives (cle de l'assistant) ne sont jamais repris du fichier.
+ * @param {unknown} value             Contenu du fichier (JSON lu)
+ * @param {number} schemaVersion      Version actuelle de la base
+ * @param {Set<string>} privateSettings
+ * @returns {{ ok: true, plan: RestorePlan } | { ok: false, error: string }}
+ */
+export function restorePlan(value, schemaVersion, privateSettings) {
+  const valid = validateExport(value);
+  if (!valid.ok) return valid;
+  const file = /** @type {ExportFile} */ (value);
+  if (file.schemaVersion > schemaVersion) {
+    return { ok: false, error: `Cette sauvegarde vient d'une version plus récente de MealDom (${file.applicationVersion}) : mettez d'abord l'application à jour.` };
+  }
+  /** @type {RestorePlan['writes']} */
+  const writes = [];
+  for (const { store, id, single } of BACKUP_STORES) {
+    if (!(store in file.data)) continue;
+    const raw = file.data[store];
+    const list = single ? (raw === null || raw === undefined ? [] : [raw]) : raw;
+    if (!Array.isArray(list)) return { ok: false, error: `Sauvegarde abîmée (${store}) : rien n'a été modifié.` };
+    /** @type {Record<string, unknown>[]} */
+    const records = [];
+    for (const r of list) {
+      const key = typeof r === 'object' && r !== null ? /** @type {Record<string, unknown>} */ (r)[id] : undefined;
+      if ((typeof key !== 'string' || !key) && typeof key !== 'number') return { ok: false, error: `Sauvegarde abîmée (${store}) : rien n'a été modifié.` };
+      if (store === 'settings' && privateSettings.has(String(key))) continue;
+      records.push(/** @type {Record<string, unknown>} */ (r));
+    }
+    writes.push({ store, records });
+  }
+  if (!writes.length) return { ok: false, error: 'Aucune donnée MealDom dans ce fichier.' };
+  const count = (/** @type {string} */ store) => writes.find((w) => w.store === store)?.records.length ?? 0;
+  return {
+    ok: true,
+    plan: {
+      writes,
+      exportDate: file.exportDate,
+      applicationVersion: file.applicationVersion,
+      counts: { meals: count('meals'), weights: count('weights'), recipes: count('userRecipes'), prices: count('priceHistory') },
+    },
+  };
+}
+
+/**
  * Nom du fichier d'export, ex. "mealdom-sauvegarde-2026-10-03.json".
  * @param {Date} now
  * @returns {string}

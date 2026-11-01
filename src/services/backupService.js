@@ -1,22 +1,18 @@
-import { APP_VERSION, SCHEMA_VERSION, BACKUP_REMINDER_DAYS } from '../config.js';
-import { buildExport, exportFileName, isBackupReminderDue } from '../domain/backup/backup.js';
-import { getAllSettings, getSetting, setSetting } from '../db/repositories/settingsRepository.js';
-import { loadHouseholdRecord } from '../db/repositories/householdRepository.js';
-import { getAllMeals } from '../db/repositories/mealRepository.js';
-import { getInventory, getPackages, getShoppingLists } from '../db/repositories/shoppingRepository.js';
-import { getStores, getPrices, getBudgetRecord, getExpenses } from '../db/repositories/budgetRepository.js';
-import { getConversations, getHistory, getPreferences } from '../db/repositories/assistantRepository.js';
-import { getDriveProducts, getDriveOrders } from '../db/repositories/driveRepository.js';
-import { getProgramRecord, getWeights } from '../db/repositories/programRepository.js';
-import { getTrips } from '../db/repositories/tripRepository.js';
-import { getPriceHistory } from '../db/repositories/priceHistoryRepository.js';
-import { getUserRecipes } from '../db/repositories/recipeRepository.js';
-import { getBarcodes } from '../db/repositories/barcodeRepository.js';
+import { APP_VERSION, BACKUP_REMINDER_DAYS } from '../config.js';
+import { buildExport, exportFileName, isBackupReminderDue, restorePlan, BACKUP_STORES } from '../domain/backup/backup.js';
+import { openDatabase, promisify } from '../db/database.js';
+import { DB_VERSION } from '../db/migrations.js';
+import { getSetting, setSetting } from '../db/repositories/settingsRepository.js';
+
+/** @typedef {import('../domain/backup/backup.js').RestorePlan} RestorePlan */
 
 /** Reglages jamais exportes : la cle API de l'assistant reste sur l'appareil. */
 const PRIVATE_SETTINGS = new Set(['assistantApiKey']);
 
 const LAST_EXPORT_KEY = 'lastExportAt';
+
+/** Identifiant des magasins a un seul enregistrement (foyer, budget, programme). */
+const SINGLE_ID = 'main';
 
 /**
  * Date ISO du dernier export, ou null.
@@ -33,46 +29,36 @@ export async function isReminderDue() {
 }
 
 /**
- * Exporte toutes les donnees locales dans un fichier JSON telecharge.
+ * Fin d'une transaction IndexedDB (rejetee si elle est annulee : rien n'est alors ecrit).
+ * @param {IDBTransaction} tx
+ * @returns {Promise<void>}
+ */
+function completion(tx) {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error ?? new Error('Transaction annulée'));
+  });
+}
+
+/**
+ * Exporte toutes les donnees locales dans un fichier JSON telecharge : chaque magasin de la
+ * base (meme liste que la restauration), sauf les reglages prives.
  * @returns {Promise<void>}
  */
 export async function exportData() {
   const now = new Date();
-  const [allSettings, household, meals, inventory, packages, shoppingLists, stores, prices, budget, expenses] = await Promise.all([
-    getAllSettings(),
-    loadHouseholdRecord(),
-    getAllMeals(),
-    getInventory(),
-    getPackages(),
-    getShoppingLists(),
-    getStores(),
-    getPrices(),
-    getBudgetRecord(),
-    getExpenses(),
-  ]);
-  const [conversations, changeHistory, preferences, driveProducts, driveOrders, program, weights, shoppingTrips, priceHistory, userRecipes, barcodes] = await Promise.all([
-    getConversations(),
-    getHistory(),
-    getPreferences(),
-    getDriveProducts(),
-    getDriveOrders(),
-    getProgramRecord(),
-    getWeights(),
-    getTrips(),
-    getPriceHistory(),
-    getUserRecipes(),
-    getBarcodes(),
-  ]);
-  const settings = allSettings.filter((s) => !PRIVATE_SETTINGS.has(s.key));
-  const file = buildExport({
-    schemaVersion: SCHEMA_VERSION,
-    applicationVersion: APP_VERSION,
-    data: {
-      settings, household, meals, inventory, packages, shoppingLists, stores, prices, budget, expenses,
-      conversations, changeHistory, preferences, driveProducts, driveOrders, program, weights, shoppingTrips, priceHistory, userRecipes, barcodes,
-    },
-    now,
+  const db = await openDatabase();
+  const tx = db.transaction(BACKUP_STORES.map((s) => s.store));
+  const all = await Promise.all(BACKUP_STORES.map((s) => promisify(tx.objectStore(s.store).getAll())));
+  /** @type {Record<string, unknown>} */
+  const data = {};
+  BACKUP_STORES.forEach(({ store, id, single }, i) => {
+    const records = /** @type {Record<string, unknown>[]} */ (all[i]);
+    if (single) data[store] = records.find((r) => r[id] === SINGLE_ID) ?? null;
+    else data[store] = store === 'settings' ? records.filter((r) => !PRIVATE_SETTINGS.has(String(r.key))) : records;
   });
+  const file = buildExport({ schemaVersion: DB_VERSION, applicationVersion: APP_VERSION, data, now });
   const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -83,4 +69,48 @@ export async function exportData() {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   await setSetting(LAST_EXPORT_KEY, now.toISOString());
+}
+
+/**
+ * Lit et verifie un fichier de sauvegarde, sans rien ecrire.
+ * @param {File} file
+ * @returns {Promise<{ ok: true, plan: RestorePlan } | { ok: false, error: string }>}
+ */
+export async function readBackup(file) {
+  /** @type {unknown} */
+  let value;
+  try {
+    value = JSON.parse(await file.text());
+  } catch {
+    return { ok: false, error: 'Ce fichier n’est pas une sauvegarde MealDom (contenu illisible).' };
+  }
+  return restorePlan(value, DB_VERSION, PRIVATE_SETTINGS);
+}
+
+/**
+ * Remplace les donnees de l'appareil par celles de la sauvegarde, en une seule transaction :
+ * tout est ecrit, ou rien (fichier abime, place insuffisante). La cle de l'assistant reste.
+ * @param {RestorePlan} plan
+ * @returns {Promise<void>}
+ */
+export async function applyBackup(plan) {
+  // Reglages prives lus avant : ils sont remis apres le remplacement des reglages.
+  const kept = [];
+  for (const key of PRIVATE_SETTINGS) {
+    const value = await getSetting(key);
+    if (value !== null) kept.push({ key, value });
+  }
+  const db = await openDatabase();
+  const tx = db.transaction(plan.writes.map((w) => w.store), 'readwrite');
+  const done = completion(tx);
+  for (const { store, records } of plan.writes) {
+    const target = tx.objectStore(store);
+    target.clear();
+    for (const r of records) target.put(r);
+    if (store !== 'settings') continue;
+    for (const record of kept) target.put(record);
+    // Les donnees sont celles de la sauvegarde : elle compte comme derniere sauvegarde.
+    if (!records.some((r) => r.key === LAST_EXPORT_KEY)) target.put({ key: LAST_EXPORT_KEY, value: plan.exportDate });
+  }
+  await done;
 }
