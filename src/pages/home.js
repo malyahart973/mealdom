@@ -5,7 +5,11 @@ import { getHousehold } from '../services/householdService.js';
 import { getMeals } from '../services/planningService.js';
 import { SLOTS, plannedEntries, slotKey, mealPortionsFor } from '../domain/planning/planning.js';
 import { toIsoDate, addDays } from '../domain/planning/dates.js';
-import { programSummary } from '../services/programService.js';
+import { programSummary, getWeights, getMeasurements, saveWeight, saveMeasurement } from '../services/programService.js';
+import { parseKg, sortEntries } from '../domain/nutrition/weight.js';
+import { parseCm, checkInReport } from '../domain/nutrition/measurements.js';
+import { shareText } from '../utils/share.js';
+import { REPORT_SHARE_STATUS } from './weight.js';
 import { plannedKcalForDay, hourText } from '../domain/nutrition/program.js';
 import { calorieRingSvg } from './calorieRing.js';
 import { totalMinutes } from '../domain/recipes/recipes.js';
@@ -25,7 +29,19 @@ import { nextCheckIn } from '../domain/nutrition/coach.js';
  */
 export async function renderHome(el) {
   const today = formatDayLong(new Date());
-  const [reminder, household, meals, program, trip, stores, inventory, season, coach] = await Promise.all([isReminderDue(), getHousehold(), getMeals(), programSummary(), nextTrip(), getStores(), getInventory(), seasonNow(), getCoachPlan()]);
+  const [reminder, household, meals, program, trip, stores, inventory, season, coach, weights, measurements] = await Promise.all([
+    isReminderDue(),
+    getHousehold(),
+    getMeals(),
+    programSummary(),
+    nextTrip(),
+    getStores(),
+    getInventory(),
+    seasonNow(),
+    getCoachPlan(),
+    getWeights(),
+    getMeasurements(),
+  ]);
   const storeNames = new Map(stores.map((s) => [s.id, s.name]));
   const todayIso = toIsoDate(new Date());
   const entries = plannedEntries(meals);
@@ -136,10 +152,30 @@ export async function renderHome(el) {
       // Bilan du coach (poids, mensurations) aujourd'hui ou dans les 2 jours.
       const check = coach ? nextCheckIn(coach, addDays(todayIso, -1)) : null;
       if (!check || check > addDays(todayIso, 2)) return '';
-      return `<section class="notice" aria-labelledby="checkin-title">
-          <h2 id="checkin-title">Bilan pour votre coach ${check === todayIso ? 'aujourd’hui' : escapeHtml(formatIsoDay(check))}</h2>
-          <p>Pesez-vous le matin à jeun et prenez vos mensurations, puis envoyez le bilan.</p>
-          <p><a class="button" href="#/poids">Pesée et mensurations</a></p>
+      const title = `<h2 id="checkin-title">Bilan pour votre coach ${check === todayIso ? 'aujourd’hui' : escapeHtml(formatIsoDay(check))}</h2>`;
+      if (check > todayIso) {
+        return `<section class="notice" aria-labelledby="checkin-title">${title}
+            <p>Ce jour-là, pesez-vous le matin à jeun et mesurez votre tour de taille : vous pourrez le noter ici, puis envoyer le bilan.</p>
+          </section>`;
+      }
+      // Le jour du bilan (ou le lendemain) : pesee et tour de taille notes ici, puis bilan envoye.
+      const kg = weights.find((w) => w.date === todayIso)?.kg;
+      const waist = measurements.find((m) => m.date === todayIso)?.values.waist;
+      return `<section class="notice" aria-labelledby="checkin-title">${title}
+          <form class="checkin" data-form="checkin" novalidate>
+            <p>Pesez-vous le matin à jeun et mesurez votre tour de taille (au nombril, ventre relâché).</p>
+            <div class="when">
+              <div class="field"><label for="ci-kg">Poids (kg)</label><input id="ci-kg" type="text" inputmode="decimal" autocomplete="off" value="${kg ? escapeHtml(formatNumber(kg)) : ''}" placeholder="ex. 84,6" /></div>
+              <div class="field"><label for="ci-waist">Tour de taille (cm)</label><input id="ci-waist" type="text" inputmode="decimal" autocomplete="off" value="${waist ? escapeHtml(formatNumber(waist)) : ''}" placeholder="ex. 92" /></div>
+            </div>
+            <p class="alert" role="alert" hidden></p>
+            <p class="form-actions">
+              <button type="submit" class="button${kg ? ' button--secondary' : ''}">${kg ? 'Corriger' : 'Enregistrer'}</button>
+              ${kg ? '<button type="button" class="button" data-action="share-checkin">Envoyer mon bilan</button>' : ''}
+            </p>
+            <p class="status" role="status" data-checkin-status></p>
+            <p><a href="#/poids">Autres mensurations et courbe</a></p>
+          </form>
         </section>`;
     })()}
     ${
@@ -171,6 +207,42 @@ export async function renderHome(el) {
         : ''
     }
   `;
+
+  const checkin = /** @type {HTMLFormElement | null} */ (el.querySelector('[data-form="checkin"]'));
+  checkin?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const alertBox = /** @type {HTMLElement} */ (checkin.querySelector('.alert'));
+    const kgText = /** @type {HTMLInputElement} */ (checkin.querySelector('#ci-kg')).value.trim();
+    const waistText = /** @type {HTMLInputElement} */ (checkin.querySelector('#ci-waist')).value.trim();
+    /** @type {string[]} */
+    const errors = [];
+    if (!kgText && !waistText) errors.push('Indiquez votre poids, votre tour de taille, ou les deux.');
+    if (kgText) {
+      const previous = weights.find((w) => w.date === todayIso);
+      errors.push(...(await saveWeight({ date: todayIso, kg: parseKg(kgText), note: previous?.note ?? '' })));
+    }
+    if (waistText) {
+      const cm = parseCm(waistText);
+      const previous = measurements.find((m) => m.date === todayIso);
+      if (cm === null) errors.push('Le tour de taille doit être un nombre de centimètres, par exemple 92.');
+      else errors.push(...(await saveMeasurement({ date: todayIso, values: { ...(previous?.values ?? {}), waist: cm }, note: previous?.note ?? '' })));
+    }
+    if (errors.length) {
+      alertBox.hidden = false;
+      alertBox.innerHTML = errors.map((e) => escapeHtml(e)).join('<br />');
+      return;
+    }
+    await renderHome(el);
+    const status = el.querySelector('[data-checkin-status]');
+    if (status) status.textContent = 'Enregistré. Envoyez maintenant le bilan à votre coach.';
+    el.querySelector('[data-form="checkin"]')?.scrollIntoView({ block: 'center' });
+  });
+  el.querySelector('[data-action="share-checkin"]')?.addEventListener('click', async () => {
+    const [w, m] = await Promise.all([getWeights(), getMeasurements()]);
+    const result = await shareText('Mon bilan', checkInReport(sortEntries(w), m, todayIso, formatIsoDay));
+    const status = /** @type {HTMLElement} */ (el.querySelector('[data-checkin-status]'));
+    status.textContent = REPORT_SHARE_STATUS[result];
+  });
 
   const button = el.querySelector('[data-action="export"]');
   button?.addEventListener('click', async () => {

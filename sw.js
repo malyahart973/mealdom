@@ -74,6 +74,7 @@ const APP_FILES = [
   './src/utils/download.js',
   './src/utils/quantity.js',
   './src/utils/forms.js',
+  './src/utils/share.js',
   './src/domain/household/household.js',
   './src/domain/household/compatibility.js',
   './src/db/repositories/householdRepository.js',

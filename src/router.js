@@ -117,12 +117,13 @@ const routes = [
     parent: () => '/foyer',
   },
   { pattern: /^\/parametres$/, title: 'Paramètres', tab: '/plus', render: renderSettings, parent: () => '/plus' },
-  { pattern: /^\/assistant$/, title: 'Assistant', tab: '/planning', render: renderAssistant, parent: () => '/planning' },
+  // Assistant : un seul ecran (Planifier ma semaine), la demande libre ouverte.
+  { pattern: /^\/assistant$/, title: 'Assistant', tab: '/planning', render: (el) => renderPlanWeek(el, { ask: '1' }), parent: () => '/planning' },
   {
     pattern: /^\/assistant\/semaine\/(?<date>\d{4}-\d{2}-\d{2})$/,
     title: 'Assistant',
     tab: '/planning',
-    render: renderAssistant,
+    render: (el, p) => renderPlanWeek(el, { ...p, ask: '1' }),
     parent: (p) => `/planning/semaine/${p.date}`,
   },
   {

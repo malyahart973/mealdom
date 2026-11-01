@@ -3,15 +3,12 @@ import { formatIsoDay, formatIsoDayMonth, formatPortions } from '../utils/format
 import { addDays, toIsoDate, weekDays, weekStart, parseIsoDate } from '../domain/planning/dates.js';
 import { SLOTS, mealPortionsFor, planningGrid, SLOT_LABELS } from '../domain/planning/planning.js';
 import { getMeals, getShowBreakfast, setShowBreakfast, getShowSnack, getShowMorningSnack, setShowMorningSnack, setShowSnack } from '../services/planningService.js';
-import { mountAssistant } from './assistantPanel.js';
 import { getHousehold } from '../services/householdService.js';
 
 /** @typedef {import('../domain/planning/planning.js').PlannedEntry} PlannedEntry */
 /** @typedef {import('../domain/household/household.js').Household} Household */
 
 
-/** L'assistant reste ouvert pendant la navigation dans le planning. */
-let assistantOpen = false;
 
 /**
  * @param {PlannedEntry} entry
@@ -58,12 +55,10 @@ export async function renderPlanning(el, params) {
   const grid = planningGrid(meals, weekDays(monday), slots);
 
   el.innerHTML = `
-    <div class="planning-layout${assistantOpen ? ' planning-layout--assistant' : ''}">
-    <section class="planning-layout__main">
+    <section>
       <h1 class="page-title">Planning</h1>
       <p class="actions form-actions">
         <a class="button" href="#/assistant/planifier/${monday}">Planifier ma semaine</a>
-        <button type="button" class="button button--secondary" data-action="assistant" aria-expanded="${assistantOpen}">${assistantOpen ? 'Fermer l’assistant' : 'Parler à l’assistant'}</button>
       </p>
       <nav class="week-nav" aria-label="Changer de semaine">
         <a href="#/planning/semaine/${addDays(monday, -7)}" aria-label="Semaine précédente">‹</a>
@@ -101,8 +96,6 @@ export async function renderPlanning(el, params) {
       <label class="check"><input type="checkbox" data-action="morning-snack"${showMorningSnack ? ' checked' : ''} /> <span>Planifier aussi la collation du matin</span></label>
       <label class="check"><input type="checkbox" data-action="snack"${showSnack ? ' checked' : ''} /> <span>Planifier aussi le goûter</span></label>
     </section>
-    <aside class="planning-layout__assistant" data-assistant${assistantOpen ? '' : ' hidden'} aria-label="Assistant"></aside>
-    </div>
   `;
 
   el.querySelector('[data-action="breakfast"]')?.addEventListener('change', async (event) => {
@@ -117,30 +110,4 @@ export async function renderPlanning(el, params) {
     await setShowSnack(/** @type {HTMLInputElement} */ (event.target).checked);
     await renderPlanning(el, params);
   });
-
-  const dock = /** @type {HTMLElement} */ (el.querySelector('[data-assistant]'));
-  const openAssistant = () => mountAssistant(dock, { monday, onPlanChange: () => refreshGrid(el, params) });
-  el.querySelector('[data-action="assistant"]')?.addEventListener('click', async () => {
-    assistantOpen = !assistantOpen;
-    await renderPlanning(el, params);
-    if (assistantOpen) dock.scrollIntoView({ block: 'start' });
-  });
-  if (assistantOpen) await openAssistant();
-}
-
-/**
- * Apres un changement accepte : seule la grille de la semaine est redessinee,
- * la conversation reste a l'ecran.
- * @param {HTMLElement} el
- * @param {Record<string, string>} params
- */
-async function refreshGrid(el, params) {
-  const holder = document.createElement('div');
-  const keep = assistantOpen;
-  assistantOpen = false;
-  await renderPlanning(holder, params);
-  assistantOpen = keep;
-  const fresh = holder.querySelector('.week');
-  const current = el.querySelector('.week');
-  if (fresh && current) current.replaceWith(fresh);
 }

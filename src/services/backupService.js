@@ -42,9 +42,11 @@ function completion(tx) {
 }
 
 /**
- * Exporte toutes les donnees locales dans un fichier JSON telecharge : chaque magasin de la
- * base (meme liste que la restauration), sauf les reglages prives.
- * @returns {Promise<void>}
+ * Exporte toutes les donnees locales dans un fichier JSON : chaque magasin de la base (meme
+ * liste que la restauration), sauf les reglages prives. Sur telephone, le fichier passe par le
+ * menu de partage (Enregistrer dans Fichiers / iCloud Drive, Google Drive...) ; ailleurs, ou si
+ * le partage n'est pas possible, il est telecharge.
+ * @returns {Promise<'shared' | 'downloaded' | 'cancelled'>}
  */
 export async function exportData() {
   const now = new Date();
@@ -58,17 +60,47 @@ export async function exportData() {
     if (single) data[store] = records.find((r) => r[id] === SINGLE_ID) ?? null;
     else data[store] = store === 'settings' ? records.filter((r) => !PRIVATE_SETTINGS.has(String(r.key))) : records;
   });
-  const file = buildExport({ schemaVersion: DB_VERSION, applicationVersion: APP_VERSION, data, now });
-  const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
+  const content = JSON.stringify(buildExport({ schemaVersion: DB_VERSION, applicationVersion: APP_VERSION, data, now }), null, 2);
+  const name = exportFileName(now);
+  const result = (await shareFile(content, name)) ?? downloadFile(content, name);
+  if (result !== 'cancelled') await setSetting(LAST_EXPORT_KEY, now.toISOString());
+  return result;
+}
+
+/**
+ * Partage le fichier (telephone). null si le partage n'est pas possible : on telecharge alors.
+ * @param {string} content
+ * @param {string} name
+ * @returns {Promise<'shared' | 'cancelled' | null>}
+ */
+async function shareFile(content, name) {
+  const phone = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  const file = new File([content], name, { type: 'application/json' });
+  if (!phone || !navigator.canShare?.({ files: [file] })) return null;
+  try {
+    await navigator.share({ files: [file], title: 'Sauvegarde MealDom' });
+    return 'shared';
+  } catch (error) {
+    // Fermeture du menu par la personne : rien n'est sauvegarde. Autre refus : telechargement.
+    return error instanceof DOMException && error.name === 'AbortError' ? 'cancelled' : null;
+  }
+}
+
+/**
+ * @param {string} content
+ * @param {string} name
+ * @returns {'downloaded'}
+ */
+function downloadFile(content, name) {
+  const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = exportFileName(now);
+  link.download = name;
   document.body.append(link);
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  await setSetting(LAST_EXPORT_KEY, now.toISOString());
+  return 'downloaded';
 }
 
 /**

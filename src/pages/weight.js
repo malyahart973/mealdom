@@ -8,6 +8,14 @@ import { MEASURES, parseCm, measurementChanges, checkInReport } from '../domain/
 import { nextCheckIn } from '../domain/nutrition/coach.js';
 import { getCoachPlan } from '../services/coachService.js';
 import { drawWeightChart } from './weightChart.js';
+import { shareText } from '../utils/share.js';
+
+/** Message apres « Envoyer mon bilan » (partage, copie ou echec). */
+export const REPORT_SHARE_STATUS = {
+  shared: '',
+  copied: 'Bilan copié : collez-le dans votre message au coach.',
+  failed: 'Partage impossible : allez dans « Pesée et mensurations », sélectionnez le texte du bilan et copiez-le.',
+};
 
 /** @typedef {import('../domain/nutrition/weight.js').WeightProgress} WeightProgress */
 
@@ -212,17 +220,7 @@ export async function renderWeight(el) {
 
   el.querySelector('[data-action="share-report"]')?.addEventListener('click', async () => {
     const status = /** @type {HTMLElement} */ (el.querySelector('[data-share-status]'));
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: 'Mon bilan', text: report });
-        status.textContent = '';
-      } else {
-        await navigator.clipboard.writeText(report);
-        status.textContent = 'Bilan copié : collez-le dans votre message au coach.';
-      }
-    } catch (error) {
-      if (!(error instanceof DOMException && error.name === 'AbortError')) status.textContent = 'Partage impossible : sélectionnez le texte du bilan et copiez-le.';
-    }
+    status.textContent = REPORT_SHARE_STATUS[await shareText('Mon bilan', report)];
   });
 
   el.querySelector('[data-table="weights"]')?.addEventListener('click', async (event) => {

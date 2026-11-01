@@ -14,6 +14,7 @@ import { loadAvailability } from '../services/territoryService.js';
 import { usableSubstitute } from '../domain/ingredients/territory.js';
 import { substitutesFor } from '../domain/assistant/substitutes.js';
 import { GUYANE_HINTS, WHERE_LABELS } from '../data/territory.js';
+import { shareText } from '../utils/share.js';
 
 /** @typedef {import('../domain/shopping/shopping.js').ShoppingLine} ShoppingLine */
 
@@ -213,19 +214,9 @@ export async function renderShopping(el, params) {
       describe: buyText,
     });
     const box = /** @type {HTMLElement} */ (el.querySelector('[data-alert="share"]'));
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: 'Liste de courses', text });
-        return;
-      }
-      await navigator.clipboard.writeText(text);
-      box.textContent = 'Liste copiée : collez-la dans WhatsApp, un SMS ou vos notes.';
-      box.hidden = false;
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return; // partage annule par l'utilisateur
-      box.textContent = 'Le partage n’est pas disponible sur ce navigateur.';
-      box.hidden = false;
-    }
+    const result = await shareText('Liste de courses', text);
+    box.hidden = result === 'shared';
+    box.textContent = result === 'copied' ? 'Liste copiée : collez-la dans WhatsApp, un SMS ou vos notes.' : 'Le partage n’est pas disponible sur ce navigateur.';
   });
 
   el.querySelector('[data-list="extras"]')?.addEventListener('click', async (event) => {

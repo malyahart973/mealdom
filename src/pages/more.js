@@ -27,7 +27,7 @@ const SECTIONS = [
   {
     title: 'Assistant et réglages',
     links: [
-      ['#/assistant', 'Assistant', 'Modifier le planning en le demandant simplement'],
+      ['#/assistant/planifier', 'Assistant', 'Planifier ma semaine, ou demander ce que vous voulez'],
       ['#/parametres', 'Paramètres', 'Sauvegarde, assistant IA, préférences retenues, version'],
     ],
   },

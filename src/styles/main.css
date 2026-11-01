@@ -1331,32 +1331,6 @@ h3 {
   color: var(--ink);
 }
 
-/* ---------- Planning avec l'assistant ---------- */
-
-@media (min-width: 64rem) {
-  .view:has(.planning-layout--assistant) {
-    max-width: 80rem;
-  }
-
-  .planning-layout--assistant {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 28rem);
-    gap: var(--space-6);
-    align-items: start;
-  }
-
-  .planning-layout--assistant .planning-layout__assistant {
-    position: sticky;
-    top: var(--space-4);
-    max-height: calc(100dvh - var(--space-8));
-    overflow-y: auto;
-  }
-}
-
-.planning-layout__assistant {
-  margin-top: var(--space-6);
-}
-
 /* ---------- Assistant ---------- */
 
 .assistant {
@@ -2292,59 +2266,6 @@ line.series-3 {
 }
 
 /* ---------- Assistant guide : « Planifier ma semaine » ---------- */
-
-.assist-actions {
-  display: grid;
-  gap: var(--space-3);
-  margin: var(--space-4) 0 var(--space-6);
-}
-
-.assist-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  width: 100%;
-  padding: var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--ink);
-  font: inherit;
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.assist-card strong {
-  font-family: var(--font-display);
-  font-size: 1.125rem;
-}
-
-.assist-card span {
-  color: var(--muted);
-  font-size: 0.9375rem;
-}
-
-.assist-card--main {
-  border-color: var(--leaf);
-  background: var(--leaf);
-  color: #fff;
-}
-
-.assist-card--main span {
-  color: inherit;
-  opacity: 0.9;
-}
-
-@media (prefers-color-scheme: dark) {
-  .assist-card--main {
-    color: var(--paper);
-  }
-}
-
-.assist-card:disabled {
-  opacity: 0.6;
-}
 
 .guided__step {
   min-width: 0;

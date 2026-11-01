@@ -35,7 +35,7 @@ export async function renderSettings(el) {
         <label for="restore-file" class="button button--secondary">Restaurer une sauvegarde</label>
       </p>
       <input id="restore-file" type="file" accept=".json,application/json" class="visually-hidden" />
-      <p class="hint">Le fichier exporté se trouve ensuite dans vos téléchargements. Gardez-le en lieu sûr. La clé de l’assistant IA n’y figure jamais. « Restaurer » remet les données d’un fichier exporté (nouveau téléphone, autre navigateur…) à la place de celles de cet appareil.</p>
+      <p class="hint">Sur téléphone, le menu de partage s’ouvre : choisissez « Enregistrer dans Fichiers » (iCloud Drive) ou Google Drive pour garder la sauvegarde hors du téléphone. Sur ordinateur, elle va dans les téléchargements. La clé de l’assistant IA n’y figure jamais. « Restaurer » remet les données d’un fichier exporté (nouveau téléphone, autre navigateur…) à la place de celles de cet appareil.</p>
       <p class="alert" role="alert" data-restore-alert hidden></p>
       <p class="status" role="status" data-restore-status></p>
 
@@ -65,8 +65,10 @@ export async function renderSettings(el) {
   `;
 
   el.querySelector('[data-action="export"]')?.addEventListener('click', async () => {
-    await exportData();
+    const result = await exportData();
     await renderSettings(el);
+    /** @type {HTMLElement} */ (el.querySelector('[data-restore-status]')).textContent =
+      result === 'shared' ? 'Sauvegarde partagée.' : result === 'downloaded' ? 'Sauvegarde enregistrée dans les téléchargements.' : 'Export annulé : rien n’a été sauvegardé.';
   });
   el.querySelector('#restore-file')?.addEventListener('change', async (event) => {
     const input = /** @type {HTMLInputElement} */ (event.target);

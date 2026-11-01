@@ -19,14 +19,18 @@ import {
   rejectProposal,
   weekHistory,
   undoChange,
+  fitBudget,
 } from '../services/assistantService.js';
+import { mountAssistant } from './assistantPanel.js';
 
 /** @typedef {import('../domain/planning/planning.js').Slot} Slot */
 /** @typedef {import('../domain/assistant/guided.js').GuidedChoices} GuidedChoices */
 
 /**
  * Parcours guide, etape des choix.
- * Adresses : #/assistant/planifier, #/assistant/planifier/AAAA-MM-JJ
+ * Ecran unique de l'assistant : les trois questions, puis la demande libre (ecrite ou dictee).
+ * Adresses : #/assistant/planifier[/AAAA-MM-JJ] ; #/assistant et #/assistant/semaine/AAAA-MM-JJ
+ * ouvrent directement la demande libre.
  * @param {HTMLElement} el
  * @param {Record<string, string>} params
  */
@@ -125,9 +129,14 @@ export async function renderPlanWeek(el, params) {
         <p class="status" aria-live="polite"></p>
         <div class="form-actions">
           <button type="submit" class="button">Voir ma semaine</button>
-          <a class="button button--secondary" href="#/assistant/semaine/${monday}">Écrire une demande libre</a>
         </div>
       </form>
+
+      <details class="settings-block ask" id="demander"${params.ask ? ' open' : ''}>
+        <summary><h2>Ou demandez-le simplement</h2><span class="hint">Écrivez ou dictez : « plus de poisson », « remplace le dîner de mardi », « ajuste à mon budget »…</span></summary>
+        <p><button type="button" class="button button--secondary" data-fit>Ajuster mes courses au budget</button></p>
+        <div data-assistant></div>
+      </details>
     </section>`;
 
   const form = /** @type {HTMLFormElement} */ (el.querySelector('form'));
@@ -180,6 +189,32 @@ export async function renderPlanWeek(el, params) {
     }),
   );
   syncBatch();
+
+  // --- Demande libre : la conversation de la semaine choisie, ouverte a la demande ---
+  const ask = /** @type {HTMLDetailsElement} */ (el.querySelector('#demander'));
+  const dock = /** @type {HTMLElement} */ (el.querySelector('[data-assistant]'));
+  const chosenWeek = () => String(new FormData(form).get('week') ?? monday);
+  let chatWeek = '';
+  const mountChat = async () => {
+    if (!ask.open || chatWeek === chosenWeek()) return;
+    chatWeek = chosenWeek();
+    await mountAssistant(dock, { monday: chatWeek });
+  };
+  ask.addEventListener('toggle', mountChat);
+  form.addEventListener('change', mountChat);
+  if (ask.open) {
+    await mountChat();
+    ask.scrollIntoView({ block: 'start' });
+  }
+  el.querySelector('[data-fit]')?.addEventListener('click', async (event) => {
+    const button = /** @type {HTMLButtonElement} */ (event.currentTarget);
+    button.disabled = true;
+    await fitBudget(chosenWeek());
+    chatWeek = '';
+    await mountChat();
+    button.disabled = false;
+    dock.querySelector('.proposal:last-of-type, .chat__msg:last-child')?.scrollIntoView({ block: 'start' });
+  });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
