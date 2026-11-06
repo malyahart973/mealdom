@@ -38,6 +38,7 @@ import { measurementChanges } from '../domain/nutrition/measurements.js';
 import { nextCheckIn } from '../domain/nutrition/coach.js';
 import { getCoachPlan } from '../services/coachService.js';
 import { coachBlockHtml, bindCoachBlock } from './coach.js';
+import { guidedDefaults } from '../services/assistantService.js';
 import { getHousehold } from '../services/householdService.js';
 import { getMeals } from '../services/planningService.js';
 import { plannedEntries } from '../domain/planning/planning.js';
@@ -85,7 +86,7 @@ function sportRowHtml(index, s) {
  */
 export async function renderProgram(el) {
   const today = toIsoDate(new Date());
-  const [program, entries, household, meals, coach, measurements] = await Promise.all([getProgram(), getWeights(), getHousehold(), getMeals(), getCoachPlan(), getMeasurements()]);
+  const [program, entries, household, meals, coach, measurements, guided] = await Promise.all([getProgram(), getWeights(), getHousehold(), getMeals(), getCoachPlan(), getMeasurements(), guidedDefaults()]);
   const valid = validateProgram(program, today).length === 0;
   const sorted = sortEntries(entries);
   const currentKg = sorted.length ? sorted[sorted.length - 1].kg : program.startWeightKg;
@@ -163,7 +164,7 @@ export async function renderProgram(el) {
       ${followHtml}
       ${
         coach
-          ? coachBlockHtml(coach, program)
+          ? coachBlockHtml(coach, program, Boolean(guided.choices.leftovers))
           : !valid
           ? startHtml
           : base && day && perMeal && perMealToday && trame && currentBmi !== null

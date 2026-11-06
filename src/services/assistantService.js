@@ -544,23 +544,26 @@ async function coachOperations(choices, env) {
   const [plan, program] = await Promise.all([getCoachPlan(), getProgram()]);
   if (!plan) return null;
   const slots = /** @type {Slot[]} */ (plan.meals.map((m) => m.slot).filter((s) => choices.slots.includes(s)));
-  const { picks, notes } = planCoachWeek(plan, {
+  const { picks, notes, removals } = planCoachWeek(plan, {
     days: env.days.filter((d) => d >= env.today),
     slots,
     meals: env.meals,
     redo: !choices.keepExisting,
     sportDays: new Set(program.sport.map((s) => s.day)),
     allowed: (recipe) => evaluateRecipeForHousehold(recipe, env.household, filterContext).status === 'compatible',
+    leftovers: Boolean(choices.leftovers),
   });
+  // D'abord les dejeuners remplaces par la boite du diner de la veille (la case doit etre libre).
   /** @type {Operation[]} */
-  const operations = [];
+  const operations = removals.map((mealId) => ({ type: /** @type {const} */ ('remove_meal'), mealId, reason: 'Remplacé par la boîte préparée avec le dîner de la veille.' }));
   for (const pick of picks) {
     registerPlannedRecipe(pick.recipe);
-    const reason = 'Programme de votre coach : quantités et aliments de son plan.';
-    if (pick.mealId) operations.push({ type: 'replace_recipe', mealId: pick.mealId, recipeId: pick.recipe.id, reason });
-    else operations.push({ type: 'add_meal', date: pick.date, slot: pick.slot, recipeId: pick.recipe.id, guests: 0, reason });
+    const reason = pick.nextLunch ? 'Programme de votre coach : dîner et boîte de demain midi en une seule cuisson, chacun à ses quantités.' : 'Programme de votre coach : quantités et aliments de son plan.';
+    if (pick.mealId) {
+      operations.push({ type: 'replace_recipe', mealId: pick.mealId, recipeId: pick.recipe.id, reason });
+      if (pick.nextLunch && !env.meals.find((m) => m.id === pick.mealId)?.nextLunch) operations.push({ type: 'set_next_lunch', mealId: pick.mealId, reason });
+    } else operations.push({ type: 'add_meal', date: pick.date, slot: pick.slot, recipeId: pick.recipe.id, guests: 0, reason, ...(pick.nextLunch ? { nextLunch: true } : {}) });
   }
-  if (choices.leftovers) notes.push('Les restes du dîner ne sont pas utilisés pour les repas du programme : le déjeuner et le dîner du coach n’ont pas les mêmes quantités.');
   return { operations, notes, slots };
 }
 
@@ -619,7 +622,7 @@ export async function previewProposal(monday, proposalId) {
           locked: meal?.locked ?? false,
           cooksNextLunch: Boolean(meal?.nextLunch),
           // Dejeuner servi par les restes du diner de la veille
-          leftoverOf: !meal && s.id === 'lunch' ? state.meals.find((m) => m.slot === 'dinner' && m.nextLunch && addDays(m.date, 1) === date)?.recipeName ?? null : null,
+          leftoverOf: !meal && s.id === 'lunch' ? state.meals.find((m) => m.slot === 'dinner' && m.nextLunch && addDays(m.date, 1) === date)?.recipeName.replace(/ \(\+ demain midi\)$/, '') ?? null : null,
         };
       }),
     }));
@@ -648,10 +651,20 @@ export async function swapProposalMeal(monday, proposalId, date, slot) {
   const pick = current?.recipeId.startsWith('coach-') ? await coachVariant(slot, current.recipeId, exclude, env) : engineIdea(proposal, date, slot, state, exclude, env);
   if (!pick) return { ok: false, message: current?.recipeId.startsWith('coach-') ? 'Je n’ai plus d’autre variante de ce repas dans le programme de votre coach.' : 'Je n’ai plus d’autre idée pour ce repas avec vos critères.' };
   const index = operationIndexFor(proposal.operations, { date, slot }, existing?.id ?? null);
+  const previous = index >= 0 ? proposal.operations[index] : null;
   /** @type {Operation} */
   const operation = existing
     ? { type: 'replace_recipe', mealId: existing.id, recipeId: pick.recipe.id, reason: pick.reason }
-    : { type: 'add_meal', date, slot, recipeId: pick.recipe.id, guests: index >= 0 && proposal.operations[index].type === 'add_meal' ? /** @type {{ guests: number }} */ (proposal.operations[index]).guests : 0, reason: pick.reason };
+    : {
+        type: 'add_meal',
+        date,
+        slot,
+        recipeId: pick.recipe.id,
+        guests: previous?.type === 'add_meal' ? previous.guests : 0,
+        reason: pick.reason,
+        // Un diner qui sert aussi le dejeuner du lendemain le garde.
+        ...(previous?.type === 'add_meal' && previous.nextLunch ? { nextLunch: true } : {}),
+      };
   if (index >= 0) proposal.operations[index] = operation;
   else proposal.operations.push(operation);
   proposal.seen = { ...(proposal.seen ?? {}), [key]: [...exclude] };
@@ -1212,6 +1225,48 @@ export async function undoChange(historyId) {
     ok: true,
     message: skipped.length ? `Changement annulé, sauf pour ${skipped.join(', ')} (modifié depuis).` : `Changement « ${entry.summary} » annulé.`,
   };
+}
+
+/**
+ * Repas a venir d'une semaine (aujourd'hui compris), que « Vider la semaine » retirerait.
+ * @param {string} monday
+ * @returns {Promise<Meal[]>}
+ */
+export async function upcomingWeekMeals(monday) {
+  const today = toIsoDate(new Date());
+  const end = addDays(monday, 7);
+  return (await getMeals()).filter((m) => m.date >= monday && m.date < end && m.date >= today);
+}
+
+/**
+ * « Vider la semaine » : retire tous les repas a venir de la semaine (verrouilles compris) pour
+ * repartir de zero. Les jours passes restent. Le changement rejoint l'historique : il s'annule.
+ * @param {string} monday
+ * @returns {Promise<{ removed: number, historyId: string | null }>}
+ */
+export async function clearWeek(monday) {
+  const meals = await upcomingWeekMeals(monday);
+  if (!meals.length) return { removed: 0, historyId: null };
+  for (const meal of meals) await deleteMealRecord(meal.id);
+  const [budget, priceData] = await Promise.all([getBudget(), loadPriceData()]);
+  /** @type {HistoryEntry} */
+  const entry = {
+    id: newMealId(),
+    week: monday,
+    proposalId: '',
+    summary: `Semaine vidée (${meals.length} repas)`,
+    createdAt: new Date().toISOString(),
+    before: { meals, weeklyBudgetCents: budget.weeklyCents, preferredProducts: priceData.settings.preferredProducts },
+    after: { meals: [], removedMealIds: meals.map((m) => m.id) },
+    touchedMealIds: meals.map((m) => m.id),
+    undone: false,
+  };
+  await historyStore.put(entry);
+  // Les propositions en attente portaient sur l'ancien planning.
+  const conv = await getConversation(monday);
+  for (const p of conv.proposals) if (p.status === 'pending') p.status = 'expired';
+  await saveConversation(conv);
+  return { removed: meals.length, historyId: entry.id };
 }
 
 /**

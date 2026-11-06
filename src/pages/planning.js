@@ -1,12 +1,17 @@
 import { escapeHtml } from '../utils/html.js';
 import { formatIsoDay, formatIsoDayMonth, formatPortions } from '../utils/format.js';
 import { addDays, toIsoDate, weekDays, weekStart, parseIsoDate } from '../domain/planning/dates.js';
-import { SLOTS, mealPortionsFor, planningGrid, SLOT_LABELS } from '../domain/planning/planning.js';
+import { SLOTS, mealPortionsFor, planningGrid, SLOT_LABELS, entryName } from '../domain/planning/planning.js';
 import { getMeals, getShowBreakfast, setShowBreakfast, getShowSnack, getShowMorningSnack, setShowMorningSnack, setShowSnack } from '../services/planningService.js';
 import { getHousehold } from '../services/householdService.js';
+import { clearWeek, undoChange } from '../services/assistantService.js';
 
 /** @typedef {import('../domain/planning/planning.js').PlannedEntry} PlannedEntry */
 /** @typedef {import('../domain/household/household.js').Household} Household */
+
+/** Derniere semaine videe, pour proposer « Annuler » juste apres. */
+/** @type {{ monday: string, historyId: string, removed: number } | null} */
+let lastCleared = null;
 
 
 
@@ -19,7 +24,7 @@ function entryHtml(entry, household) {
   const href = `#/planning/repas/${encodeURIComponent(entry.meal.id)}`;
   if (entry.kind === 'leftover') {
     return `<a class="slot__meal slot__meal--leftover" href="${href}">
-      <span class="slot__name">${escapeHtml(entry.meal.recipeName)}</span>
+      <span class="slot__name">${escapeHtml(entryName(entry))}</span>
       <span class="slot__meta">Restes du dîner, ${escapeHtml(formatPortions(mealPortionsFor(entry.meal, household).nextLunch))}</span>
     </a>`;
   }
@@ -53,6 +58,8 @@ export async function renderPlanning(el, params) {
 
   const slots = SLOTS.filter((s) => (showBreakfast || s.id !== 'breakfast') && (showMorningSnack || s.id !== 'morning_snack') && (showSnack || s.id !== 'snack')).map((s) => s.id);
   const grid = planningGrid(meals, weekDays(monday), slots);
+  // Repas a venir de la semaine (les jours passes restent quand on vide la semaine).
+  const upcoming = meals.filter((m) => m.date >= monday && m.date < addDays(monday, 7) && m.date >= today);
 
   el.innerHTML = `
     <section>
@@ -66,7 +73,15 @@ export async function renderPlanning(el, params) {
         <a href="#/planning/semaine/${addDays(monday, 7)}" aria-label="Semaine suivante">›</a>
       </nav>
       ${monday !== weekStart(today) ? '<p class="week-today"><a href="#/planning">Revenir à cette semaine</a></p>' : ''}
-      <p class="actions"><a class="button button--secondary" href="#/batch/semaine/${monday}">Préparer la semaine en batch cooking</a></p>
+      <p class="actions form-actions">
+        <a class="button button--secondary" href="#/batch/semaine/${monday}">Préparer la semaine en batch cooking</a>
+        ${upcoming.length ? '<button type="button" class="button button--danger" data-action="clear-week">Vider la semaine</button>' : ''}
+      </p>
+      ${
+        lastCleared?.monday === monday
+          ? `<p class="notice-inline" role="status">${lastCleared.removed} repas effacé${lastCleared.removed > 1 ? 's' : ''} : la semaine repart de zéro. <button type="button" class="button button--small button--secondary" data-action="undo-clear">Annuler</button></p>`
+          : ''
+      }
       <ol class="week">
         ${grid
           .map(
@@ -97,6 +112,23 @@ export async function renderPlanning(el, params) {
       <label class="check"><input type="checkbox" data-action="snack"${showSnack ? ' checked' : ''} /> <span>Planifier aussi le goûter</span></label>
     </section>
   `;
+
+  el.querySelector('[data-action="clear-week"]')?.addEventListener('click', async () => {
+    const locked = upcoming.filter((m) => m.locked).length;
+    const ok = window.confirm(
+      `Effacer les ${upcoming.length} repas prévus à partir d’aujourd’hui dans la semaine du ${formatIsoDayMonth(monday)}${locked ? `, dont ${locked} verrouillé${locked > 1 ? 's' : ''}` : ''} ?\n\nLes jours déjà passés restent. Vous pourrez annuler juste après.`,
+    );
+    if (!ok) return;
+    const result = await clearWeek(monday);
+    lastCleared = result.historyId ? { monday, historyId: result.historyId, removed: result.removed } : null;
+    await renderPlanning(el, params);
+  });
+  el.querySelector('[data-action="undo-clear"]')?.addEventListener('click', async () => {
+    if (!lastCleared) return;
+    await undoChange(lastCleared.historyId);
+    lastCleared = null;
+    await renderPlanning(el, params);
+  });
 
   el.querySelector('[data-action="breakfast"]')?.addEventListener('change', async (event) => {
     await setShowBreakfast(/** @type {HTMLInputElement} */ (event.target).checked);

@@ -80,7 +80,7 @@ export async function renderPlanWeek(el, params) {
             <label class="check"><input type="radio" name="keep" value="redo"${choices.keepExisting ? '' : ' checked'} /> <span>Tout refaire (sauf les repas verrouillés)</span></label>
           </div>
           <p class="notice-inline" data-planned hidden></p>
-          <label class="check"><input type="checkbox" name="leftovers"${choices.leftovers ? ' checked' : ''} /> <span>Les restes du dîner pour le déjeuner du lendemain (on cuisine plus le soir)</span></label>
+          <label class="check"><input type="checkbox" name="leftovers"${choices.leftovers ? ' checked' : ''} /> <span>Les restes du dîner pour le déjeuner du lendemain (on cuisine plus le soir${coachActive ? ' ; avec le programme du coach, la boîte suit les quantités de son déjeuner' : ''})</span></label>
           ${
             coachActive
               ? `<label class="check check--block"><input type="checkbox" name="followCoach"${choices.followCoach ? ' checked' : ''} /> <span><strong>Suivre le programme de mon coach</strong><span class="hint">Ses repas, ses grammages et ses alternatives ; la collation d’après le sport les jours de sport. <a href="#/programme">Voir le programme</a></span></span></label>`

@@ -18,6 +18,16 @@ export const SLOTS = [
   { id: 'dinner', label: 'Dîner' },
 ];
 
+/**
+ * Nom d'un plat a afficher : le dejeuner servi par les restes du diner ne repete pas
+ * « (+ demain midi) » (diner du programme du coach cuisine aussi pour la boite).
+ * @param {{ kind: 'meal' | 'leftover', meal: Meal }} entry
+ * @returns {string}
+ */
+export function entryName(entry) {
+  return entry.kind === 'leftover' ? entry.meal.recipeName.replace(/ \(\+ demain midi\)$/, '') : entry.meal.recipeName;
+}
+
 /** Nom de chaque repas, avec majuscule (titres : « Déjeuner »). */
 export const SLOT_LABELS = new Map(SLOTS.map((s) => [s.id, s.label]));
 

@@ -52,14 +52,20 @@ export async function renderCoach(el, params) {
  * Bloc « Programme de mon coach » de l'ecran Mon programme : repas, consignes, actions.
  * @param {CoachPlan} plan
  * @param {import('../domain/nutrition/program.js').Program} program
+ * @param {boolean} lunchBox   Le diner sert aussi le dejeuner du lendemain (dernier choix enregistre)
  * @returns {string}
  */
-export function coachBlockHtml(plan, program) {
+export function coachBlockHtml(plan, program, lunchBox) {
   const est = coachEstimates(plan);
   const sportMeal = plan.meals.find((m) => m.sportDaysOnly);
   return `
     <section class="coach card-block">
       <h2>Mes repas : programme de mon coach</h2>
+      ${
+        plan.meals.some((m) => m.slot === 'lunch') && plan.meals.some((m) => m.slot === 'dinner')
+          ? `<label class="check check--block"><input type="checkbox" data-lunch-box${lunchBox ? ' checked' : ''} /> <span><strong>Je ne rentre pas le midi</strong><span class="hint">Le dîner est cuisiné aussi pour la boîte du lendemain midi : mêmes aliments, aux quantités du déjeuner de votre coach. Une seule cuisson par jour ; en batch cooking, la quantité est simplement augmentée.</span></span></label>`
+          : ''
+      }
       <p><button type="button" class="button" data-action="adapt">Adapter ma semaine à ce programme</button></p>
       <p class="hint" data-adapt-status aria-live="polite">Les repas aux heures du programme sont composés avec ses quantités ; les repas verrouillés et les repas libres restent. Vous vérifiez avant de valider.</p>
       ${
@@ -104,7 +110,8 @@ export function bindCoachBlock(el, plan, rerender) {
     // Le week-end, on prepare la semaine suivante (comme « Planifier ma semaine »).
     const week = weekToPlan(toIsoDate(new Date()));
     const { choices } = await guidedDefaults();
-    const result = await planWeek(week, { ...choices, slots: plan.meals.map((m) => m.slot), followCoach: true, leftovers: false });
+    const lunchBox = /** @type {HTMLInputElement | null} */ (el.querySelector('[data-lunch-box]'))?.checked ?? false;
+    const result = await planWeek(week, { ...choices, slots: plan.meals.map((m) => m.slot), followCoach: true, leftovers: lunchBox });
     if (result.proposalId) {
       window.location.hash = `#/assistant/apercu/${week}/${result.proposalId}`;
       return;

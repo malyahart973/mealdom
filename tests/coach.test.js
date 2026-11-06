@@ -12,6 +12,7 @@ import {
   nextCheckIn,
   typicalDay,
   nextCoachVariant,
+  pairedId,
 } from '../src/domain/nutrition/coach.js';
 
 // Programme type (anonyme), tel qu'on le copie depuis un PDF : quantites seules sur leur ligne.
@@ -211,4 +212,52 @@ test('« Changer » un menu fixe : le menu suivant, puis plus rien quand tout a 
   assertEqual(next?.id, optionId('breakfast', 1));
   assertEqual(nextCoachVariant(plan, 'breakfast', optionId('breakfast', 1), new Set([optionId('breakfast', 0)]), all), null);
   assertEqual(nextCoachVariant(plan, 'breakfast', 'coach-breakfast-o1', new Set(), () => false), null);
+});
+
+test('Dîner + boîte de demain midi : une cuisson, quantités du dîner et du déjeuner du coach', () => {
+  const r = coachRecipe(pairedId('chicken', 'green_beans', 'rice_jasmine', 'rice_jasmine'), plan);
+  assertEqual([r?.name, r?.servings, r?.mealTypes], ['Poulet, haricots verts et riz thaï (+ demain midi)', 2, ['dinner']]);
+  // 170 g + 170 g de poulet ; 150 g + 200 g de légumes ; riz : 50 g + 100 g cuits (20 g + 35 g crus).
+  assertEqual(r?.ingredients.map((l) => `${l.ingredientId}:${l.quantity}`), ['chicken:340', 'green_beans:350', 'rice_jasmine:55', 'rapeseed_oil:1']);
+  const steps = r?.methods[0].steps ?? [];
+  assertEqual(steps.some((x) => x.startsWith('Ce soir : servir 170 g de poulet, 150 à 200 g de haricots verts et 50 g de riz thaï cuit')), true);
+  assertEqual(steps.some((x) => x.startsWith('Boîte de demain midi : 170 g de poulet, 200 g de haricots verts et 100 g de riz thaï cuit')), true);
+  // Aliment absent du déjeuner, ou féculent différent du dîner : pas de boîte.
+  assertEqual([coachRecipe(pairedId('chicken', 'green_beans', 'rice_jasmine', 'quinoa'), plan), coachRecipe('coach-dinner-a-chicken-green_beans-rice_jasmine-x', plan)], [null, null]);
+});
+
+const WEEK = ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08'];
+/** @param {Partial<import('../src/domain/planning/planning.js').Meal>} m */
+const meal = (m) => /** @type {import('../src/domain/planning/planning.js').Meal} */ ({ id: 'x', date: WEEK[0], slot: 'lunch', recipeId: 'r', recipeName: 'R', attendees: [], guests: 0, nextLunch: null, locked: false, ...m });
+
+test('Restes avec le programme du coach : chaque dîner sert la boîte du lendemain, plus de déjeuner à cuisiner', () => {
+  const res = planCoachWeek(plan, { days: WEEK, slots: ['lunch', 'dinner'], meals: [], redo: false, sportDays: new Set(), allowed: () => true, leftovers: true });
+  const lunches = res.picks.filter((p) => p.slot === 'lunch').map((p) => p.date);
+  const dinners = res.picks.filter((p) => p.slot === 'dinner');
+  // Seul le lundi midi est cuisiné (pas de dîner la veille) ; les 7 dîners ont leur boîte.
+  assertEqual([lunches, dinners.length, dinners.every((d) => d.nextLunch && d.recipe.id.includes('-plus-'))], [[WEEK[0]], 7, true]);
+});
+
+test('Restes avec le coach : un déjeuner déjà prévu est retiré, un déjeuner verrouillé reste', () => {
+  const meals = [
+    meal({ id: 'planned', date: WEEK[2], slot: 'lunch', recipeId: 'coach-lunch-a-chicken-broccoli-quinoa' }),
+    meal({ id: 'locked', date: WEEK[4], slot: 'lunch', recipeId: 'chicken_colombo', locked: true }),
+    meal({ id: 'resto', date: WEEK[5], slot: 'lunch', recipeId: 'free' }),
+  ];
+  const res = planCoachWeek(plan, { days: WEEK, slots: ['lunch', 'dinner'], meals, redo: false, sportDays: new Set(), allowed: () => true, leftovers: true });
+  const box = (/** @type {string} */ date) => res.picks.find((p) => p.date === date && p.slot === 'dinner')?.nextLunch ?? false;
+  assertEqual(res.removals, ['planned']);
+  // Les dîners de la veille d'un déjeuner verrouillé ou libre n'ont pas de boîte.
+  assertEqual([box(WEEK[1]), box(WEEK[3]), box(WEEK[4])], [true, false, false]);
+});
+
+test('Restes avec le coach : sans la case cochée, rien ne change', () => {
+  const res = planCoachWeek(plan, { days: WEEK, slots: ['lunch', 'dinner'], meals: [], redo: false, sportDays: new Set(), allowed: () => true });
+  assertEqual([res.picks.filter((p) => p.slot === 'lunch').length, res.picks.some((p) => p.nextLunch)], [7, false]);
+});
+
+test('« Changer » un dîner avec boîte : la variante garde la boîte', () => {
+  const current = pairedId('chicken', 'green_beans', 'rice_jasmine', 'rice_jasmine');
+  const next = nextCoachVariant(plan, 'dinner', current, new Set(), () => true);
+  assertEqual([next?.id.includes('-plus-'), next?.id.includes('-chicken-'), next?.servings], [true, false, 2]);
 });

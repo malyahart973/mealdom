@@ -3,7 +3,7 @@ import { escapeHtml } from '../utils/html.js';
 import { exportData, isReminderDue } from '../services/backupService.js';
 import { getHousehold } from '../services/householdService.js';
 import { getMeals } from '../services/planningService.js';
-import { SLOTS, plannedEntries, slotKey, mealPortionsFor } from '../domain/planning/planning.js';
+import { SLOTS, plannedEntries, slotKey, mealPortionsFor, entryName } from '../domain/planning/planning.js';
 import { toIsoDate, addDays } from '../domain/planning/dates.js';
 import { programSummary, getWeights, getMeasurements, saveWeight, saveMeasurement } from '../services/programService.js';
 import { parseKg, sortEntries } from '../domain/nutrition/weight.js';
@@ -71,7 +71,7 @@ export async function renderHome(el) {
       <p class="hero__date">${escapeHtml(today)}</p>
       ${
         featured?.entry
-          ? `<h1 class="hero__title">${escapeHtml(momentLabels[featured.slot.id] ?? featured.slot.label)} : ${escapeHtml(featured.entry.meal.recipeName)}</h1>
+          ? `<h1 class="hero__title">${escapeHtml(momentLabels[featured.slot.id] ?? featured.slot.label)} : ${escapeHtml(entryName(featured.entry))}</h1>
             <p class="hero__chips">
               ${featuredRecipe ? `<span class="hero__chip hero__chip--accent">${escapeHtml(formatMinutes(totalMinutes(featuredRecipe)))}</span>` : ''}
               <span class="hero__chip">${escapeHtml(detailOf(featured))}</span>
@@ -87,7 +87,7 @@ export async function renderHome(el) {
             <ul class="today__meals">${others
               .map(
                 (x) => `<li><span class="today__slot">${escapeHtml(x.slot.label)}</span>
-                  <a href="#/recettes/${encodeURIComponent(x.entry?.meal.recipeId ?? '')}">${escapeHtml(x.entry?.meal.recipeName ?? '')}</a>
+                  <a href="#/recettes/${encodeURIComponent(x.entry?.meal.recipeId ?? '')}">${escapeHtml(x.entry ? entryName(x.entry) : '')}</a>
                   <span class="hint">${escapeHtml(detailOf(x))}</span></li>`,
               )
               .join('')}</ul>
